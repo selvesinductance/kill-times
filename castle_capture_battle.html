@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三色戦記 — CMY城取り合戦シミュレーション</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1319;
+    --panel: #161c25;
+    --panel-2: #131820;
+    --line: #29323f;
+    --text: #e9edf3;
+    --muted: #8b96a6;
+    --magenta: #ef4fbe;
+    --magenta-dark: #93227a;
+    --yellow: #eec21a;
+    --yellow-dark: #8f7407;
+    --cyan: #23c4dc;
+    --cyan-dark: #0e7284;
+    --water: rgba(63, 132, 214, 0.42);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 28px 16px 48px;
+  }
+
+  .wrap { width: 100%; max-width: 920px; }
+
+  /* ---- header ---- */
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .logo {
+    display: inline-flex;
+    gap: 3px;
+    align-self: center;
+  }
+  .logo span { width: 12px; height: 12px; display: block; }
+  .logo span:nth-child(1) { background: var(--magenta); }
+  .logo span:nth-child(2) { background: var(--yellow); margin-top: 5px; }
+  .logo span:nth-child(3) { background: var(--cyan); }
+  h1 {
+    font-family: 'DotGothic16', 'Hiragino Kaku Gothic ProN', sans-serif;
+    font-size: clamp(26px, 4.5vw, 34px);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ---- scoreboard ---- */
+  .scoreboard {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .nation {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: border-color 0.4s ease, box-shadow 0.4s ease;
+  }
+  .nation.leader { border-color: var(--nation-color); box-shadow: 0 0 14px -6px var(--nation-color); }
+  .nation-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    color: var(--nation-color);
+    margin-bottom: 6px;
+  }
+  .nation-name::before {
+    content: '';
+    width: 10px; height: 10px;
+    background: var(--nation-color);
+    flex-shrink: 0;
+  }
+  .nation .stats {
+    display: flex;
+    gap: 16px;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 15px;
+  }
+  .nation .stats b { font-size: 22px; font-weight: 400; }
+  .nation .stats .label { color: var(--muted); font-size: 12px; margin-right: 4px; }
+  .nation.dead { opacity: 0.35; }
+
+  #nation0 { --nation-color: var(--magenta); }
+  #nation1 { --nation-color: var(--yellow); }
+  #nation2 { --nation-color: var(--cyan); }
+
+  /* ---- battlefield ---- */
+  .battlefield {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 14px;
+  }
+  canvas { width: 100%; display: block; border-radius: 6px; }
+
+  /* ---- controls ---- */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  button {
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 18px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  button:hover { background: #1d2530; border-color: #3a4554; }
+  button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  #toggleBtn { min-width: 108px; }
+  .speed-group { display: flex; align-items: center; gap: 8px; }
+  .speed-group label { color: var(--muted); font-size: 13px; }
+  input[type="range"] { width: 130px; accent-color: var(--cyan); }
+  input[type="range"]:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+  #status {
+    margin-left: auto;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    min-height: 1.4em;
+  }
+
+  /* ---- rules footer ---- */
+  .rules {
+    margin-top: 26px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.9;
+  }
+  .rules h2 {
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  @media (max-width: 560px) {
+    .scoreboard { grid-template-columns: 1fr; }
+    #status { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="logo" aria-hidden="true"><span></span><span></span><span></span></span>
+    <h1>三色戦記</h1>
+    <span class="subtitle">マゼンタ・イエロー・シアン 城取り合戦シミュレーション</span>
+  </header>
+
+  <div class="scoreboard">
+    <div class="nation" id="nation0">
+      <div class="nation-name">マゼンタ国</div>
+      <div class="stats">
+        <span><span class="label">城</span><b id="cas0">1</b></span>
+        <span><span class="label">兵士</span><b id="cnt0">0</b></span>
+      </div>
+    </div>
+    <div class="nation" id="nation1">
+      <div class="nation-name">イエロー国</div>
+      <div class="stats">
+        <span><span class="label">城</span><b id="cas1">1</b></span>
+        <span><span class="label">兵士</span><b id="cnt1">0</b></span>
+      </div>
+    </div>
+    <div class="nation" id="nation2">
+      <div class="nation-name">シアン国</div>
+      <div class="stats">
+        <span><span class="label">城</span><b id="cas2">1</b></span>
+        <span><span class="label">兵士</span><b id="cnt2">0</b></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="battlefield">
+    <canvas id="field"></canvas>
+  </div>
+
+  <div class="controls">
+    <button id="toggleBtn">▶ 開始</button>
+    <button id="resetBtn">リセット</button>
+    <div class="speed-group">
+      <label for="speed">速度</label>
+      <input type="range" id="speed" min="1" max="10" step="1" value="5">
+    </div>
+    <span id="status" role="status"></span>
+  </div>
+
+  <div class="rules">
+    <h2>ルール</h2>
+    3つの国が城(HP100)と兵士を持って戦います。兵士はマス目に沿って最も近い敵または城へ進軍します。敵城のHPを0にするとその城を占領(HP20から回復)。<br>
+    HP満タンの城は1体/6ティックで兵士を召喚し、回復中の城は召喚頻度が半分(1体/12ティック)になります。城はHP1/ティックで自然回復します。<br>
+    すべての城を失った国は滅亡し、最後に残った国の勝利です。
+  </div>
+</div>
+
+<script>
+const GW = 50, GH = 25, CELL = 13;
+const W = GW * CELL, H = GH * CELL;
+const canvas = document.getElementById('field');
+const ctx = canvas.getContext('2d');
+canvas.width = W * 2; canvas.height = H * 2;
+canvas.style.aspectRatio = W + '/' + H;
+ctx.scale(2, 2);
+
+const css = getComputedStyle(document.documentElement);
+const TEAMS = [
+  { name: 'マゼンタ国', color: css.getPropertyValue('--magenta').trim(), dark: css.getPropertyValue('--magenta-dark').trim() },
+  { name: 'イエロー国', color: css.getPropertyValue('--yellow').trim(), dark: css.getPropertyValue('--yellow-dark').trim() },
+  { name: 'シアン国',   color: css.getPropertyValue('--cyan').trim(), dark: css.getPropertyValue('--cyan-dark').trim() }
+];
+const NEUTRAL = { color: '#77828f', dark: '#454e59' };
+const WATER_COLOR = css.getPropertyValue('--water').trim();
+
+const CASTLE_HP = 100, CAPTURE_HP = 20, SOLDIER_HP = 1, DMG_S = 1, DMG_C = 1, REGEN = 1;
+const SPAWN_EVERY = 6, SPAWN_EVERY_DAMAGED = 12;
+const MAX_SOLDIERS = 80, INITIAL_SOLDIERS = 14, NEUTRAL_CASTLES = 6;
+const RESTART_DELAY = 3000, PREVIEW_DELAY = 1000;
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+let castles = [], soldiers = [], occ = {}, water = new Set();
+let running = false, over = false;
+let eliminated = [false, false, false];
+let timer = null, restartTO = null;
+
+const $ = id => document.getElementById(id);
+const toggleBtn = $('toggleBtn'), resetBtn = $('resetBtn'), statusEl = $('status'), speedEl = $('speed');
+
+function key(x, y) { return x + ',' + y; }
+function teamColor(t) { return t === -1 ? NEUTRAL : TEAMS[t]; }
+
+function placeCastles() {
+  castles = [];
+  const total = 3 + NEUTRAL_CASTLES;
+  let tries = 0;
+  while (castles.length < total && tries < 10000) {
+    tries++;
+    const x = 2 + Math.floor(Math.random() * (GW - 6));
+    const y = 2 + Math.floor(Math.random() * (GH - 6));
+    let ok = true;
+    for (const c of castles) {
+      if (Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) < 9) { ok = false; break; }
+    }
+    if (!ok) continue;
+    const idx = castles.length;
+    castles.push({
+      team: idx < 3 ? idx : -1,
+      x, y,
+      hp: CASTLE_HP, maxHp: CASTLE_HP,
+      spawnT: 0, lastAttacker: -1
+    });
+  }
+}
+
+function distToCastle(x, y, c) {
+  const dx = Math.max(c.x - x, x - (c.x + 1), 0);
+  const dy = Math.max(c.y - y, y - (c.y + 1), 0);
+  return Math.max(dx, dy);
+}
+
+function waterAllowed(x, y) {
+  if (x < 0 || y < 0 || x >= GW || y >= GH) return false;
+  for (const c of castles) if (distToCastle(x, y, c) < 2) return false;
+  return true;
+}
+
+function ellipseCells(cx, cy, rx, ry) {
+  const cells = [];
+  for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
+      const nx = (x - cx) / rx, ny = (y - cy) / ry;
+      if (nx * nx + ny * ny <= 1) cells.push([x, y]);
+    }
+  }
+  return cells;
+}
+
+function makePonds() {
+  water = new Set();
+  const count = Math.floor(Math.random() * 3);
+  for (let p = 0; p < count; p++) {
+    let placed = false;
+    for (let t = 0; t < 600 && !placed; t++) {
+      const shrink = 1 - 0.45 * (t / 600);
+      const rx = (4.5 + Math.random() * 4) * shrink;
+      const ry = (3 + Math.random() * 2.2) * shrink;
+      const cx = rx + 1 + Math.random() * Math.max(1, GW - 2 * rx - 2);
+      const cy = ry + 1 + Math.random() * Math.max(1, GH - 2 * ry - 2);
+      const cells = ellipseCells(cx, cy, rx, ry);
+      if (cells.length && cells.every(([x, y]) => waterAllowed(x, y) && !water.has(key(x, y)))) {
+        for (const [x, y] of cells) water.add(key(x, y));
+        placed = true;
+      }
+    }
+  }
+}
+
+function castleCells(c) {
+  return [[c.x, c.y], [c.x + 1, c.y], [c.x, c.y + 1], [c.x + 1, c.y + 1]];
+}
+
+function cellFree(x, y) {
+  if (x < 0 || y < 0 || x >= GW || y >= GH) return false;
+  if (water.has(key(x, y))) return false;
+  if (occ[key(x, y)]) return false;
+  return true;
+}
+
+function spawnInitial(c) {
+  const spots = [];
+  for (let dx = -3; dx <= 4; dx++) for (let dy = -3; dy <= 4; dy++) {
+    const x = c.x + dx, y = c.y + dy;
+    if (cellFree(x, y)) spots.push([x, y]);
+  }
+  for (let i = spots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [spots[i], spots[j]] = [spots[j], spots[i]];
+  }
+  for (let i = 0; i < Math.min(INITIAL_SOLDIERS, spots.length); i++) {
+    const [x, y] = spots[i];
+    const s = { team: c.team, x, y, hp: SOLDIER_HP };
+    soldiers.push(s);
+    occ[key(x, y)] = s;
+  }
+}
+
+function reset() {
+  clearRestart();
+  running = false; over = false;
+  eliminated = [false, false, false];
+  soldiers = [];
+  placeCastles();
+  makePonds();
+  occ = {};
+  for (const c of castles) for (const [cx, cy] of castleCells(c)) occ[key(cx, cy)] = 'castle';
+  for (const c of castles) if (c.team >= 0) spawnInitial(c);
+  statusEl.textContent = '';
+  setToggle();
+  updatePanel();
+}
+
+function trySpawn(c) {
+  const teamCount = soldiers.filter(s => s.team === c.team).length;
+  if (teamCount >= MAX_SOLDIERS) return;
+  const spots = [];
+  for (let dx = -1; dx <= 2; dx++) for (let dy = -1; dy <= 2; dy++) {
+    const x = c.x + dx, y = c.y + dy;
+    if (cellFree(x, y)) spots.push([x, y]);
+  }
+  if (!spots.length) return;
+  const [x, y] = spots[Math.floor(Math.random() * spots.length)];
+  const s = { team: c.team, x, y, hp: SOLDIER_HP };
+  soldiers.push(s);
+  occ[key(x, y)] = s;
+}
+
+function nearestTarget(s) {
+  let best = null, bd = Infinity;
+  for (const o of soldiers) {
+    if (o.team === s.team || o.hp <= 0) continue;
+    const d = Math.abs(o.x - s.x) + Math.abs(o.y - s.y);
+    if (d < bd) { bd = d; best = { type: 'soldier', obj: o, x: o.x, y: o.y }; }
+  }
+  for (const c of castles) {
+    if (c.team === s.team) continue;
+    for (const [cx, cy] of castleCells(c)) {
+      const d = Math.abs(cx - s.x) + Math.abs(cy - s.y);
+      if (d < bd) { bd = d; best = { type: 'castle', obj: c, x: cx, y: cy }; }
+    }
+  }
+  return best;
+}
+
+function adjacent(s, t) {
+  return Math.max(Math.abs(s.x - t.x), Math.abs(s.y - t.y)) <= 1;
+}
+
+function tryMove(s, tx, ty) {
+  const dx = tx - s.x, dy = ty - s.y;
+  const stepX = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+  const stepY = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+  const options = [];
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    if (stepX) options.push([stepX, 0]);
+    if (stepY) options.push([0, stepY]);
+  } else {
+    if (stepY) options.push([0, stepY]);
+    if (stepX) options.push([stepX, 0]);
+  }
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (let i = dirs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+  }
+  options.push(...dirs);
+  for (const [mx, my] of options) {
+    const nx = s.x + mx, ny = s.y + my;
+    if (!cellFree(nx, ny)) continue;
+    delete occ[key(s.x, s.y)];
+    s.x = nx; s.y = ny;
+    occ[key(nx, ny)] = s;
+    return;
+  }
+}
+
+function step() {
+  for (const c of castles) {
+    if (c.hp < c.maxHp) c.hp = Math.min(c.maxHp, c.hp + REGEN);
+    if (c.team < 0) continue;
+    c.spawnT++;
+    const interval = c.hp >= c.maxHp ? SPAWN_EVERY : SPAWN_EVERY_DAMAGED;
+    if (c.spawnT >= interval) { c.spawnT = 0; trySpawn(c); }
+  }
+  const order = soldiers.slice().sort(() => Math.random() - 0.5);
+  for (const s of order) {
+    if (s.hp <= 0) continue;
+    const t = nearestTarget(s);
+    if (!t) continue;
+    if (adjacent(s, t)) {
+      if (t.type === 'soldier') {
+        t.obj.hp -= DMG_S;
+      } else {
+        t.obj.hp -= DMG_C;
+        t.obj.lastAttacker = s.team;
+      }
+    } else {
+      tryMove(s, t.x, t.y);
+    }
+  }
+  for (const s of soldiers) if (s.hp <= 0) delete occ[key(s.x, s.y)];
+  soldiers = soldiers.filter(s => s.hp > 0);
+
+  for (const c of castles) {
+    if (c.hp <= 0 && c.lastAttacker >= 0) {
+      const newTeam = c.lastAttacker;
+      const wasNeutral = c.team === -1;
+      c.team = newTeam;
+      c.hp = CAPTURE_HP;
+      c.maxHp = CASTLE_HP;
+      c.spawnT = 0;
+      c.lastAttacker = -1;
+      statusEl.textContent = TEAMS[newTeam].name + 'が' + (wasNeutral ? '空き城' : '敵城') + 'を占領';
+    }
+  }
+
+  for (let t = 0; t < 3; t++) {
+    if (eliminated[t]) continue;
+    const owns = castles.some(c => c.team === t);
+    if (!owns) {
+      eliminated[t] = true;
+      for (const s of soldiers) if (s.team === t) delete occ[key(s.x, s.y)];
+      soldiers = soldiers.filter(s => s.team !== t);
+      statusEl.textContent = TEAMS[t].name + 'が滅亡';
+    }
+  }
+
+  const alive = [0, 1, 2].filter(t => !eliminated[t]);
+  if (alive.length <= 1 && !over) {
+    over = true; running = false; setToggle(); stopTimer();
+    const msg = alive.length ? TEAMS[alive[0]].name + 'の勝利' : '全滅';
+    statusEl.textContent = msg + ' — 3秒後に再戦';
+    restartTO = setTimeout(() => {
+      reset();
+      statusEl.textContent = '開戦準備中…';
+      restartTO = setTimeout(() => {
+        statusEl.textContent = '';
+        running = true;
+        setToggle();
+        startTimer();
+      }, PREVIEW_DELAY);
+    }, RESTART_DELAY);
+  }
+  updatePanel();
+}
+
+function updatePanel() {
+  const castleCounts = [0, 1, 2].map(t => castles.filter(c => c.team === t).length);
+  const maxCastles = Math.max(...castleCounts);
+  for (let t = 0; t < 3; t++) {
+    $('cas' + t).textContent = castleCounts[t];
+    $('cnt' + t).textContent = soldiers.filter(s => s.team === t).length;
+    const card = $('nation' + t);
+    card.classList.toggle('leader', castleCounts[t] === maxCastles && castleCounts[t] > 0 && !eliminated[t]);
+    card.classList.toggle('dead', eliminated[t]);
+  }
+}
+
+function draw(now) {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#141922';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= GW; x++) { ctx.moveTo(x * CELL + 0.5, 0); ctx.lineTo(x * CELL + 0.5, H); }
+  for (let y = 0; y <= GH; y++) { ctx.moveTo(0, y * CELL + 0.5); ctx.lineTo(W, y * CELL + 0.5); }
+  ctx.stroke();
+
+  ctx.fillStyle = WATER_COLOR;
+  for (const w of water) {
+    const [x, y] = w.split(',').map(Number);
+    ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+  }
+
+  for (const s of soldiers) {
+    ctx.fillStyle = TEAMS[s.team].color;
+    ctx.fillRect(s.x * CELL + 2, s.y * CELL + 2, CELL - 4, CELL - 4);
+  }
+
+  const pulse = reducedMotion.matches ? 0.5 : (Math.sin(now / 320) + 1) / 2;
+  for (const c of castles) {
+    const col = teamColor(c.team);
+    const px = c.x * CELL, py = c.y * CELL, size = CELL * 2;
+    const full = c.hp >= c.maxHp;
+
+    if (full) {
+      ctx.save();
+      ctx.shadowColor = col.color;
+      ctx.shadowBlur = 4 + 4 * pulse;
+      ctx.fillStyle = col.color;
+      ctx.fillRect(px, py, size, size);
+      ctx.restore();
+      ctx.globalAlpha = 0.12 + 0.18 * pulse;
+      ctx.strokeStyle = col.color;
+      ctx.lineWidth = 1.5;
+      const o = 2.5 + 1.5 * pulse;
+      ctx.strokeRect(px - o, py - o, size + o * 2, size + o * 2);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillStyle = col.color;
+      ctx.fillRect(px, py, size, size);
+    }
+
+    ctx.strokeStyle = col.dark;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px + 1, py + 1, size - 2, size - 2);
+    ctx.fillStyle = col.dark;
+    ctx.fillRect(px + 5, py + 5, size - 10, size - 10);
+
+    if (!full) {
+      const ratio = Math.max(0, c.hp / c.maxHp);
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.fillRect(px, py - 6, size, 4);
+      ctx.fillStyle = col.color;
+      ctx.fillRect(px, py - 6, size * ratio, 4);
+    }
+  }
+}
+
+function render(now) {
+  draw(now || 0);
+  requestAnimationFrame(render);
+}
+
+function intervalMs() { return 320 - (Number(speedEl.value) * 28); }
+
+function startTimer() {
+  stopTimer();
+  timer = setInterval(() => { if (running) step(); }, intervalMs());
+}
+function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+function clearRestart() { if (restartTO) { clearTimeout(restartTO); restartTO = null; } }
+
+speedEl.addEventListener('input', () => { if (running) startTimer(); });
+
+function setToggle() {
+  toggleBtn.textContent = running ? '❚❚ 停止' : '▶ 開始';
+}
+
+toggleBtn.addEventListener('click', () => {
+  clearRestart();
+  if (over) {
+    reset();
+    running = true;
+    setToggle();
+    startTimer();
+    return;
+  }
+  running = !running;
+  setToggle();
+  if (running) startTimer(); else stopTimer();
+});
+resetBtn.addEventListener('click', () => { stopTimer(); reset(); });
+
+reset();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

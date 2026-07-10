@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#080510">
+<title>運命のマインスイーパー 〜生存編 v3.1〜</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💥</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700;800&family=Cinzel:wght@500;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg0:#080510;--gold:#f0cd72;--gold-dim:#9b8244;--magenta:#ff3b7b;
+    --cyan:#39f0cf;--violet:#9b6bff;--ink:#f4ecdd;--ink-dim:#a89bbf;
+    --tile-face:linear-gradient(150deg,#2a1748 0%,#1a0e30 100%);--tile-edge:#52306b;
+    --shadow:0 8px 24px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Zen Kaku Gothic New",sans-serif;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #34185c 0%, transparent 60%),
+      radial-gradient(900px 500px at 90% 110%, #3a0f3e 0%, transparent 55%),
+      radial-gradient(900px 500px at 5% 90%, #102047 0%, transparent 55%),
+      var(--bg0);
+    color:var(--ink);min-height:100vh;min-height:100dvh;display:flex;justify-content:center;
+    padding:18px 12px 40px;overflow-x:hidden;
+  }
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  button,.item,.cell{touch-action:manipulation;}
+  button:focus-visible,.cell:focus-visible,.item:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+  .wrap{width:100%;max-width:520px;position:relative;z-index:1;}
+
+  header{text-align:center;margin-bottom:14px;}
+  .kicker{font-family:"Cinzel",serif;letter-spacing:.42em;font-size:11px;color:var(--gold-dim);text-transform:uppercase;margin-bottom:6px;padding-left:.42em;}
+  h1{font-family:"Zen Kaku Gothic New",sans-serif;font-weight:900;font-size:clamp(26px,7.4vw,39px);letter-spacing:.015em;margin:0;line-height:1.12;
+    background:linear-gradient(180deg,#fff4d2 0%,var(--gold) 45%,#b9842f 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 2px 0 rgba(0,0,0,.4));}
+  .sub{font-size:12px;color:var(--ink-dim);margin-top:8px;line-height:1.65;}
+  .sub b{color:var(--magenta);} .sub .g{color:var(--gold);}
+
+  .hud{display:flex;align-items:center;gap:10px;justify-content:space-between;
+    background:linear-gradient(160deg,rgba(40,22,70,.85),rgba(20,10,38,.85));border:1px solid rgba(240,205,114,.25);
+    border-radius:16px;padding:12px 14px;margin-bottom:12px;box-shadow:var(--shadow);backdrop-filter:blur(4px);}
+  .hud .block{flex:1;min-width:0;} .hud .block.wide{flex:1.7;} .hud .block.slim{flex:.65;}
+  .hud .label{font-family:"Cinzel",serif;font-size:9.5px;letter-spacing:.22em;color:var(--gold-dim);text-transform:uppercase;margin-bottom:5px;white-space:nowrap;}
+  .hearts{font-size:19px;letter-spacing:1px;line-height:1.1;}
+  .hearts .dead{filter:grayscale(1) brightness(.4);opacity:.55;}
+  .armor{font-size:12px;color:var(--cyan);margin-top:3px;min-height:16px;line-height:1.3;}
+  .minesnum{font-size:15px;font-weight:900;line-height:1.3;} .minesnum b{color:var(--magenta);}
+  .meterwrap{height:14px;border-radius:8px;background:#1a0e2e;overflow:hidden;border:1px solid rgba(240,205,114,.2);}
+  .meter{height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,var(--cyan),var(--violet));
+    transition:width .35s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 12px rgba(57,240,207,.5);}
+  .meter-txt{font-size:11px;color:var(--ink-dim);margin-top:4px;text-align:right;} .meter-txt b{color:var(--cyan);}
+
+  .banner{display:none;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;
+    background:linear-gradient(160deg,rgba(80,20,50,.9),rgba(40,10,30,.9));border:1px solid var(--magenta);
+    border-radius:14px;padding:10px 14px;box-shadow:0 0 18px rgba(255,59,123,.35);animation:bpulse 1.1s infinite;}
+  .banner.show{display:flex;}
+  @keyframes bpulse{0%,100%{box-shadow:0 0 12px rgba(255,59,123,.3);}50%{box-shadow:0 0 22px rgba(255,59,123,.6);}}
+  .banner .bt{font-weight:900;font-size:13px;} .banner .bt small{display:block;font-weight:500;font-size:10.5px;color:var(--ink-dim);}
+  .banner button{border:none;background:rgba(255,255,255,.12);color:var(--ink);font-family:"Zen Kaku Gothic New";font-weight:700;
+    font-size:11px;padding:6px 12px;border-radius:18px;cursor:pointer;flex-shrink:0;}
+
+  .board-frame{position:relative;border-radius:18px;padding:10px;container-type:inline-size;
+    background:linear-gradient(160deg,rgba(45,24,80,.6),rgba(12,7,24,.6));border:1px solid rgba(240,205,114,.28);
+    box-shadow:var(--shadow), inset 0 0 40px rgba(155,107,255,.08);}
+  .board-frame.aiming{border-color:var(--magenta);box-shadow:var(--shadow),inset 0 0 40px rgba(255,59,123,.18);}
+  .board-frame.boom{animation:frameshake .45s ease;}
+  @keyframes frameshake{0%,100%{transform:translate(0,0);}15%{transform:translate(-7px,2px);}30%{transform:translate(6px,-3px);}
+    45%{transform:translate(-5px,-2px);}60%{transform:translate(4px,2px);}75%{transform:translate(-2px,1px);}}
+  .board{display:grid;gap:5px;width:100%;}
+  .cell{aspect-ratio:1/1;border:none;border-radius:9px;cursor:pointer;position:relative;padding:0;
+    font-family:"Cinzel",serif;font-weight:700;
+    font-size:clamp(12px,3.4vw,18px);font-size:clamp(13px,5cqw,26px);
+    display:flex;align-items:center;justify-content:center;background:var(--tile-face);
+    box-shadow:inset 0 0 0 1px var(--tile-edge), 0 3px 0 #0c0719, 0 5px 8px rgba(0,0,0,.4);
+    color:var(--ink);transition:transform .08s, box-shadow .15s;user-select:none;-webkit-user-select:none;overflow:hidden;}
+  .cell::before{content:"";position:absolute;inset:0;border-radius:9px;
+    background:radial-gradient(circle at 50% 30%, rgba(255,255,255,.10), transparent 60%);opacity:.6;pointer-events:none;}
+  .cell .glyph{position:relative;z-index:1;opacity:.3;font-size:.85em;}
+  .cell:not(.revealed):active{transform:translateY(2px);}
+  @media(hover:hover){
+    .cell:not(.revealed):hover{box-shadow:inset 0 0 0 1px var(--gold),0 3px 0 #0c0719,0 5px 14px rgba(240,205,114,.25);}
+  }
+  .board-frame.aiming .cell:not(.revealed){cursor:crosshair;}
+  .board-frame.aiming .cell.aim-prev:not(.revealed){
+    box-shadow:inset 0 0 0 2px var(--magenta),0 0 16px rgba(255,59,123,.55)!important;transform:translateY(-1px);}
+
+  .cell.revealed{cursor:default;animation:flip .35s ease;}
+  @keyframes flip{0%{transform:rotateX(80deg);opacity:.2;}100%{transform:rotateX(0);opacity:1;}}
+  .cell.safe{background:linear-gradient(160deg,#11362f,#0a221d);box-shadow:inset 0 0 0 1px rgba(57,240,207,.4), inset 0 0 14px rgba(57,240,207,.12);color:#6ef3d6;}
+  .cell.safe.honest{color:var(--gold);box-shadow:inset 0 0 0 1px rgba(240,205,114,.65), inset 0 0 14px rgba(240,205,114,.22);}
+  .cell .corner{position:absolute;top:1px;left:3px;font-size:9px;line-height:1;z-index:2;color:var(--gold);font-family:"Zen Kaku Gothic New";opacity:.9;}
+  .cell.item{background:linear-gradient(160deg,#3c2a12,#241606);box-shadow:inset 0 0 0 1px rgba(240,205,114,.55), inset 0 0 16px rgba(240,205,114,.2);font-size:1.2em;animation:flip .35s ease, pop .4s ease;}
+  @keyframes pop{50%{transform:scale(1.18);}}
+  .cell.bomb{background:linear-gradient(160deg,#4a0d22,#2a0411);box-shadow:inset 0 0 0 1px rgba(255,59,123,.6), inset 0 0 18px rgba(255,59,123,.3);font-size:1.3em;animation:flip .3s ease, shake .4s ease;}
+  .cell.destroyed{background:linear-gradient(160deg,#0c2a3a,#08161f);box-shadow:inset 0 0 0 1px rgba(57,200,240,.5), inset 0 0 14px rgba(57,200,240,.18);font-size:1.15em;opacity:.85;}
+  .cell.catsafe{background:linear-gradient(160deg,#11362f,#0a221d);box-shadow:inset 0 0 0 1px rgba(57,240,207,.4), inset 0 0 14px rgba(57,240,207,.12);font-size:1.15em;animation:flip .35s ease;}
+  .cell.catsafe::after{content:"🦄";position:absolute;top:1px;left:3px;font-size:10px;opacity:.95;}
+  @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-5px);}40%{transform:translateX(5px);}60%{transform:translateX(-3px);}80%{transform:translateX(3px);}}
+  .cell .hint{position:absolute;top:3px;right:4px;font-size:10px;z-index:2;font-family:"Zen Kaku Gothic New";line-height:1;animation:fadein .3s ease;}
+  .hint.danger{color:var(--magenta);text-shadow:0 0 6px rgba(255,59,123,.8);}
+  .hint.safe{color:var(--cyan);text-shadow:0 0 6px rgba(57,240,207,.8);}
+  @keyframes fadein{from{opacity:0;transform:scale(.4);}to{opacity:1;transform:scale(1);}}
+  .cell.lucky{box-shadow:inset 0 0 0 2px var(--gold),0 0 12px rgba(240,205,114,.5)!important;}
+
+  .inv-title{font-family:"Cinzel",serif;font-size:10px;letter-spacing:.28em;color:var(--gold-dim);text-transform:uppercase;
+    margin:16px 4px 8px;display:flex;justify-content:space-between;align-items:center;}
+  .inv-title .hintnote{color:var(--ink-dim);letter-spacing:.04em;font-family:"Zen Kaku Gothic New";text-transform:none;font-size:10px;}
+  .inv{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+  .item{position:relative;border:1px solid rgba(240,205,114,.25);background:linear-gradient(160deg,rgba(40,22,70,.7),rgba(18,9,34,.7));
+    border-radius:12px;padding:9px 5px 8px;cursor:pointer;text-align:center;transition:transform .1s,border-color .15s,box-shadow .15s;}
+  @media(hover:hover){
+    .item:not(.disabled):hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 6px 16px rgba(240,205,114,.18);}
+  }
+  .item .emoji{font-size:22px;line-height:1;}
+  .item .nm{font-size:10px;font-weight:700;margin-top:4px;color:var(--ink);line-height:1.2;}
+  .item .ds{font-size:8.5px;color:var(--ink-dim);margin-top:3px;line-height:1.3;min-height:34px;}
+  .item .tag{position:absolute;top:5px;left:5px;font-size:9px;color:var(--magenta);}
+  .item .count{position:absolute;top:-7px;right:-7px;background:var(--magenta);color:#fff;font-size:11px;font-weight:900;
+    min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 5px;
+    box-shadow:0 2px 6px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.3);}
+  .item.disabled{opacity:.3;cursor:not-allowed;filter:grayscale(.6);}
+  .item.armed{border-color:var(--cyan);animation:armpulse 1.2s infinite;}
+  .item.aiming{border-color:var(--magenta);animation:armpulse 1s infinite;}
+  @keyframes armpulse{0%,100%{box-shadow:0 0 8px rgba(57,240,207,.3);}50%{box-shadow:0 0 18px rgba(57,240,207,.6);}}
+
+  .toast-zone{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:90%;max-width:420px;}
+  .toast{background:linear-gradient(160deg,rgba(40,22,70,.96),rgba(20,10,38,.96));border:1px solid rgba(240,205,114,.4);color:var(--ink);
+    padding:10px 16px;border-radius:30px;font-size:13px;font-weight:700;box-shadow:var(--shadow);text-align:center;
+    animation:toastin .3s ease, toastout .3s ease 2.2s forwards;}
+  @keyframes toastin{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes toastout{to{opacity:0;transform:translateY(-10px);}}
+
+  .controls{display:flex;gap:8px;margin-top:18px;}
+  .seg{flex:1;display:flex;background:#160b29;border-radius:12px;padding:4px;border:1px solid rgba(240,205,114,.2);}
+  .seg button{flex:1;border:none;background:transparent;color:var(--ink-dim);font-family:"Zen Kaku Gothic New";font-weight:700;font-size:12px;padding:7px 0;border-radius:9px;cursor:pointer;transition:.15s;}
+  .seg button.on{background:linear-gradient(160deg,var(--gold),#b9842f);color:#22130a;box-shadow:0 2px 8px rgba(240,205,114,.35);}
+  .btn-new{border:none;border-radius:12px;padding:0 18px;cursor:pointer;font-family:"Shippori Mincho B1",serif;font-weight:700;font-size:13.5px;letter-spacing:.08em;
+    background:linear-gradient(160deg,var(--magenta),#c01a52);color:#fff;box-shadow:0 4px 14px rgba(255,59,123,.4);transition:transform .1s;}
+  .btn-new:active{transform:scale(.96);}
+
+  .rules{margin-top:22px;background:linear-gradient(160deg,rgba(30,16,54,.55),rgba(14,8,26,.55));
+    border:1px solid rgba(240,205,114,.18);border-radius:16px;padding:16px 18px 15px;}
+  .rules-title{font-family:"Cinzel",serif;font-size:10px;letter-spacing:.28em;color:var(--gold-dim);text-transform:uppercase;margin-bottom:11px;}
+  .rules ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;}
+  .rules li{font-size:12px;line-height:1.75;color:var(--ink-dim);padding-left:27px;position:relative;}
+  .rules li .ic{position:absolute;left:0;top:2px;font-size:14px;line-height:1;}
+  .rules b{color:var(--ink);} .rules .g{color:var(--gold);} .rules .m{color:var(--magenta);} .rules .c{color:var(--cyan);}
+
+  .overlay{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%,rgba(20,10,38,.7),rgba(5,3,10,.94));backdrop-filter:blur(6px);padding:24px;}
+  .overlay.show{display:flex;animation:fadein .4s ease;}
+  .panel{max-width:380px;width:100%;text-align:center;background:linear-gradient(165deg,rgba(45,24,80,.95),rgba(16,8,30,.97));
+    border:1px solid rgba(240,205,114,.4);border-radius:22px;padding:30px 24px;box-shadow:var(--shadow),inset 0 0 50px rgba(155,107,255,.1);animation:pop .5s ease;}
+  .panel .big{font-size:54px;line-height:1;margin-bottom:8px;}
+  .panel h2{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:30px;letter-spacing:.04em;margin:6px 0;background:linear-gradient(180deg,#fff4d2,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .panel.lose h2{background:linear-gradient(180deg,#ffd2dd,var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .panel p{color:var(--ink-dim);font-size:13px;line-height:1.7;margin:10px 0 14px;} .panel p b{color:var(--gold);}
+  .revive{border:none;border-radius:12px;padding:11px 22px;margin:0 0 12px;cursor:pointer;font-family:"Shippori Mincho B1",serif;font-weight:700;font-size:13.5px;letter-spacing:.08em;
+    background:linear-gradient(160deg,#4ad6c2,#1f9e8c);color:#06231f;box-shadow:0 4px 14px rgba(74,214,194,.4);transition:transform .1s;display:none;}
+  .revive.show{display:inline-block;} .revive:active{transform:scale(.96);}
+  .revive.fire{background:linear-gradient(160deg,#ff8a4a,#d23a1f);color:#2a0d05;box-shadow:0 4px 14px rgba(255,90,40,.4);}
+
+  /* ===== PC・タブレット横向けレイアウト ===== */
+  @media (min-width: 980px){
+    body{padding:36px 28px 56px;align-items:flex-start;}
+    .wrap{
+      max-width:1040px;
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 352px;
+      grid-template-areas:
+        "header header"
+        "board  hud"
+        "board  inv"
+        "board  controls"
+        "board  ."
+        "footer footer";
+      grid-template-rows:auto auto auto auto 1fr auto;
+      column-gap:28px;
+    }
+    header{grid-area:header;margin-bottom:24px;}
+    h1{font-size:46px;}
+    .sub{font-size:13px;}
+    .board-zone{grid-area:board;}
+    .hud{grid-area:hud;margin-bottom:0;flex-wrap:wrap;row-gap:12px;}
+    .hud .block.wide{flex-basis:100%;}
+    .inv-block{grid-area:inv;}
+    .inv{grid-template-columns:repeat(2,1fr);gap:9px;}
+    .item{padding:11px 8px 10px;}
+    .item .emoji{font-size:26px;}
+    .item .nm{font-size:11.5px;}
+    .item .ds{font-size:10px;min-height:0;}
+    .controls{grid-area:controls;margin-top:18px;}
+    .btn-new{padding:0 22px;font-size:14px;}
+    .board-frame{padding:14px;border-radius:22px;}
+    .board{gap:7px;}
+    .cell{border-radius:11px;}
+    .rules{grid-area:footer;margin-top:28px;padding:18px 22px 17px;}
+    .rules ol{display:grid;grid-template-columns:1fr 1fr;gap:11px 30px;}
+    .rules li{font-size:12.5px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Luck 90% · Reckless Arsenal</div>
+    <h1>運命のマインスイーパー</h1>
+    <div class="sub">数字は<b>半分が本物・半分が嘘</b>。だが見分けはつかない。<br>強力な<span class="g">切り札</span>を使い、<span class="g">安全マス</span>をこじ開けろ。</div>
+  </header>
+
+  <div class="hud">
+    <div class="block">
+      <div class="label">Life</div>
+      <div class="hearts" id="hearts"></div>
+      <div class="armor" id="armor"></div>
+    </div>
+    <div class="block slim">
+      <div class="label">Mines</div>
+      <div class="minesnum">💣 <b id="mines">0</b></div>
+    </div>
+    <div class="block wide">
+      <div class="label">Escape Meter ｜ 脱出ゲージ</div>
+      <div class="meterwrap"><div class="meter" id="meter"></div></div>
+      <div class="meter-txt"><b id="prog">0</b> / <span id="goal">0</span> マス開けて脱出</div>
+    </div>
+  </div>
+
+  <div class="board-zone">
+    <div class="banner" id="banner">
+      <div class="bt" id="bannerText">🎯 着弾点をタップ<small></small></div>
+      <button id="cancelAim">やめる</button>
+    </div>
+    <div class="board-frame" id="frame">
+      <div class="board" id="board"></div>
+    </div>
+  </div>
+
+  <div class="inv-block">
+    <div class="inv-title"><span>Arsenal ｜ 切り札</span><span class="hintnote">タップで発動・🎯は狙って撃つ</span></div>
+    <div class="inv" id="inv"></div>
+  </div>
+
+  <div class="controls">
+    <div class="seg" id="diffSeg">
+      <button data-d="normal" class="on">普通</button>
+      <button data-d="hard">ハード</button>
+      <button data-d="hell">地獄</button>
+    </div>
+    <button class="btn-new" id="newBtn">新しい運命</button>
+  </div>
+
+  <footer class="rules">
+    <div class="rules-title">How to Play ｜ 遊びかた</div>
+    <ol>
+      <li><span class="ic">🖱️</span><b>マスを開ける</b> — 盤面のマスをタップすると開く。中身は<span class="c">安全な数字マス</span>か<span class="m">💥爆弾</span>のどちらか。どこから開けてもOK。</li>
+      <li><span class="ic">❤️</span><b>爆弾を踏んでも即終了ではない</b> — ライフが1減るだけ。ただし❤️がすべて尽きたらゲームオーバー。</li>
+      <li><span class="ic">🏁</span><b>勝利条件</b> — 安全なマスを規定数(脱出ゲージの右の数字)開ければ<span class="g">脱出成功</span>。爆弾を全部当てる必要はない。</li>
+      <li><span class="ic">🔢</span><b>数字はヒント…のはず</b> — 本来マインスイーパーの数字は「そのマスの周囲8マスにある爆弾の数」。だがこの盤面では<span class="m">半分が嘘の数字</span>。<span class="g">金色(✓付き)の数字だけは本物</span>と保証される。</li>
+      <li><span class="ic">🃏</span><b>切り札</b> — マスを開くと手に入ることがある。下のカードをタップで発動。<span class="m">🎯付き</span>は発動したあと、盤面の狙いたいマスをタップして撃つ(もう一度カードを押せばキャンセル)。</li>
+      <li><span class="ic">🪬</span><b>占い印</b> — 「神の透視」を使うと未開封マスに予想マークが付く。<span class="m">💀=爆弾かも</span>、<span class="c">○=安全かも</span>。ただし2割は外れるので過信は禁物。</li>
+    </ol>
+  </footer>
+</div>
+
+<div class="toast-zone" id="toasts"></div>
+
+<div class="overlay" id="overlay">
+  <div class="panel" id="panel">
+    <div class="big" id="ovIcon">🎉</div>
+    <h2 id="ovTitle"></h2>
+    <p id="ovText"></p>
+    <button class="revive" id="reviveBtn">⏳ 夢の砂時計で蘇る</button>
+    <button class="revive fire" id="revivePhoenixBtn">🐦‍🔥 不死鳥で蘇る</button>
+    <button class="btn-new" id="ovBtn" style="padding:12px 26px;">もう一度 運に挑む</button>
+  </div>
+</div>
+
+<script>
+const ROWS=8, COLS=8;
+const DIFF={
+  normal:{bombs:24, goal:16, start:2, label:"普通"},
+  hard:  {bombs:32, goal:18, start:2, label:"ハード"},
+  hell:  {bombs:40, goal:20, start:3, label:"地獄"},
+};
+const ON_BOARD_ITEMS=4;
+
+// --- 切り札カタログ ---
+const ITEMS={
+  cat:    {emoji:"🦄", nm:"運命の招き猫", ds:"次の3マスを確実に安全化"},
+  truth:  {emoji:"📜", nm:"真実の経典",   ds:"本物の数字の6割を黄金に炙り出す"},
+  defuse: {emoji:"☃️", nm:"雪まつり",     ds:"3×3を凍結して開く", aim:true},
+  meteor: {emoji:"🚀", nm:"ロケット花火", ds:"縦横一直線を吹き飛ばす", aim:true},
+  xray:   {emoji:"🪬", nm:"神の透視",     ds:"8マスを占う…2割は嘘"},
+  clover: {emoji:"🍀", nm:"黄金の四つ葉", ds:"残り爆弾の1/4を黄金の本物数字に変える"},
+  rewind: {emoji:"⏳", nm:"夢の砂時計",   ds:"直前の1手をなかったことに"},
+  phoenix:{emoji:"🐦‍🔥", nm:"不死鳥",       ds:"全回復＋ライフ上限+1"},
+};
+const ITEM_KEYS=Object.keys(ITEMS);
+const MUTATING=['cat','truth','clover','xray','phoenix']; // スナップショット対象
+
+let state=null, difficulty="normal", history=[], deathSnapshot=null;
+let boardEls=[], lastInvSig="";
+const $=id=>document.getElementById(id);
+const rand=n=>Math.floor(Math.random()*n);
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]];}}
+function snapshot(){history.push(JSON.parse(JSON.stringify(state)));if(history.length>40)history.shift();}
+
+// 開始時の隣接地雷数を一度だけ固定で書き込む（以後は変化しない＝本物の数字）
+function computeAdj(grid){
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    let n=0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      if(!dr&&!dc)continue;const rr=r+dr,cc=c+dc;
+      if(rr>=0&&rr<ROWS&&cc>=0&&cc<COLS&&grid[rr][cc].bomb)n++;
+    }
+    grid[r][c].adj=n;
+  }
+}
+
+function newGame(){
+  const cfg=DIFF[difficulty];
+  const grid=[];
+  for(let r=0;r<ROWS;r++){const row=[];for(let c=0;c<COLS;c++)row.push({bomb:false,item:null,revealed:false,hint:null,truthful:false,gold:false,destroyed:false,catSafe:false,clover:false,fake:rand(9),adj:0});grid.push(row);}
+  let placed=0;
+  while(placed<cfg.bombs){const r=rand(ROWS),c=rand(COLS);if(!grid[r][c].bomb){grid[r][c].bomb=true;placed++;}}
+  computeAdj(grid); // 開始時の数字を固定（以後変化させない）
+  const safeCells=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(!grid[r][c].bomb)safeCells.push([r,c]);
+  shuffle(safeCells);
+  const itemCount=Math.min(ON_BOARD_ITEMS,safeCells.length);
+  for(let i=0;i<itemCount;i++){const [r,c]=safeCells[i];grid[r][c].item=ITEM_KEYS[rand(ITEM_KEYS.length)];}
+  // 最初から半分の数字は本物（隣接地雷数を表示）。見分けはつかない
+  const truthHalf=Math.ceil(safeCells.length/2);
+  for(let i=0;i<truthHalf;i++){const [r,c]=safeCells[i];grid[r][c].truthful=true;}
+  const inv={};
+  for(let i=0;i<cfg.start;i++){const k=ITEM_KEYS[rand(ITEM_KEYS.length)];inv[k]=(inv[k]||0)+1;}
+  state={grid,hp:3,maxHp:3,revealedSafe:0,goal:cfg.goal,inv,catCharges:0,aiming:null,over:false,won:false};
+  history=[];deathSnapshot=null;lastInvSig="";
+  $('mines').textContent=cfg.bombs;
+  $('overlay').classList.remove('show');
+  render();
+}
+
+function render(){
+  let h="";for(let i=0;i<state.maxHp;i++){const e=i<3?"❤️":"❤️‍🔥";h+=`<span class="${i<state.hp?'':'dead'}">${e}</span>`;}
+  $('hearts').innerHTML=h;
+  let arm=[];
+  if(state.catCharges>0)arm.push(`🦄 安全×${state.catCharges}`);
+  $('armor').textContent=arm.join("　");
+  $('goal').textContent=state.goal;$('prog').textContent=state.revealedSafe;
+  $('meter').style.width=Math.min(100,state.revealedSafe/state.goal*100)+"%";
+  const banner=$('banner'),frame=$('frame');
+  if(state.aiming){banner.classList.add('show');frame.classList.add('aiming');
+    $('bannerText').innerHTML=`🎯 ${ITEMS[state.aiming].emoji} ${ITEMS[state.aiming].nm} の着弾点をタップ<small>${state.aiming==='meteor'?'選んだマスの縦一列＆横一列を吹き飛ばす':'選んだマスを中心に3×3を凍結する'}</small>`;
+  }else{banner.classList.remove('show');frame.classList.remove('aiming');clearAimPreview();}
+  renderBoard();renderInv();
+}
+
+/* ===== 盤面：初回だけDOMを組み立て、以後は変化したマスだけ更新 ===== */
+function buildBoard(){
+  const b=$('board');b.style.gridTemplateColumns=`repeat(${COLS},1fr)`;
+  b.innerHTML="";boardEls=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const el=document.createElement('button');
+    el.className="cell";el.dataset.r=r;el.dataset.c=c;el.dataset.sig="";
+    el.setAttribute('aria-label',`${r+1}行 ${c+1}列`);
+    b.appendChild(el);boardEls.push(el);
+  }
+}
+
+// 未開封マスの署名には盤面の中身（爆弾など）を含めない＝DOMから答えが漏れない
+function cellSig(cell){
+  if(!cell.revealed)
+    return 'H|'+(cell.hint||'')+((state.catCharges>0&&!state.aiming)?'|L':'');
+  return ['R',cell.bomb?1:0,cell.catSafe?1:0,cell.destroyed?1:0,cell.item||'',
+    cell.gold?1:0,cell.clover?1:0,cell.truthful?cell.adj:cell.fake].join('|');
+}
+
+function updateCell(el,cell){
+  el.className="cell";el.innerHTML="";
+  if(state.catCharges>0&&!cell.revealed&&!state.aiming)el.classList.add('lucky');
+  if(cell.revealed){
+    el.classList.add('revealed');el.disabled=true;
+    if(cell.catSafe){el.classList.add('catsafe');el.textContent="💥";}
+    else if(cell.destroyed){el.classList.add('destroyed');el.textContent=cell.bomb?"💥":"✦";}
+    else if(cell.bomb){el.classList.add('bomb');el.textContent="💥";}
+    else if(cell.item){el.classList.add('item');el.textContent=ITEMS[cell.item].emoji;}
+    else{el.classList.add('safe');
+      el.textContent=cell.truthful?cell.adj:cell.fake;
+      if(cell.gold)el.classList.add('honest');
+      const mk=cell.clover?'🍀':(cell.gold?'✓':'');
+      if(mk){const cm=document.createElement('span');cm.className='corner';cm.textContent=mk;el.appendChild(cm);}}
+  }else{
+    el.disabled=false;
+    el.innerHTML=`<span class="glyph">✦</span>`;
+    if(cell.hint){const hg=document.createElement('span');hg.className="hint "+cell.hint;hg.textContent=cell.hint==='danger'?"💀":"○";el.appendChild(hg);}
+  }
+}
+
+function renderBoard(){
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const cell=state.grid[r][c],el=boardEls[r*COLS+c],sig=cellSig(cell);
+    if(el.dataset.sig!==sig){el.dataset.sig=sig;updateCell(el,cell);}
+  }
+}
+
+function renderInv(){
+  const sig=ITEM_KEYS.map(k=>state.inv[k]||0).join(',')+'|'+(state.catCharges>0)+'|'+(state.aiming||'')+'|'+state.over;
+  if(sig===lastInvSig)return;lastInvSig=sig;
+  const inv=$('inv');inv.innerHTML="";
+  ITEM_KEYS.forEach(k=>{
+    const count=state.inv[k]||0,it=ITEMS[k];
+    const el=document.createElement('div');el.className="item"+(count<=0?" disabled":"");
+    el.dataset.k=k;
+    if(k==='cat'&&state.catCharges>0)el.classList.add('armed');
+    if(state.aiming===k)el.classList.add('aiming');
+    el.innerHTML=(it.aim?`<div class="tag">🎯</div>`:"")+`<div class="emoji">${it.emoji}</div><div class="nm">${it.nm}</div><div class="ds">${it.ds}</div>`+(count>0?`<div class="count">${count}</div>`:"");
+    inv.appendChild(el);
+  });
+}
+
+function toast(msg){const z=$('toasts');const t=document.createElement('div');t.className="toast";t.textContent=msg;z.appendChild(t);setTimeout(()=>t.remove(),2600);}
+
+function boom(){const fr=$('frame');fr.classList.remove('boom');void fr.offsetWidth;fr.classList.add('boom');}
+
+function cellClick(r,c){
+  if(state.over)return;
+  if(state.aiming){fireAim(r,c);return;}
+  reveal(r,c);
+}
+
+function reveal(r,c){
+  const cell=state.grid[r][c];if(cell.revealed)return;
+  snapshot();
+  if(state.catCharges>0){
+    state.catCharges--;
+    const wasBomb=cell.bomb;
+    if(wasBomb)cell.catSafe=true; // 爆弾を安全に開封（数字にはしない・爆発絵文字のまま）
+    cell.revealed=true;afterSafe(cell);
+    toast(wasBomb?"🦄 運命の招き猫が爆弾を安全に開封した！":"🦄 運命の招き猫の加護で安全に開いた！");finishTurn();return;
+  }
+  if(cell.bomb){
+    cell.revealed=true;state.hp--;toast("💥 爆発！ ライフ −1");boom();
+    if(state.hp<=0){render();gameOver(false);return;}
+    finishTurn();return;
+  }
+  cell.revealed=true;afterSafe(cell);finishTurn();
+}
+
+function afterSafe(cell){
+  state.revealedSafe++;
+  if(cell.item){const k=cell.item;state.inv[k]=(state.inv[k]||0)+1;toast(`${ITEMS[k].emoji} ${ITEMS[k].nm} を発見！`);cell.item=null;}
+}
+
+function finishTurn(){if(state.revealedSafe>=state.goal&&!state.over){render();gameOver(true);return;}render();}
+
+function useItem(k){
+  if(state.over)return;
+  if(state.aiming===k){state.aiming=null;render();return;} // 照準キャンセル
+  if((state.inv[k]||0)<=0)return;
+
+  // 巻き戻し（スナップショット対象外）
+  if(k==='rewind'){
+    if(history.length===0){toast("⏳ 巻き戻せる過去がない…");return;}
+    const prev=history.pop();
+    const rc=Math.max(0,(prev.inv.rewind||0)-1);
+    state=prev;state.inv.rewind=rc;state.aiming=null;state.over=false;
+    toast("⏳ 時を巻き戻した！");render();return;
+  }
+
+  if(ITEMS[k].aim){state.aiming=k;render();return;} // 照準モード（消費は着弾時）
+
+  if(MUTATING.includes(k))snapshot();
+
+  if(k==='cat'){state.inv[k]--;state.catCharges+=3;toast("🦄 運命の招き猫を構えた。次の3マスは安全！");render();return;}
+  if(k==='phoenix'){state.inv[k]--;state.maxHp++;state.hp=state.maxHp;toast("🐦‍🔥 不死鳥が舞い、全回復＋上限UP！");render();return;}
+  if(k==='truth'){
+    state.inv[k]--;
+    const cands=[];for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const x=state.grid[r][c];if(!x.bomb&&x.truthful&&!x.gold)cands.push(x);}
+    shuffle(cands);const n=Math.ceil(cands.length*0.6);
+    for(let i=0;i<n;i++)cands[i].gold=true;
+    toast(n>0?`📜 本物の数字 ${n}個を金色に炙り出した`:"📜 炙り出せる本物の数字はもう無い…");render();return;
+  }
+  if(k==='clover'){
+    state.inv[k]--;
+    const bombs=[];for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const x=state.grid[r][c];if(x.bomb&&!x.revealed)bombs.push(x);}
+    shuffle(bombs);const n=Math.max(bombs.length>0?1:0,Math.round(bombs.length/4));
+    for(let i=0;i<n;i++){bombs[i].bomb=false;bombs[i].truthful=true;bombs[i].gold=true;bombs[i].clover=true;}
+    toast(n>0?`🍀 爆弾 ${n}個を黄金の本物数字に変えた！`:"🍀 変えられる爆弾が無かった…");render();return;
+  }
+  if(k==='xray'){
+    state.inv[k]--;
+    const hidden=[];for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const x=state.grid[r][c];if(!x.revealed&&!x.hint)hidden.push(x);}
+    shuffle(hidden);let n=0;
+    for(let i=0;i<8&&i<hidden.length;i++){
+      const x=hidden[i];const truth=x.bomb;const lie=Math.random()<0.2; // 2割は嘘
+      const verdict=lie?!truth:truth;x.hint=verdict?'danger':'safe';n++;
+    }
+    toast(n>0?`👁️ ${n}マスを占った…2割は嘘かも`:"👁️ 占うマスが無かった…");render();return;
+  }
+}
+
+/* ===== 照準：効果範囲の計算はプレビューと着弾で共通 ===== */
+function aimCells(k,r,c){
+  const out=[];
+  if(k==='defuse'){for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const rr=r+dr,cc=c+dc;if(rr>=0&&rr<ROWS&&cc>=0&&cc<COLS)out.push([rr,cc]);}}
+  else if(k==='meteor'){for(let cc=0;cc<COLS;cc++)out.push([r,cc]);for(let rr=0;rr<ROWS;rr++)if(rr!==r)out.push([rr,c]);}
+  return out;
+}
+
+function clearAimPreview(){boardEls.forEach(el=>el.classList.remove('aim-prev'));}
+
+function fireAim(r,c){
+  const k=state.aiming;
+  if((state.inv[k]||0)<=0){state.aiming=null;render();return;}
+  snapshot();
+  state.inv[k]--;state.aiming=null;
+  let cleared=0,opened=0;
+  aimCells(k,r,c).forEach(([rr,cc])=>{
+    const cell=state.grid[rr][cc];
+    if(cell.revealed)return;
+    if(cell.bomb){cell.revealed=true;cell.destroyed=true;cleared++;}
+    else{cell.revealed=true;afterSafe(cell);opened++;}
+  });
+  toast(`${ITEMS[k].emoji} 着弾！ 爆弾${cleared}除去・${opened}マス開放`);
+  finishTurn();
+}
+
+function gameOver(won){
+  state.over=true;state.won=won;state.aiming=null;
+  if(!won){
+    deathSnapshot=JSON.parse(JSON.stringify(state)); // 全爆弾を見せる演出の前に、死亡時の盤面を保存（不死鳥のその場復活用）
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const x=state.grid[r][c];if(x.bomb&&!x.revealed)x.revealed=true;}
+  }
+  render();
+  const panel=$('panel'),ov=$('overlay');panel.classList.toggle('lose',!won);
+  // 残っていれば「蘇る」ボタンを出す（敗北時のみ）
+  const canRewind=!won && (state.inv.rewind||0)>0 && history.length>0;
+  const canPhoenix=!won && (state.inv.phoenix||0)>0;
+  $('reviveBtn').classList.toggle('show',canRewind);
+  $('revivePhoenixBtn').classList.toggle('show',canPhoenix);
+  if(won){$('ovIcon').textContent="🎊";$('ovTitle').textContent="脱出成功！";
+    $('ovText').innerHTML=`地雷原をこじ開けて生還した。<br>残りライフ <b>${state.hp}</b> ／ 難易度 <b>${DIFF[difficulty].label}</b>`;}
+  else{$('ovIcon').textContent="💀";$('ovTitle').textContent="運、尽きる";
+    $('ovText').innerHTML=`あと <b>${state.goal-state.revealedSafe}</b> マスで脱出だった…`+((canRewind||canPhoenix)?`<br>だが——まだ蘇る力が残っている。`:`<br>次こそは上手くいくだろう。`);}
+  setTimeout(()=>ov.classList.add('show'),550);
+}
+
+function reviveByRewind(){
+  if(history.length===0)return;
+  const prev=history.pop();
+  const rc=Math.max(0,(prev.inv.rewind||0)-1);
+  state=prev;state.inv.rewind=rc;state.aiming=null;state.over=false;
+  $('overlay').classList.remove('show');
+  toast("⏳ 時を巻き戻し、死の運命を回避した！");
+  render();
+}
+function reviveByPhoenix(){
+  if(!deathSnapshot)return;
+  state=deathSnapshot;deathSnapshot=null; // 死亡時の盤面に戻す（踏んだ爆弾はそのまま・他の爆弾は隠れたまま）
+  state.over=false;state.won=false;state.aiming=null;
+  state.inv.phoenix=Math.max(0,(state.inv.phoenix||0)-1);
+  state.maxHp++;state.hp=state.maxHp; // 全回復＋ライフ上限+1
+  $('overlay').classList.remove('show');
+  toast("🐦‍🔥 不死鳥が灰より蘇った！全回復＋上限UP");
+  render();
+}
+
+/* ===== イベント（委譲で一括登録） ===== */
+$('board').addEventListener('click',e=>{
+  const el=e.target.closest('.cell');if(!el||!state)return;
+  cellClick(+el.dataset.r,+el.dataset.c);
+});
+// 照準モード中、マウスを乗せたマスの効果範囲をプレビュー（PC向け）
+$('board').addEventListener('pointerover',e=>{
+  if(!state||!state.aiming)return;
+  const el=e.target.closest('.cell');
+  clearAimPreview();
+  if(!el||el.classList.contains('revealed'))return;
+  aimCells(state.aiming,+el.dataset.r,+el.dataset.c)
+    .forEach(([rr,cc])=>boardEls[rr*COLS+cc].classList.add('aim-prev'));
+});
+$('board').addEventListener('pointerleave',clearAimPreview);
+$('inv').addEventListener('click',e=>{
+  const el=e.target.closest('.item');
+  if(!el||el.classList.contains('disabled')||!state||state.over)return;
+  useItem(el.dataset.k);
+});
+$('cancelAim').addEventListener('click',()=>{state.aiming=null;render();});
+$('reviveBtn').addEventListener('click',reviveByRewind);
+$('revivePhoenixBtn').addEventListener('click',reviveByPhoenix);
+$('diffSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('diffSeg').children].forEach(x=>x.classList.remove('on'));b.classList.add('on');difficulty=b.dataset.d;newGame();});
+$('newBtn').addEventListener('click',newGame);
+$('ovBtn').addEventListener('click',newGame);
+
+buildBoard();
+newGame();
+</script>
+</body>
+</html>

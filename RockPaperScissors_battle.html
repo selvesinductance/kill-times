@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>じゃんけんバトル</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overscroll-behavior:none}
+body{background:#111;overflow:hidden;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+canvas{display:block;touch-action:none}
+#ui{position:fixed;top:12px;left:12px;z-index:1;color:#fff;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:10px 14px}
+#counts{display:flex;gap:16px;font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+#speedRow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px}
+#speedRow input{flex:1;min-width:130px;accent-color:#fff}
+#speedVal{min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+#btns{display:flex;gap:8px;margin-top:8px}
+button{padding:6px 16px;border:none;border-radius:8px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;font-size:14px;font-family:inherit}
+button:hover{background:rgba(255,255,255,.3)}
+button:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="counts"></div>
+  <div id="speedRow">
+    <span>速度</span>
+    <input type="range" id="speed" min="0.25" max="4" step="0.25" value="1">
+    <span id="speedVal">×1</span>
+  </div>
+  <div id="btns">
+    <button id="pauseBtn">一時停止</button>
+    <button id="resetBtn">リセット</button>
+  </div>
+</div>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d'),countsEl=document.getElementById('counts');
+const N=192,SPD=1.8,SZ=14,SC=360,SC2=SC*SC,SZ2=SZ*SZ,PR=150,PR2=PR*PR;
+// type: 0=rock,1=scissors,2=paper / prey=(t+1)%3(追う相手のみ。逃げる動きはなし)
+const EMOJI=['🪨','✂️','📄'];
+const COLORS=['rgb(225,100,100)','rgb(100,215,100)','rgb(120,120,245)'];
+
+let W,H,DPR=1,sprites=[];
+// 絵文字を事前レンダリング(毎フレームのfillTextより高速&表示濃度が安定)
+function makeSprites(){
+  sprites=EMOJI.map(e=>{
+    const s=SZ*2,c=document.createElement('canvas');
+    c.width=c.height=Math.ceil(s*DPR);
+    const g=c.getContext('2d');
+    g.scale(DPR,DPR);
+    g.font=SZ+'px serif';g.textAlign='center';g.textBaseline='middle';g.fillStyle='#fff';
+    g.fillText(e,s/2,s/2);
+    return c;
+  });
+}
+function resize(){
+  DPR=devicePixelRatio||1;W=innerWidth;H=innerHeight;
+  canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  makeSprites();
+}
+resize();addEventListener('resize',resize);
+
+let px,py,pvx,pvy,pt;
+let history=[],startAt=0,finished=false,finishTime=0,running=false,paused=false,speedMult=1,interacted=false,acc=0;
+let pointer={a:false,x:0,y:0};
+
+function reset(){
+  px=new Float32Array(N);py=new Float32Array(N);
+  pvx=new Float32Array(N);pvy=new Float32Array(N);
+  pt=new Uint8Array(N);
+  for(let i=0;i<N;i++){
+    px[i]=Math.random()*W;py[i]=Math.random()*H;
+    pvx[i]=(Math.random()-.5)*2;pvy[i]=(Math.random()-.5)*2;
+    pt[i]=i%3; // 192/3 = 各64個
+  }
+  history=[];finished=false;finishTime=0;running=false;paused=false;speedMult=1;acc=0;
+  startAt=performance.now()+1500; // 1.5秒待機(カウントダウン非表示)
+  pauseBtn.textContent='一時停止';
+}
+const pauseBtn=document.getElementById('pauseBtn');
+pauseBtn.addEventListener('click',()=>{paused=!paused;pauseBtn.textContent=paused?'再開':'一時停止'});
+document.getElementById('resetBtn').addEventListener('click',reset);
+// 速度スライダー(サブステップ方式なので高速時でも物理挙動は同一)
+let userSpeed=1;
+const speedEl=document.getElementById('speed'),speedValEl=document.getElementById('speedVal');
+speedEl.addEventListener('input',()=>{userSpeed=+speedEl.value;speedValEl.textContent='×'+parseFloat(userSpeed.toFixed(2))});
+reset();
+
+canvas.addEventListener('pointerdown',e=>{pointer.a=true;interacted=true;pointer.x=e.clientX;pointer.y=e.clientY;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(pointer.a){pointer.x=e.clientX;pointer.y=e.clientY}});
+canvas.addEventListener('pointerup',()=>pointer.a=false);
+canvas.addEventListener('pointercancel',()=>pointer.a=false);
+
+function step(){
+  if(!running||paused)return;
+  acc+=userSpeed*speedMult; // speedMultは終盤(2種以下)の自動ブースト
+  let n=0;
+  while(acc>=1&&n<6){acc--;n++;substep()}
+  if(acc>2)acc=2;
+}
+function substep(){
+  const pa=pointer.a,ppx=pointer.x,ppy=pointer.y;
+  for(let i=0;i<N;i++){
+    const prey=(pt[i]+1)%3;
+    let md=Infinity,mtx=0,mty=0;
+    for(let j=0;j<N;j++){
+      if(i===j)continue;
+      const dx=px[j]-px[i],dy=py[j]-py[i],d2=dx*dx+dy*dy;
+      if(pt[j]===prey){
+        if(d2<SZ2){pt[j]=pt[i]} // 接触したら変換(移動ループに統合してO(N^2)を1パス削減)
+        else if(d2<md){md=d2;mtx=dx;mty=dy}
+      }
+      if(d2<SZ2&&d2>0){const d=Math.sqrt(d2);pvx[i]-=dx/d*0.5;pvy[i]-=dy/d*0.5} // 分離
+    }
+    if(md<SC2&&md>0){const d=Math.sqrt(md);pvx[i]+=mtx/d*0.3;pvy[i]+=mty/d*0.3} // 追跡
+    if(pa){const dx=px[i]-ppx,dy=py[i]-ppy,d2=dx*dx+dy*dy;if(d2<PR2&&d2>0){const d=Math.sqrt(d2);pvx[i]+=dx/d*1.5;pvy[i]+=dy/d*1.5}}
+    const spd=Math.sqrt(pvx[i]*pvx[i]+pvy[i]*pvy[i]);
+    if(spd>SPD){const s=SPD/spd;pvx[i]*=s;pvy[i]*=s}
+    px[i]+=pvx[i];py[i]+=pvy[i];
+    if(px[i]<0){px[i]=0;pvx[i]*=-1}else if(px[i]>W){px[i]=W;pvx[i]*=-1}
+    if(py[i]<0){py[i]=0;pvy[i]*=-1}else if(py[i]>H){py[i]=H;pvy[i]*=-1}
+  }
+}
+
+function draw(){
+  const cnt=[0,0,0];
+  for(let i=0;i<N;i++)cnt[pt[i]]++;
+  // 背景色: 各チャンネル=255*勢力比率(独占で255、全滅で0)
+  const r=Math.round(255*cnt[0]/N),g=Math.round(255*cnt[1]/N),b=Math.round(255*cnt[2]/N);
+  ctx.fillStyle='rgb('+r+','+g+','+b+')';
+  ctx.fillRect(0,0,W,H);
+
+  if(!running&&!finished&&performance.now()>=startAt)running=true;
+
+  const alive=(cnt[0]>0)+(cnt[1]>0)+(cnt[2]>0);
+  if(running&&!finished){
+    speedMult=alive<=2?1.25:1;
+    if(alive===1){finished=true;finishTime=performance.now()}
+  }
+
+  // 粒子(常に通常の濃さで描画)
+  const S2=SZ*2;
+  for(let i=0;i<N;i++)ctx.drawImage(sprites[pt[i]],px[i]-SZ,py[i]-SZ,S2,S2);
+
+  // 優勝演出
+  if(finished){
+    const sec=Math.ceil(3-(performance.now()-finishTime)/1000);
+    ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fillRect(0,0,W,H);
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';
+    ctx.font='110px serif';
+    ctx.fillText('👑',W/2,H/2-120);
+    ctx.fillText(EMOJI[pt[0]],W/2,H/2);
+    ctx.font='bold 72px sans-serif';ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.fillText(sec,W/2,H/2+120);
+    if(sec<=0)reset();
+  }
+
+  // ポインタの反発範囲
+  if(pointer.a){ctx.beginPath();ctx.arc(pointer.x,pointer.y,PR,0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=2;ctx.stroke()}
+
+  countsEl.innerHTML='<span style="color:'+COLORS[0]+'">🪨 '+cnt[0]+'</span><span style="color:'+COLORS[1]+'">✂️ '+cnt[1]+'</span><span style="color:'+COLORS[2]+'">📄 '+cnt[2]+'</span>';
+
+  // 操作ヒント(初回操作まで表示)
+  if(!interacted){
+    ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='14px sans-serif';
+    ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillText('タッチ/クリックで粒子を弾き飛ばせます',12,H-12);
+  }
+
+  // 勢力推移グラフ
+  if(running&&!paused&&!finished){history.push(cnt[0]<<16|cnt[1]<<8|cnt[2]);if(history.length>300)history.shift()}
+  const gW=200,gH=60,gX=W-gW-14,gY=14;
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(gX-5,gY-5,gW+10,gH+10,10);else ctx.rect(gX-5,gY-5,gW+10,gH+10);
+  ctx.fill();
+  const bw=gW/300+1;
+  for(let i=0;i<history.length;i++){
+    const v=history[i],hr=v>>16,hs=(v>>8)&255,hp=v&255,ht=hr+hs+hp||1;
+    let y=gY,x=gX+i*gW/300;
+    const rH=hr/ht*gH,sH=hs/ht*gH,pH=hp/ht*gH;
+    ctx.fillStyle='rgba(225,100,100,0.9)';ctx.fillRect(x,y,bw,rH);y+=rH;
+    ctx.fillStyle='rgba(100,215,100,0.9)';ctx.fillRect(x,y,bw,sH);y+=sH;
+    ctx.fillStyle='rgba(120,120,245,0.9)';ctx.fillRect(x,y,bw,pH);
+  }
+  // 現在の背景色のカラーコードをグラフに重ねて表示
+  const hex='#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1).toUpperCase();
+  ctx.font='bold 14px ui-monospace,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.55)';ctx.strokeText(hex,gX+gW/2,gY+gH/2);
+  ctx.fillStyle='#fff';ctx.fillText(hex,gX+gW/2,gY+gH/2);
+}
+
+function loop(){step();draw();requestAnimationFrame(loop)}
+loop();
+</script>
+</body>
+</html>

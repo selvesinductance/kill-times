@@ -1,0 +1,196 @@
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">語彙と構文パターンを大幅に増やした、キー入力で疑似コードを生成するターミナル風ウィジェット</h2>
+<style>
+#term{max-width:720px;margin:0 auto;background:#0d1117;border:0.5px solid var(--border-strong);border-radius:12px;overflow:hidden;font-family:var(--font-mono),ui-monospace,'SF Mono',Menlo,Consolas,monospace;}
+#tbar{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#161b22;border-bottom:1px solid #21262d;}
+.dt{width:11px;height:11px;border-radius:50%;}
+#ttl{margin-left:6px;font-size:12px;color:#8b949e;user-select:none;}
+#scr{position:relative;height:320px;overflow-y:auto;padding:12px 14px;cursor:text;font-size:13px;line-height:1.6;}
+#out{white-space:pre-wrap;word-break:break-all;color:#abb2bf;}
+#out .kw{color:#c678dd}#out .fn{color:#61afef}#out .str{color:#98c379}#out .num{color:#d19a66}
+#out .com{color:#7f848e;font-style:italic}#out .type{color:#e5c07b}#out .prop{color:#e06c75}
+#out .ok{color:#3fb950}#out .warn{color:#d29922}#out .err{color:#f85149}#out .pr{color:#56d364}
+#cur{display:inline-block;width:8px;height:1.05em;background:#9da5b0;vertical-align:text-bottom;animation:bl 1s steps(1) infinite;}
+@keyframes bl{50%{opacity:0}}
+#hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#c9d1d9;font-size:13px;padding:20px;background:rgba(13,17,23,.55);transition:opacity .4s;pointer-events:none;line-height:1.8;}
+#stat{display:flex;gap:16px;flex-wrap:wrap;padding:7px 14px;background:#161b22;border-top:1px solid #21262d;font-size:11px;color:#8b949e;user-select:none;}
+#acc{margin-left:auto;}
+#acc.on{color:#3fb950;}
+#mob{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;}
+</style>
+<div id="term">
+  <div id="tbar">
+    <span class="dt" style="background:#ff5f56"></span><span class="dt" style="background:#ffbd2e"></span><span class="dt" style="background:#27c93f"></span>
+    <span id="ttl">root@mainframe: ~/src — zsh</span>
+  </div>
+  <div id="scr">
+    <div id="out"></div>
+    <div id="hint">ここをクリック / タップして、<br>キーボードを適当に連打してみて</div>
+  </div>
+  <div id="stat">
+    <span id="stL">lines 0</span>
+    <span id="stC">chars 0</span>
+    <span style="color:#484f58">esc でクリア</span>
+    <span id="acc">access: pending…</span>
+  </div>
+</div>
+<input id="mob" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="タイピング入力" />
+<script>
+(function(){
+var pick=function(a){return a[(Math.random()*a.length)|0]};
+var cap=function(s){return s[0].toUpperCase()+s.slice(1)};
+var V=['fetch','parse','resolve','dispatch','validate','encode','decode','sync','flush','spawn','bind','merge','hash','encrypt','serialize','init','load','compile','patch','migrate','rotate','verify','stream','normalize','inject','probe','allocate','revoke','sanitize','throttle','broadcast','reconcile','prefetch','purge','fork','pipe','seal','unwrap','clone','audit','trace','batch','commit','rollback','warm','drain','evict','mount','shred','tokenize','replay'];
+var N=['user','cache','buffer','token','session','config','node','packet','queue','worker','shard','index','payload','handler','socket','cluster','schema','vector','snapshot','mutex','kernel','daemon','registry','pipeline','frame','chunk','proxy','ledger','manifest','stream','router','engine','pool','bucket','event','job','task','block','header','record','channel','context','env','key','lock','peer','replica','tenant','graph','heap','stack','runtime','module','driver','quota','cipher','beacon'];
+var A=['async','lazy','secure','remote','cached','stale','raw','deep','temp','global','atomic','virtual','shadow','hot','dirty','safe','frozen','managed','pinned','primary','fallback','encrypted','internal','edge','core','local','strict','verbose','silent','ephemeral','immutable','zero','quantum'];
+var PKG=['node:crypto','node:fs/promises','@core/runtime','fast-queue','zlib','@net/socket','uuid','@auth/jwt','pino','ioredis','@edge/tls','node:stream','@grpc/core','ws','axios','protobufjs','@vault/secrets','lru-cache','node:worker_threads','@queue/bull','esbuild','@mesh/discovery'];
+var STRS=['utf-8','aes-256-gcm','application/json','sha512','0.0.0.0:8443','ws://edge-07.internal','/var/log/core.sock','x-request-id','prod-eu-2','/api/v2/session','redis://cache-01:6379','chacha20-poly1305','gzip','x-trace-id','eu-west-1','application/octet-stream','::1','10.0.0.42','base64url','ed25519','tcp://mesh-gw:9000'];
+var PROPS=['isValid','ready','locked','stale','length','status','ttl','offset','retries','payload','checksum','head','cursor','depth','flags','expiresAt','maxSize','pending','hash','origin','epoch','weight','dirty','sealed'];
+var SUF=['Manager','Service','Factory','Controller','Adapter','Broker','Registry','Engine','Observer','Resolver','Orchestrator'];
+var COM=[function(){return 'TODO: refactor '+pick(N)+' pipeline before friday'},
+function(){return 'FIXME: '+pick(N)+' leaks on hot reload'},
+function(){return 'do not remove — everything breaks'},
+function(){return 'HACK: works, no idea why'},
+function(){return 'NOTE: '+pick(A)+' mode is intentional'},
+function(){return 'legacy code, here be dragons'},
+function(){return 'TODO('+pick(['alex','kim','sato','riley'])+'): remove after '+pick(N)+' migration'},
+function(){return 'this used to be recursive. never again'},
+function(){return 'WARNING: touching this breaks prod on tuesdays'},
+function(){return 'temporary fix ('+(2013+((Math.random()*10)|0))+')'},
+function(){return 'if you are reading this, good luck'},
+function(){return 'here lies the old '+pick(N)+' logic, rest in peace'},
+function(){return 'benchmarked: '+pick(A)+' path is '+(2+((Math.random()*40)|0))+'x faster'}];
+var camel=function(){var r=Math.random();
+ if(r<.5)return pick(V)+cap(pick(N));
+ if(r<.8)return pick(V)+cap(pick(A))+cap(pick(N));
+ return pick(N)+cap(pick(N));};
+var pascal=function(){var r=Math.random();
+ if(r<.5)return cap(pick(A))+cap(pick(N));
+ if(r<.8)return cap(pick(N))+pick(SUF);
+ return cap(pick(A))+cap(pick(N))+pick(SUF);};
+var CONST=function(){return pick(['MAX','MIN','DEFAULT','GLOBAL','BASE'])+'_'+pick(N).toUpperCase()+pick(['','_LIMIT','_TTL','_SIZE','_MS']);};
+var T=function(t,c){return {t:t,c:c||'',p:0}};
+var NL={n:true};
+var blocks=[],ages=[];
+function val(){var r=Math.random();
+ if(r<.22)return[T(String(1+((Math.random()*4096)|0)),'num')];
+ if(r<.36)return[T("'"+pick(STRS)+"'",'str')];
+ if(r<.46)return[T('0x'+(((Math.random()*65535)|0).toString(16)),'num')];
+ if(r<.64)return[T(camel())];
+ if(r<.8)return[T(pick(N)),T('.'),T(pick(PROPS),'prop')];
+ if(r<.9)return[T(pick(['true','false','null']),'kw')];
+ return[T('Date','type'),T('.'),T('now','fn'),T('()')];}
+function args(){var n=(Math.random()*3)|0,o=[],i;for(i=0;i<n;i++){if(i)o.push(T(', '));o.push.apply(o,val());}return o;}
+function stImport(){if(Math.random()<.25)return[T('import','kw'),T(' '),T('*','kw'),T(' '),T('as','kw'),T(' '+pick(N)+' '),T('from','kw'),T(' '),T("'"+pick(PKG)+"'",'str'),T(';')];
+ return[T('import','kw'),T(' { '),T(camel()),T(', '),T(pascal(),'type'),T(' } '),T('from','kw'),T(' '),T("'"+pick(PKG)+"'",'str'),T(';')];}
+function stConst(){var t=[T('const','kw'),T(' '+camel()+' = ')];
+ if(Math.random()<.5)t.push(T('await','kw'),T(' '));
+ t.push(T(pick(N)),T('.'),T(pick(V)+pick(['','Sync','All']),'fn'),T('('));
+ t.push.apply(t,args());t.push(T(');'));return t;}
+function stDestr(){return[T('const','kw'),T(' { '),T(pick(PROPS),'prop'),T(', '),T(pick(PROPS),'prop'),T(', '),T(pick(PROPS),'prop'),T(' } = '),T(pick(N)),T(';')];}
+function stChain(){var t=[T('const','kw'),T(' '+camel()+' = '),T(pick(N)+'s'),T('.'),T(pick(['filter','find','flatMap']),'fn'),T('(v => v.'),T(pick(PROPS),'prop'),T(')')];
+ if(Math.random()<.6)t.push(T('.'),T('map','fn'),T('(v => v.'),T(pick(PROPS),'prop'),T(')'));
+ t.push(T(';'));return t;}
+function stTernary(){var t=[T('const','kw'),T(' '+camel()+' = '),T(pick(N)),T('.'),T(pick(PROPS),'prop'),T(' ? ')];
+ t.push.apply(t,val());t.push(T(' : '));t.push.apply(t,val());t.push(T(';'));return t;}
+function stExport(){if(Math.random()<.5)return[T('export','kw'),T(' '),T('const','kw'),T(' '+CONST()+' = '),T(String(1+((Math.random()*8192)|0)),'num'),T(';')];
+ var t=[T('export','kw'),T(' '),T('default','kw'),T(' '),T('new','kw'),T(' '),T(pascal(),'type'),T('(')];
+ t.push.apply(t,args());t.push(T(');'));return t;}
+function stFunc(){blocks.push('fn');ages.push(0);var t=[];
+ if(Math.random()<.6)t.push(T('async','kw'),T(' '));
+ t.push(T('function','kw'),T(' '),T(camel(),'fn'),T('('),T(pick(N)),T(', '),T(pick(N)),T(') {'));return t;}
+function stArrow(){blocks.push('arrow');ages.push(0);var t=[T('const','kw'),T(' '+camel()+' = ')];
+ if(Math.random()<.5)t.push(T('async','kw'),T(' '));
+ t.push(T('('+pick(N)+', '+pick(N)+') => {'));return t;}
+function stClass(){blocks.push('class');ages.push(0);
+ return[T('class','kw'),T(' '),T(pascal(),'type'),T(' '),T('extends','kw'),T(' '),T(pascal(),'type'),T(' {')];}
+function stIf(){blocks.push('if');ages.push(0);
+ if(Math.random()<.5)return[T('if','kw'),T(' (!'),T(camel()),T('.'),T(pick(PROPS),'prop'),T(') {')];
+ var t=[T('if','kw'),T(' ('),T(pick(N)),T('.'),T(pick(PROPS),'prop'),T(' '+pick(['>','<','===','!==','>='])+' ')];
+ t.push.apply(t,val());t.push(T(') {'));return t;}
+function stFor(){blocks.push('for');ages.push(0);
+ if(Math.random()<.5)return[T('for','kw'),T(' ('),T('const','kw'),T(' '+pick(N)+' '),T('of','kw'),T(' '+pick(N)+'s) {')];
+ return[T('for','kw'),T(' ('),T('let','kw'),T(' i = '),T('0','num'),T('; i < '+pick(N)+'s'),T('.'),T('length','prop'),T('; i++) {')];}
+function stWhile(){blocks.push('while');ages.push(0);
+ return[T('while','kw'),T(' ('),T(pick(N)),T('.'),T(pick(['length','pending','depth']),'prop'),T(' > '),T('0','num'),T(') {')];}
+function stTry(){blocks.push('try');ages.push(0);return[T('try','kw'),T(' {')];}
+function stLog(){var msg=pick(V)+' '+pick(N)+' '+pick(['ok','queued','failed','locked','→ retry','in '+((Math.random()*90)|0)+'ms','('+pick(A)+')']);
+ return[T(pick(['logger','console','trace','metrics'])),T('.'),T(pick(['debug','info','warn','log','emit']),'fn'),T('('),T('`'+msg+' ${','str'),T(camel()),T('}`','str'),T(');')];}
+function stThrow(){return[T('throw','kw'),T(' '),T('new','kw'),T(' '),T(pick(['Error','TypeError','RangeError']),'type'),T('('),T("'"+pick(['failed to','unable to','refusing to'])+' '+pick(V)+' '+pick(N)+"'",'str'),T(');')];}
+function stReturn(){if(Math.random()<.5){var t=[T('return','kw'),T(' ')];t.push.apply(t,val());t.push(T(';'));return t;}
+ return[T('return','kw'),T(' { ok: '),T('true','kw'),T(', '),T(pick(N)),T(' };')];}
+function stAssign(){var r=Math.random();
+ if(r<.35){var t=[T(pick(N)),T('.'),T(pick(PROPS),'prop'),T(' = ')];t.push.apply(t,val());t.push(T(';'));return t;}
+ if(r<.6)return[T(camel()),T(' '+pick(['+=','-=','|=','??='])+' '),T(String(1+((Math.random()*64)|0)),'num'),T(';')];
+ if(r<.8){var u=[T('await','kw'),T(' '),T(pick(N)),T('.'),T(pick(V),'fn'),T('(')];u.push.apply(u,args());u.push(T(');'));return u;}
+ return[T('setTimeout','fn'),T('(() => '),T(camel(),'fn'),T('('),T(pick(N)),T('), '),T(String(250+((Math.random()*40)|0)*250),'num'),T(');')];}
+function stAwaitAll(){return[T('await','kw'),T(' '),T('Promise','type'),T('.'),T(pick(['all','allSettled','race']),'fn'),T('('),T(pick(N)+'s'),T('.'),T('map','fn'),T('('),T(camel(),'fn'),T('));')];}
+function stComment(){return[T('// '+pick(COM)(),'com')];}
+function stSys(){var r=Math.random();
+ if(r<.18)return[T('$ ','pr'),T(pick(['make build --release','npm run deploy','cargo test --all','git push origin main --force','docker compose up -d','ssh deploy@edge-07','kubectl rollout status core','rsync -avz dist/ prod:/srv']))];
+ if(r<.36)return[T('✔ compiled '+(32+((Math.random()*400)|0))+' modules in '+(Math.random()*4+.4).toFixed(2)+'s','ok')];
+ if(r<.5)return[T('⚠ '+(1+((Math.random()*6)|0))+' warnings ','warn'),T('(unused '+pick(N)+')','com')];
+ if(r<.62){var f=Math.random()<.75;return[T(f?'PASS ':'FAIL ',f?'ok':'err'),T(' core/'+pick(N)+'.test.js ('+(3+((Math.random()*20)|0))+' tests)','com')];}
+ if(r<.74){var c=pick(['200','201','304','429','500']);return[T(pick(['GET','POST','PUT','DELETE'])+' /api/v2/'+pick(N)+' '),T(c+' ',c<'400'?'ok':'err'),T((1+((Math.random()*180)|0))+'ms','com')];}
+ if(r<.86)return[T('[main '+(((Math.random()*0xfffffff)|0).toString(16).slice(0,7))+'] ','warn'),T(pick(V)+' '+pick(N)+' '+pick(N))];
+ return[T('→ deploying to '+pick(['prod-eu-2','staging','edge-07','us-west-1'])+' … '),T('done ('+(Math.random()*6+.5).toFixed(1)+'s)','ok')];}
+function genLine(){var toks,lvl,r,top;
+ if(blocks.length){ages[ages.length-1]++;top=blocks[blocks.length-1];
+  if(blocks.length>2||Math.random()<Math.min(.13*ages[ages.length-1],.6)){
+   blocks.pop();ages.pop();lvl=blocks.length;
+   if(top==='try'){toks=[T('} '),T('catch','kw'),T(' (err) {')];blocks.push('catch');ages.push(0);}
+   else if(top==='if'&&Math.random()<.3){toks=[T('} '),T('else','kw'),T(' {')];blocks.push('else');ages.push(0);}
+   else if(top==='arrow')toks=[T('};')];
+   else toks=[T('}')];
+  }else{lvl=blocks.length;r=Math.random();
+   if(r<.14)toks=stConst();else if(r<.25)toks=stLog();else if(r<.35)toks=stAssign();
+   else if(r<.43)toks=stIf();else if(r<.5)toks=stFor();else if(r<.55)toks=stWhile();
+   else if(r<.61)toks=stThrow();else if(r<.68)toks=stReturn();else if(r<.75)toks=stComment();
+   else if(r<.81)toks=stDestr();else if(r<.87)toks=stChain();else if(r<.92)toks=stAwaitAll();
+   else if(r<.96)toks=stTernary();else toks=stTry();}
+ }else{lvl=0;r=Math.random();
+  if(r<.16)toks=stFunc();else if(r<.28)toks=stArrow();else if(r<.4)toks=stConst();
+  else if(r<.5)toks=stImport();else if(r<.57)toks=stClass();else if(r<.65)toks=stComment();
+  else if(r<.79)toks=stSys();else if(r<.85)toks=stIf();else if(r<.91)toks=stExport();
+  else if(r<.96)toks=stChain();else toks=stDestr();}
+ var line=[];if(lvl)line.push(T(Array(lvl+1).join('  ')));
+ line.push.apply(line,toks);line.push(NL);return line;}
+var q=[];
+function refill(){while(q.length<60){var l=genLine(),i;for(i=0;i<l.length;i++)q.push(l[i].n?NL:{t:l[i].t,c:l[i].c,p:0});}}
+var out=document.getElementById('out'),scr=document.getElementById('scr'),hint=document.getElementById('hint');
+var stL=document.getElementById('stL'),stC=document.getElementById('stC'),acc=document.getElementById('acc'),mob=document.getElementById('mob');
+var cur=document.createElement('span');cur.id='cur';
+var line=null,curSpan=null,curCls='',lineCount=0,chars=0,hintOn=true;
+function newLine(){line=document.createElement('div');out.appendChild(line);line.appendChild(cur);curSpan=null;curCls='';}
+function stats(){stL.textContent='lines '+lineCount;stC.textContent='chars '+chars;
+ var a='access: pending…',on=false;
+ if(chars>1100){a='mainframe: unlocked';on=true;}
+ else if(chars>480){a='privileges: root';on=true;}
+ else if(chars>110){a='access: granted ✔';on=true;}
+ acc.textContent=a;acc.className=on?'on':'';}
+function typeChunk(n){refill();
+ while(n>0){if(!q.length)refill();
+  var tk=q[0];
+  if(tk.n){q.shift();lineCount++;newLine();n--;continue;}
+  if(!curSpan||curCls!==tk.c){curSpan=document.createElement('span');if(tk.c)curSpan.className=tk.c;curCls=tk.c;line.insertBefore(curSpan,cur);}
+  var take=Math.min(n,tk.t.length-tk.p);
+  curSpan.textContent+=tk.t.substr(tk.p,take);
+  tk.p+=take;n-=take;chars+=take;
+  if(tk.p>=tk.t.length)q.shift();}
+ scr.scrollTop=scr.scrollHeight;stats();}
+function stroke(){typeChunk(3+((Math.random()*4)|0));
+ if(hintOn){hint.style.opacity=0;hintOn=false;}}
+function clearAll(){out.innerHTML='';q=[];blocks=[];ages=[];lineCount=0;chars=0;newLine();stats();}
+var recent=false;
+window.addEventListener('keydown',function(e){
+ if(e.key==='Escape'){clearAll();return;}
+ if(e.metaKey||e.ctrlKey||e.altKey)return;
+ if(e.key==='Unidentified')return;
+ if(e.key.length===1||e.key==='Backspace'||e.key==='Enter'||e.key==='Tab')e.preventDefault();else return;
+ recent=true;setTimeout(function(){recent=false},80);
+ stroke();});
+mob.addEventListener('input',function(){mob.value='';if(!recent)stroke();});
+scr.addEventListener('pointerdown',function(e){e.preventDefault();
+ try{mob.focus({preventScroll:true});}catch(err){mob.focus();}
+ stroke();});
+newLine();refill();stats();
+})();
+</script>

@@ -19,7 +19,7 @@ h1:hover, h2:hover {
     color: red;
     transition: all 10s;
 }
-a {
+a.content {
     display: block;
     padding: 8px;
     font-size: large;
@@ -30,7 +30,7 @@ a {
     cursor: pointer;
     transition: all 0.1s;
 }
-a:hover {
+a.content:hover {
     color: gold;
     font-size: x-large;
 }
@@ -45,7 +45,7 @@ a:hover {
     text-align: left;
     position: relative;
     background-color: transparent;
-    left: 36px;
+    left: 30px;
     transition: all 0.5s;
     cursor: help;
 }
@@ -54,6 +54,9 @@ a:hover {
 }
 .understood:hover {
     left: 0;
+}
+.understood:active, h2:active  {
+    font-family: misakigothic;
 }
 footer {
     position: fixed;
@@ -84,4 +87,26 @@ footer {
     .footercontents {
         display: none;
     }
+}
+.jumpscarebox {
+    margin: 256px auto;
+}
+.jumpscare {
+    font-size: 100px;
+    font-weight: x-large;
+    position: relative;
+    bottom: 0;
+    transition: all 0.5s;
+    cursor:vertical-text;
+}
+.jumpscare:hover {
+    bottom: 200px;
+}
+a.behind {
+    text-decoration: none;
+}
+.footercontents2 {
+    text-align: right;
+    margin-right: 16px;
+    cursor: not-allowed;
 }

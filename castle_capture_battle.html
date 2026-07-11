@@ -122,6 +122,25 @@
   }
   canvas { width: 100%; display: block; border-radius: 6px; }
 
+  #rotateBtn { display: none; }
+
+  /* スマホ縦画面ではフィールドを90度回転して縦長に表示(ボタンで切替可) */
+  @media (orientation: portrait) and (max-width: 700px) {
+    #rotateBtn { display: inline-block; }
+    .field-box.rotated {
+      position: relative;
+      aspect-ratio: 1 / 2; /* 回転後の縦横比(横2:縦1 → 縦2:横1) */
+      overflow: hidden;
+    }
+    .field-box.rotated canvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 200%; /* コンテナの高さぶんの幅 */
+      transform: translate(-50%, -50%) rotate(-90deg);
+    }
+  }
+
   /* ---- controls ---- */
   .controls {
     display: flex;
@@ -214,12 +233,15 @@
   </div>
 
   <div class="battlefield">
-    <canvas id="field"></canvas>
+    <div class="field-box rotated" id="fieldBox">
+      <canvas id="field"></canvas>
+    </div>
   </div>
 
   <div class="controls">
     <button id="toggleBtn">▶ 開始</button>
     <button id="resetBtn">リセット</button>
+    <button id="rotateBtn">↺ 元に戻す</button>
     <div class="speed-group">
       <label for="speed">速度</label>
       <input type="range" id="speed" min="1" max="10" step="1" value="5">
@@ -229,9 +251,7 @@
 
   <div class="rules">
     <h2>ルール</h2>
-    3つの国が城(HP100)と兵士を持って戦います。兵士はマス目に沿って最も近い敵または城へ進軍します。敵城のHPを0にするとその城を占領(HP20から回復)。<br>
-    HP満タンの城は1体/6ティックで兵士を召喚し、回復中の城は召喚頻度が半分(1体/12ティック)になります。城はHP1/ティックで自然回復します。<br>
-    すべての城を失った国は滅亡し、最後に残った国の勝利です。
+    3つの国が城(HP100)と兵士を持って戦います。城は一定間隔で兵士を召喚し、兵士はマス目に沿って最も近い敵へ進軍します。敵城のHPをゼロにするとその城を占領(HP20から回復開始)。グレーの空き城は早い者勝ちの争奪ポイントです。城はHP1/ティックで自然回復しますが、回復中の城は召喚頻度が半分になります。光っている城はHP満タンでフル生産中。青いマスは池で、兵士は通れません。すべての城を失った国は滅亡し、最後に残った国の勝利です。決着後は自動で次の戦いが始まります。
   </div>
 </div>
 
@@ -623,6 +643,17 @@ toggleBtn.addEventListener('click', () => {
   if (running) startTimer(); else stopTimer();
 });
 resetBtn.addEventListener('click', () => { stopTimer(); reset(); });
+
+const rotateBtn = $('rotateBtn');
+const fieldBox = $('fieldBox');
+function setRotateLabel() {
+  rotateBtn.textContent = fieldBox.classList.contains('rotated') ? '↺ 元に戻す' : '⟳ 回転する';
+}
+rotateBtn.addEventListener('click', () => {
+  fieldBox.classList.toggle('rotated');
+  setRotateLabel();
+});
+setRotateLabel();
 
 reset();
 requestAnimationFrame(render);

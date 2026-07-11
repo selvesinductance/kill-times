@@ -18,6 +18,10 @@ canvas{display:block;touch-action:none}
 button{padding:6px 16px;border:none;border-radius:8px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;font-size:14px;font-family:inherit}
 button:hover{background:rgba(255,255,255,.3)}
 button:active{transform:scale(.97)}
+/* スマホ縦画面幅ではUIパネルを左下(ヒント文の真上)へ */
+@media (max-width:500px){
+  #ui{top:auto;bottom:calc(40px + env(safe-area-inset-bottom,0px))}
+}
 </style>
 </head>
 <body>
@@ -41,18 +45,38 @@ const N=192,SPD=1.8,SZ=14,SC=360,SC2=SC*SC,SZ2=SZ*SZ,PR=150,PR2=PR*PR;
 const EMOJI=['🪨','✂️','📄'];
 const COLORS=['rgb(225,100,100)','rgb(100,215,100)','rgb(120,120,245)'];
 
-let W,H,DPR=1,sprites=[];
+let W,H,DPR=1,sprites=[],bigSprites={};
+// iOS Safariは絵文字によってはmeasureTextのメトリクス自体が不正確なため、
+// 一度オフスクリーンに描いてピクセル走査で「見た目の中心」を実測して合わせる
+function makeEmojiSprite(e,size){
+  const box=size*3; // 余白込みのスプライトサイズ
+  const c=document.createElement('canvas');
+  c.width=c.height=Math.ceil(box*DPR);
+  const g=c.getContext('2d');
+  g.scale(DPR,DPR);
+  g.font=size+'px serif';g.textAlign='center';g.textBaseline='middle';g.fillStyle='#fff';
+  g.fillText(e,box/2,box/2);
+  const cw=c.width,ch=c.height,d=g.getImageData(0,0,cw,ch).data;
+  let minX=cw,minY=ch,maxX=-1,maxY=-1;
+  for(let y=0;y<ch;y++){
+    const row=y*cw;
+    for(let x=0;x<cw;x++){
+      if(d[(row+x)*4+3]>8){
+        if(x<minX)minX=x;if(x>maxX)maxX=x;
+        if(y<minY)minY=y;if(y>maxY)maxY=y;
+      }
+    }
+  }
+  const cx=maxX<0?box/2:(minX+maxX+1)/2/DPR;
+  const cy=maxY<0?box/2:(minY+maxY+1)/2/DPR;
+  return {c,cx,cy,box};
+}
+function drawSprite(g,s,x,y){g.drawImage(s.c,x-s.cx,y-s.cy,s.box,s.box)}
 // 絵文字を事前レンダリング(毎フレームのfillTextより高速&表示濃度が安定)
 function makeSprites(){
-  sprites=EMOJI.map(e=>{
-    const s=SZ*2,c=document.createElement('canvas');
-    c.width=c.height=Math.ceil(s*DPR);
-    const g=c.getContext('2d');
-    g.scale(DPR,DPR);
-    g.font=SZ+'px serif';g.textAlign='center';g.textBaseline='middle';g.fillStyle='#fff';
-    g.fillText(e,s/2,s/2);
-    return c;
-  });
+  sprites=EMOJI.map(e=>makeEmojiSprite(e,SZ));
+  bigSprites={};
+  for(const e of EMOJI.concat('👑'))bigSprites[e]=makeEmojiSprite(e,110);
 }
 function resize(){
   DPR=devicePixelRatio||1;W=innerWidth;H=innerHeight;
@@ -142,18 +166,16 @@ function draw(){
   }
 
   // 粒子(常に通常の濃さで描画)
-  const S2=SZ*2;
-  for(let i=0;i<N;i++)ctx.drawImage(sprites[pt[i]],px[i]-SZ,py[i]-SZ,S2,S2);
+  for(let i=0;i<N;i++)drawSprite(ctx,sprites[pt[i]],px[i],py[i]);
 
   // 優勝演出
   if(finished){
     const sec=Math.ceil(3-(performance.now()-finishTime)/1000);
     ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fillRect(0,0,W,H);
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';
-    ctx.font='110px serif';
-    ctx.fillText('👑',W/2,H/2-120);
-    ctx.fillText(EMOJI[pt[0]],W/2,H/2);
+    drawSprite(ctx,bigSprites['👑'],W/2,H/2-120);
+    drawSprite(ctx,bigSprites[EMOJI[pt[0]]],W/2,H/2);
     ctx.font='bold 72px sans-serif';ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(sec,W/2,H/2+120);
     if(sec<=0)reset();
   }

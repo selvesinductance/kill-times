@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gendered Life</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; background: #0a0a0a; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif; display: flex; flex-direction: column; align-items: center; gap: 16px; min-height: 100vh; -webkit-user-select: none; user-select: none; }
+  h1 { font-size: 20px; margin: 0; font-weight: 500; letter-spacing: 0.5px; }
+  .subtitle { font-size: 12px; color: #888; margin-top: -8px; }
+  canvas { border: 1px solid #222; background: #111; cursor: crosshair; image-rendering: pixelated; touch-action: none; width: min(92vw, 600px); height: auto; aspect-ratio: 1; }
+  .panel { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center; max-width: 640px; }
+  button { background: #1a1a1a; color: #eee; border: 1px solid #333; padding: 10px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.15s; min-height: 40px; }
+  button:hover { background: #252525; border-color: #555; }
+  button.primary { background: #2d5a2d; border-color: #3d7a3d; }
+  button.primary:hover { background: #3d7a3d; }
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .stat { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; }
+  .dot.male { background: #4ade80; }
+  .dot.female { background: #fbbf24; }
+  .dot.empty { background: #333; }
+  label { font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 6px; }
+  input[type=range] { width: 100px; }
+  select { background: #1a1a1a; color: #eee; border: 1px solid #333; padding: 6px 8px; border-radius: 4px; font-size: 12px; min-height: 32px; }
+  .hint { font-size: 11px; color: #666; text-align: center; padding: 0 12px; }
+  footer.rules { width: min(92vw, 640px); border-top: 1px solid #222; margin-top: 8px; padding: 16px 4px 8px; font-size: 12px; color: #999; line-height: 1.75; }
+  footer.rules h2 { font-size: 13px; font-weight: 600; color: #ccc; margin: 0 0 8px; letter-spacing: 0.5px; }
+  footer.rules p { margin: 0 0 10px; }
+  footer.rules ol { margin: 0 0 12px; padding-left: 1.5em; }
+  footer.rules li { margin-bottom: 8px; }
+  footer.rules li::marker { color: #555; }
+  footer.rules b { color: #ccc; font-weight: 600; }
+  footer.rules h3 { font-size: 12.5px; font-weight: 600; color: #ddd; margin: 16px 0 4px; }
+  footer.rules table { width: 100%; border-collapse: collapse; margin: 0 0 6px; }
+  footer.rules th, footer.rules td { padding: 8px 10px; border-bottom: 1px solid #222; text-align: left; line-height: 1.5; }
+  footer.rules th { color: #ccc; font-weight: 600; font-size: 12px; }
+  footer.rules th:nth-child(1), footer.rules td:nth-child(1),
+  footer.rules th:nth-child(2), footer.rules td:nth-child(2) { text-align: center; white-space: nowrap; }
+  footer.rules .m { color: #4ade80; font-weight: 600; }
+  footer.rules .f { color: #fbbf24; font-weight: 600; }
+  footer.rules .note { color: #666; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Gendered Life</h1>
+<div class="subtitle">オス(緑) × メス(黄) のライフゲーム亜種</div>
+
+<canvas id="c" width="600" height="600"></canvas>
+
+<div class="stats">
+  <div class="stat"><span class="dot male"></span><span>オス: <b id="mCount">0</b></span></div>
+  <div class="stat"><span class="dot female"></span><span>メス: <b id="fCount">0</b></span></div>
+  <div class="stat"><span>世代: <b id="gen">0</b></span></div>
+</div>
+
+<div class="panel">
+  <button id="play" class="primary">▶ 再生</button>
+  <button id="step">⏭ 1ステップ</button>
+  <button id="rand">🎲 ランダム</button>
+  <button id="clear">🗑 クリア</button>
+  <label>速度 <input type="range" id="speed" min="1" max="60" value="10"></label>
+  <label>描画
+    <select id="brush">
+      <option value="1">オス(緑)</option>
+      <option value="2">メス(黄)</option>
+      <option value="0">消去</option>
+    </select>
+  </label>
+  <label>世界
+    <select id="world">
+      <option value="torus">トーラス (端がつながる)</option>
+      <option value="wall">壁 (端で止まる)</option>
+    </select>
+  </label>
+</div>
+
+<div class="hint">クリック / ドラッグ / タッチで描画 · 右クリックで消去 (タッチの場合はブラシで「消去」を選択)</div>
+
+<footer class="rules">
+  <h2>ルール</h2>
+  <p>各世代、すべてのセルに以下を同時に適用します。「隣接数」は周囲8マスにいる生きたセルの数です。</p>
+
+  <h3>生きているセルの運命</h3>
+  <table>
+    <thead>
+      <tr><th>隣接数</th><th>内訳</th><th>結果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>0〜1</td><td>-</td><td>過疎で死亡</td></tr>
+      <tr><td>2</td><td>同性のみ</td><td>過疎で死亡</td></tr>
+      <tr><td>2</td><td><span class="m">オス1</span>+<span class="f">メス1</span></td><td><b>新陳</b> — <span class="m">オス40%</span> / <span class="f">メス40%</span> / 死20%</td></tr>
+      <tr><td>3</td><td>何でも</td><td>生存(性別維持)</td></tr>
+      <tr><td>4以上</td><td>-</td><td>過密で死亡</td></tr>
+    </tbody>
+  </table>
+
+  <h3>死んでいるセルの運命</h3>
+  <table>
+    <thead>
+      <tr><th>隣接数</th><th>内訳</th><th>結果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>0〜1</td><td>-</td><td>死亡のまま</td></tr>
+      <tr><td>2</td><td>同性のみ</td><td>死亡のまま</td></tr>
+      <tr><td>2</td><td><span class="m">オス1</span>+<span class="f">メス1</span></td><td><b>新陳</b> — <span class="m">オス40%</span> / <span class="f">メス40%</span> / 死20%</td></tr>
+      <tr><td>3</td><td>全部同性</td><td>全部オスでも全部メスでも死亡のまま</td></tr>
+      <tr><td>3</td><td><b>両性混在</b></td><td><b>誕生</b> — <span class="m">オス</span>/<span class="f">メス</span> 50/50</td></tr>
+      <tr><td>4以上</td><td>-</td><td>死亡のまま</td></tr>
+    </tbody>
+  </table>
+  <p class="note">通常のライフゲーム(誕生3 / 生存2・3)との違い: 生存条件が「3」だけになり、誕生には両性が必要で、さらに「出会い」による確率的な再抽選が入るため、盤面は毎回同じようには進みません。(ゴミカス)</p>
+</footer>
+
+<script>
+const SIZE = 80;           // グリッドの1辺
+const CELL = 7.5;          // 1セルのピクセル
+const DEAD = 0, MALE = 1, FEMALE = 2;
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = SIZE * CELL;
+canvas.height = SIZE * CELL;
+
+let grid = new Uint8Array(SIZE * SIZE);
+let generation = 0;
+let running = false;
+let lastTick = 0;
+let fps = 10;
+let worldMode = 'torus';  // 'torus' または 'wall'
+
+function countNeighbors(x, y) {
+  let total = 0, m = 0, f = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      let nx = x + dx, ny = y + dy;
+      if (worldMode === 'wall') {
+        // 壁モード: グリッド外は死セル扱い
+        if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) continue;
+      } else {
+        // トーラス: 端がつながる
+        nx = (nx + SIZE) % SIZE;
+        ny = (ny + SIZE) % SIZE;
+      }
+      const v = grid[ny * SIZE + nx];
+      if (v === MALE) { total++; m++; }
+      else if (v === FEMALE) { total++; f++; }
+    }
+  }
+  return { total, m, f };
+}
+
+function step() {
+  const next = new Uint8Array(SIZE * SIZE);
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const i = y * SIZE + x;
+      const cell = grid[i];
+      const { total, m, f } = countNeighbors(x, y);
+
+      // 新陳: オス1+メス1 が隣接しているとき、生死不問で
+      //       オス40% / メス40% / 死20% で再ロール
+      if (m === 1 && f === 1) {
+        const r = Math.random();
+        next[i] = r < 0.40 ? MALE : (r < 0.80 ? FEMALE : DEAD);
+      } else if (cell !== DEAD) {
+        // 生存: ちょうど3の隣接で生き残る(性別はそのまま)
+        // それ以外(過疎<=1/同性2、過密>=4)は死亡
+        next[i] = (total === 3) ? cell : DEAD;
+      } else {
+        // 誕生: 死セルで隣接ちょうど3 + オス・メス両方いれば 50/50 で誕生
+        if (total === 3 && m >= 1 && f >= 1) {
+          next[i] = Math.random() < 0.5 ? MALE : FEMALE;
+        }
+      }
+    }
+  }
+  grid = next;
+  generation++;
+}
+
+function draw() {
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let males = 0, females = 0;
+  for (let i = 0; i < grid.length; i++) {
+    const v = grid[i];
+    if (v === DEAD) continue;
+    if (v === MALE) { ctx.fillStyle = '#4ade80'; males++; }
+    else { ctx.fillStyle = '#fbbf24'; females++; }
+    const x = (i % SIZE) * CELL;
+    const y = Math.floor(i / SIZE) * CELL;
+    ctx.fillRect(x, y, CELL - 0.5, CELL - 0.5);
+  }
+  document.getElementById('mCount').textContent = males;
+  document.getElementById('fCount').textContent = females;
+  document.getElementById('gen').textContent = generation;
+}
+
+function loop(ts) {
+  if (running && ts - lastTick > 1000 / fps) {
+    step();
+    draw();
+    lastTick = ts;
+  }
+  requestAnimationFrame(loop);
+}
+
+// ========== 描画 (マウス / タッチ / ペン 共通: Pointer Events) ==========
+let drawing = false;
+let erasing = false;
+let drawValue = MALE;
+let lastCell = null;  // ドラッグ補間用
+
+function cellFromEvent(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / rect.width * SIZE);
+  const y = Math.floor((e.clientY - rect.top) / rect.height * SIZE);
+  return { x, y };
+}
+
+function setCell(x, y, value) {
+  if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) return;
+  grid[y * SIZE + x] = value;
+}
+
+// 速いドラッグでも途切れないよう、前回セルとの間を線形補間して塗る
+function paintTo(e) {
+  const { x, y } = cellFromEvent(e);
+  const value = erasing ? DEAD : drawValue;
+  if (lastCell) {
+    const steps = Math.max(Math.abs(x - lastCell.x), Math.abs(y - lastCell.y), 1);
+    for (let s = 0; s <= steps; s++) {
+      const px = Math.round(lastCell.x + (x - lastCell.x) * s / steps);
+      const py = Math.round(lastCell.y + (y - lastCell.y) * s / steps);
+      setCell(px, py, value);
+    }
+  } else {
+    setCell(x, y, value);
+  }
+  lastCell = { x, y };
+  draw();
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  drawing = true;
+  erasing = (e.button === 2);
+  drawValue = parseInt(document.getElementById('brush').value, 10);
+  lastCell = null;
+  canvas.setPointerCapture(e.pointerId);
+  paintTo(e);
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (drawing) paintTo(e);
+});
+function stopDrawing() { drawing = false; lastCell = null; }
+canvas.addEventListener('pointerup', stopDrawing);
+canvas.addEventListener('pointercancel', stopDrawing);
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ========== 初期化 ==========
+function randomize() {
+  for (let i = 0; i < grid.length; i++) {
+    const r = Math.random();
+    if (r < 0.15) grid[i] = MALE;
+    else if (r < 0.30) grid[i] = FEMALE;
+    else grid[i] = DEAD;
+  }
+  generation = 0;
+  draw();
+}
+
+function clearGrid() {
+  grid.fill(DEAD);
+  generation = 0;
+  draw();
+}
+
+// ========== ボタン類 ==========
+document.getElementById('play').addEventListener('click', (e) => {
+  running = !running;
+  e.currentTarget.textContent = running ? '⏸ 停止' : '▶ 再生';
+});
+document.getElementById('step').addEventListener('click', () => { step(); draw(); });
+document.getElementById('rand').addEventListener('click', randomize);
+document.getElementById('clear').addEventListener('click', clearGrid);
+document.getElementById('speed').addEventListener('input', (e) => fps = parseInt(e.target.value, 10));
+document.getElementById('world').addEventListener('change', (e) => {
+  worldMode = e.target.value;
+  draw();
+});
+
+// スタート
+randomize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

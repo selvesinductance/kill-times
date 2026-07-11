@@ -1,39 +1,78 @@
-<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">語彙と構文パターンを大幅に増やした、キー入力で疑似コードを生成するターミナル風ウィジェット</h2>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>hacker typer — 適当に叩くだけ</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230d1117'/%3E%3Crect x='4' y='4' width='5' height='8' fill='%233fb950'/%3E%3C/svg%3E">
 <style>
-#term{max-width:720px;margin:0 auto;background:#0d1117;border:0.5px solid var(--border-strong);border-radius:12px;overflow:hidden;font-family:var(--font-mono),ui-monospace,'SF Mono',Menlo,Consolas,monospace;}
-#tbar{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#161b22;border-bottom:1px solid #21262d;}
-.dt{width:11px;height:11px;border-radius:50%;}
-#ttl{margin-left:6px;font-size:12px;color:#8b949e;user-select:none;}
-#scr{position:relative;height:320px;overflow-y:auto;padding:12px 14px;cursor:text;font-size:13px;line-height:1.6;}
-#out{white-space:pre-wrap;word-break:break-all;color:#abb2bf;}
-#out .kw{color:#c678dd}#out .fn{color:#61afef}#out .str{color:#98c379}#out .num{color:#d19a66}
-#out .com{color:#7f848e;font-style:italic}#out .type{color:#e5c07b}#out .prop{color:#e06c75}
-#out .ok{color:#3fb950}#out .warn{color:#d29922}#out .err{color:#f85149}#out .pr{color:#56d364}
-#cur{display:inline-block;width:8px;height:1.05em;background:#9da5b0;vertical-align:text-bottom;animation:bl 1s steps(1) infinite;}
+:root{--bg:#07090d;--panel:#0d1117;--bar:#161b22;--bd:#21262d;--tx:#abb2bf;--mut:#8b949e}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);overflow:hidden;
+ font-family:ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,'Noto Sans Mono CJK JP',monospace;
+ display:flex;align-items:center;justify-content:center;padding:22px;touch-action:manipulation}
+#term{width:min(980px,100%);height:min(700px,100%);display:flex;flex-direction:column;
+ background:var(--panel);border:1px solid #30363d;border-radius:12px;overflow:hidden;
+ box-shadow:0 24px 70px rgba(0,0,0,.55)}
+@media(max-width:640px){body{padding:0}#term{width:100%;height:100%;border-radius:0;border:0}}
+#tbar{display:flex;align-items:center;gap:7px;padding:10px 13px;background:var(--bar);
+ border-bottom:1px solid var(--bd);flex:none;user-select:none}
+.dt{width:12px;height:12px;border-radius:50%}
+#ttl{margin-left:7px;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#scrwrap{position:relative;flex:1;display:flex;min-height:0}
+#scr{flex:1;overflow-y:auto;padding:14px 16px;cursor:text;
+ font-size:clamp(12px,1.7vw,14px);line-height:1.65;-webkit-overflow-scrolling:touch}
+#fx{position:absolute;inset:0;pointer-events:none;
+ background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
+ radial-gradient(ellipse at center,transparent 62%,rgba(0,0,0,.28) 100%)}
+#out{white-space:pre-wrap;word-break:break-all}
+.kw{color:#c678dd}.fn{color:#61afef}.str{color:#98c379}.num{color:#d19a66}
+.com{color:#7f848e;font-style:italic}.type{color:#e5c07b}.prop{color:#e06c75}
+.ok{color:#3fb950}.warn{color:#d29922}.err{color:#f85149}.pr{color:#56d364}
+#cur{display:inline-block;width:.55em;height:1.05em;background:#9da5b0;
+ vertical-align:text-bottom;animation:bl 1s steps(1) infinite}
 @keyframes bl{50%{opacity:0}}
-#hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#c9d1d9;font-size:13px;padding:20px;background:rgba(13,17,23,.55);transition:opacity .4s;pointer-events:none;line-height:1.8;}
-#stat{display:flex;gap:16px;flex-wrap:wrap;padding:7px 14px;background:#161b22;border-top:1px solid #21262d;font-size:11px;color:#8b949e;user-select:none;}
-#acc{margin-left:auto;}
-#acc.on{color:#3fb950;}
-#mob{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;}
+#hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+ text-align:center;color:#c9d1d9;font-size:clamp(13px,2vw,15px);padding:24px;line-height:2;
+ background:rgba(13,17,23,.55);opacity:0;transition:opacity .5s;pointer-events:none}
+#stat{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 13px;
+ background:var(--bar);border-top:1px solid var(--bd);font-size:11px;color:var(--mut);
+ flex:none;user-select:none}
+#acc{margin-left:auto;white-space:nowrap}
+#acc.on{color:#3fb950}
+.tbtn{background:none;border:1px solid #30363d;color:var(--mut);font:inherit;font-size:11px;
+ padding:2px 9px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.tbtn:hover{color:#c9d1d9;border-color:#6e7681}
+.tbtn:focus-visible{outline:2px solid #58a6ff;outline-offset:1px}
+#mob{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px}
+@media(prefers-reduced-motion:reduce){#cur{animation:none}}
 </style>
+</head>
+<body>
 <div id="term">
   <div id="tbar">
-    <span class="dt" style="background:#ff5f56"></span><span class="dt" style="background:#ffbd2e"></span><span class="dt" style="background:#27c93f"></span>
+    <span class="dt" style="background:#ff5f56"></span>
+    <span class="dt" style="background:#ffbd2e"></span>
+    <span class="dt" style="background:#27c93f"></span>
     <span id="ttl">root@mainframe: ~/src — zsh</span>
   </div>
-  <div id="scr">
-    <div id="out"></div>
-    <div id="hint">ここをクリック / タップして、<br>キーボードを適当に連打してみて</div>
+  <div id="scrwrap">
+    <div id="scr"><div id="out"></div></div>
+    <div id="fx"></div>
+    <div id="hint">キーボードを適当に連打してみて<br>enter を押すと何かが実行される<br>(スマホは画面をタップ連打)</div>
   </div>
   <div id="stat">
     <span id="stL">lines 0</span>
     <span id="stC">chars 0</span>
-    <span style="color:#484f58">esc でクリア</span>
+    <button class="tbtn" id="runBtn" type="button">run (enter)</button>
+    <button class="tbtn" id="sndBtn" type="button">sound: off</button>
+    <button class="tbtn" id="clrBtn" type="button">clear (esc)</button>
+    <button class="tbtn" id="fsBtn" type="button">fullscreen</button>
     <span id="acc">access: pending…</span>
   </div>
 </div>
-<input id="mob" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="タイピング入力" />
+<input id="mob" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="タイピング入力">
 <script>
 (function(){
 var pick=function(a){return a[(Math.random()*a.length)|0]};
@@ -157,9 +196,11 @@ var q=[];
 function refill(){while(q.length<60){var l=genLine(),i;for(i=0;i<l.length;i++)q.push(l[i].n?NL:{t:l[i].t,c:l[i].c,p:0});}}
 var out=document.getElementById('out'),scr=document.getElementById('scr'),hint=document.getElementById('hint');
 var stL=document.getElementById('stL'),stC=document.getElementById('stC'),acc=document.getElementById('acc'),mob=document.getElementById('mob');
+var sndBtn=document.getElementById('sndBtn'),clrBtn=document.getElementById('clrBtn'),fsBtn=document.getElementById('fsBtn'),runBtn=document.getElementById('runBtn');
 var cur=document.createElement('span');cur.id='cur';
-var line=null,curSpan=null,curCls='',lineCount=0,chars=0,hintOn=true;
-function newLine(){line=document.createElement('div');out.appendChild(line);line.appendChild(cur);curSpan=null;curCls='';}
+var line=null,curSpan=null,curCls='',lineCount=0,chars=0,hintOn=false,booting=true,running=false;
+function newLine(){line=document.createElement('div');out.appendChild(line);line.appendChild(cur);curSpan=null;curCls='';
+ while(out.childElementCount>400)out.removeChild(out.firstChild);}
 function stats(){stL.textContent='lines '+lineCount;stC.textContent='chars '+chars;
  var a='access: pending…',on=false;
  if(chars>1100){a='mainframe: unlocked';on=true;}
@@ -169,28 +210,137 @@ function stats(){stL.textContent='lines '+lineCount;stC.textContent='chars '+cha
 function typeChunk(n){refill();
  while(n>0){if(!q.length)refill();
   var tk=q[0];
-  if(tk.n){q.shift();lineCount++;newLine();n--;continue;}
+  if(tk.n){q.shift();lineCount++;newLine();n--;chars++;continue;}
   if(!curSpan||curCls!==tk.c){curSpan=document.createElement('span');if(tk.c)curSpan.className=tk.c;curCls=tk.c;line.insertBefore(curSpan,cur);}
   var take=Math.min(n,tk.t.length-tk.p);
   curSpan.textContent+=tk.t.substr(tk.p,take);
   tk.p+=take;n-=take;chars+=take;
   if(tk.p>=tk.t.length)q.shift();}
  scr.scrollTop=scr.scrollHeight;stats();}
-function stroke(){typeChunk(3+((Math.random()*4)|0));
+var actx=null,noiseBuf=null,soundOn=false;
+function initAudio(){if(actx)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+ actx=new AC();var len=(actx.sampleRate*.012)|0;
+ noiseBuf=actx.createBuffer(1,len,actx.sampleRate);
+ var d=noiseBuf.getChannelData(0),i;
+ for(i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);}
+var alt=false;
+function click(){if(!soundOn||!actx||!noiseBuf)return;
+ if(actx.state==='suspended')actx.resume();
+ alt=!alt;
+ var s=actx.createBufferSource();s.buffer=noiseBuf;
+ s.playbackRate.value=(alt?1.15:.92)+(Math.random()*.16-.08);
+ var f=actx.createBiquadFilter();f.type='bandpass';
+ f.frequency.value=4200+Math.random()*1600;f.Q.value=.9;
+ var g=actx.createGain();g.gain.value=.055+Math.random()*.02;
+ s.connect(f);f.connect(g);g.connect(actx.destination);s.start();}
+function stroke(){if(booting||running)return;
+ typeChunk(3+((Math.random()*4)|0));click();
  if(hintOn){hint.style.opacity=0;hintOn=false;}}
-function clearAll(){out.innerHTML='';q=[];blocks=[];ages=[];lineCount=0;chars=0;newLine();stats();}
+var runTimer=null;
+function clearAll(){if(runTimer){clearInterval(runTimer);runTimer=null;running=false;}
+ out.innerHTML='';q=[];blocks=[];ages=[];lineCount=0;chars=0;newLine();stats();}
+function thunk(){if(!soundOn||!actx||!noiseBuf)return;
+ if(actx.state==='suspended')actx.resume();
+ var s=actx.createBufferSource();s.buffer=noiseBuf;s.playbackRate.value=.5;
+ var f=actx.createBiquadFilter();f.type='bandpass';f.frequency.value=1100;f.Q.value=.8;
+ var g=actx.createGain();g.gain.value=.09;
+ s.connect(f);f.connect(g);g.connect(actx.destination);s.start();}
+function hx(n){var s='',i;for(i=0;i<n;i++)s+=((Math.random()*16)|0).toString(16);return s;}
+function finishLine(){refill();
+ while(q.length&&!q[0].n)typeChunk(q[0].t.length-q[0].p);
+ if(q.length&&q[0].n)typeChunk(1);}
+var PROGS=[
+function(){var L=[[T('$ ','pr'),T('make build --release')]],i,n=2+((Math.random()*3)|0);
+ for(i=0;i<n;i++)L.push([T('   compiling ','com'),T(pick(N)+'-'+pick(N)+' '),T('v'+(1+((Math.random()*4)|0))+'.'+((Math.random()*9)|0)+'.'+((Math.random()*20)|0),'num')]);
+ L.push([T('✔ finished ','ok'),T('release [optimized] in '+(Math.random()*8+1).toFixed(2)+'s','com')],[]);return L;},
+function(){var L=[[T('$ ','pr'),T('npm test')]],i,n=3+((Math.random()*3)|0),fail=Math.random()<.3?1:0,total=0;
+ for(i=0;i<n;i++){var t=3+((Math.random()*20)|0);total+=t;var f=fail&&i===n-1;
+  L.push([T(f?'FAIL':'PASS',f?'err':'ok'),T('  core/'+pick(N)+'.test.js ('+t+' tests)','com')]);}
+ L.push([T('tests: '),T((total-fail)+' passed','ok'),T(', '),T(fail+' failed',fail?'err':'com'),T(' — '+(Math.random()*5+.5).toFixed(1)+'s','com')],[]);return L;},
+function(){var rev=hx(7),reps=2+((Math.random()*8)|0);
+ return[[T('$ ','pr'),T('deploy --target '+pick(['prod-eu-2','prod-us-1','staging']))],
+ [T('→ building image … '),T('done','ok')],
+ [T('→ pushing layers ['),T('██████████','ok'),T('] 100%')],
+ [T('→ rolling out '+reps+' replicas … '),T('done','ok')],
+ [T('✔ deployed ','ok'),T('rev '+rev+' — zero downtime','com')],[]];},
+function(){var L=[[T('$ ','pr'),T('nmap -sS 10.0.0.0/24')]],i,n=2+((Math.random()*2)|0);
+ for(i=0;i<n;i++)L.push([T('   host 10.0.0.'+(2+((Math.random()*250)|0))+' — '),T('ports '+pick(['22,443','22,80,443','8443','22,6379'])+' open','warn')]);
+ L.push([T('   bypassing firewall … '),T('ok','ok')],
+ [T('ACCESS GRANTED','ok'),T(' — welcome, root','com')],[]);return L;},
+function(){var a=hx(7),b=hx(7),n=8+((Math.random()*90)|0);
+ return[[T('$ ','pr'),T('git push origin main')],
+ [T('   enumerating objects: '+n+', done.','com')],
+ [T('   compressing objects: 100% ('+n+'/'+n+'), done.','com')],
+ [T('   '+a+'..'+b+'  ','warn'),T('main -> main')],[]];},
+function(){var L=[[T('$ ','pr'),T('migrate up')]],i,n=2+((Math.random()*3)|0),base=3+((Math.random()*90)|0);
+ for(i=0;i<n;i++)L.push([T('   applying '+('00'+(base+i)).slice(-3)+'_'+pick(V)+'_'+pick(N)+' … '),T('ok','ok')]);
+ L.push([T('✔ schema up to date','ok')],[]);return L;},
+function(){var fp='',cs='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',i;
+ for(i=0;i<16;i++)fp+=cs[(Math.random()*cs.length)|0];
+ return[[T('$ ','pr'),T('ssh-keygen -t ed25519 -q')],
+ [T('   generating keypair … '),T('done','ok')],
+ [T('   fingerprint ','com'),T('SHA256:'+fp,'num')],[]];},
+function(){return[[T('$ ','pr'),T('sudo rm -rf /var/cache/'+pick(N))],
+ [T('   freed '+(Math.random()*3+.2).toFixed(1)+' GB','ok'),T(' — feels good','com')],[]];}
+];
+function runCommand(){if(booting||running)return;
+ thunk();
+ if(line&&line.childElementCount>1)finishLine();
+ q=[];blocks=[];ages=[];
+ var prog=pick(PROGS)(),total=0,i,j;
+ for(i=0;i<prog.length;i++){for(j=0;j<prog[i].length;j++){var tk=prog[i][j];
+  q.push({t:tk.t,c:tk.c,p:0});total+=tk.t.length;}q.push(NL);total++;}
+ running=true;var done=0,pause=3;
+ runTimer=setInterval(function(){
+  if(pause>0){pause--;return;}
+  refill();
+  if(q.length&&q[0].n){typeChunk(1);done++;pause=2+((Math.random()*6)|0);}
+  else{var tk2=q[0],step=Math.min(4+((Math.random()*4)|0),tk2.t.length-tk2.p,total-done);
+   typeChunk(step);done+=step;}
+  if(done>=total){clearInterval(runTimer);runTimer=null;running=false;}
+ },16);
+ if(hintOn){hint.style.opacity=0;hintOn=false;}}
 var recent=false;
 window.addEventListener('keydown',function(e){
- if(e.key==='Escape'){clearAll();return;}
+ if(e.key==='Escape'){if(!booting)clearAll();return;}
  if(e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='Unidentified')return;
- if(e.key.length===1||e.key==='Backspace'||e.key==='Enter'||e.key==='Tab')e.preventDefault();else return;
+ if(e.target===sndBtn||e.target===clrBtn||e.target===fsBtn||e.target===runBtn){if(e.key==='Enter'||e.key===' ')return;}
+ if(e.key==='Enter'){e.preventDefault();
+  recent=true;setTimeout(function(){recent=false},80);
+  runCommand();return;}
+ if(e.key.length===1||e.key==='Backspace'||e.key==='Tab')e.preventDefault();else return;
  recent=true;setTimeout(function(){recent=false},80);
  stroke();});
 mob.addEventListener('input',function(){mob.value='';if(!recent)stroke();});
+runBtn.addEventListener('click',function(){runCommand();});
 scr.addEventListener('pointerdown',function(e){e.preventDefault();
  try{mob.focus({preventScroll:true});}catch(err){mob.focus();}
  stroke();});
-newLine();refill();stats();
+sndBtn.addEventListener('click',function(){initAudio();soundOn=!soundOn;
+ sndBtn.textContent='sound: '+(soundOn?'on':'off');if(soundOn)click();});
+clrBtn.addEventListener('click',function(){clearAll();});
+fsBtn.addEventListener('click',function(){
+ if(document.fullscreenElement){document.exitFullscreen();}
+ else if(document.documentElement.requestFullscreen){document.documentElement.requestFullscreen().catch(function(){});}});
+var BOOT=[
+ [T('mainframe bios ','com'),T('v4.2.0','num'),T(' … '),T('ok','ok')],
+ [T('mounting /dev/keyboard … '),T('ok','ok')],
+ [T('loading fake-code generator … '),T('ok','ok')],
+ [T('$ ','pr'),T('ready.')]];
+var bootTotal=0,bi,bj;
+for(bi=BOOT.length-1;bi>=0;bi--){q.unshift(NL);bootTotal++;
+ for(bj=BOOT[bi].length-1;bj>=0;bj--){var bt=BOOT[bi][bj];
+  q.unshift({t:bt.t,c:bt.c,p:0});bootTotal+=bt.t.length;}}
+newLine();stats();
+var bootDone=0;
+var bootTimer=setInterval(function(){
+ var step=Math.min(3,bootTotal-bootDone);
+ typeChunk(step);bootDone+=step;
+ if(bootDone>=bootTotal){clearInterval(bootTimer);booting=false;
+  chars=0;lineCount=0;stats();
+  hintOn=true;hint.style.opacity=1;}},16);
 })();
 </script>
+</body>
+</html>

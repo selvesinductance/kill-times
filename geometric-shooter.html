@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ジオメトリック・シューター</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; }
+body {
+  background:#000; display:flex; flex-direction:column; overflow:hidden;
+  font-family:'Segoe UI',system-ui,sans-serif; overscroll-behavior:none;
+  -webkit-user-select:none; user-select:none;
+}
+#ui {
+  flex:0 0 auto; height:48px; display:flex; align-items:center;
+  justify-content:space-between; gap:10px; padding:0 12px;
+}
+.stat { color:#fff; font-size:clamp(13px,2.4vmin,18px); text-shadow:0 0 8px cyan; white-space:nowrap; }
+#waveprog { font-size:0.8em; color:#8ff; }
+#firestat { font-size:0.75em; color:#aaa; }
+#pauseBtn {
+  background:transparent; border:1px solid rgba(0,255,255,0.5); color:cyan;
+  border-radius:6px; font-size:15px; width:40px; height:32px; cursor:pointer; flex:0 0 auto;
+}
+#pauseBtn:hover { background:rgba(0,255,255,0.12); }
+#stage { flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; }
+canvas { display:block; cursor:crosshair; touch-action:none; }
+#bossbar {
+  position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+  width:min(420px,72vw); display:none; flex-direction:column; align-items:center; pointer-events:none;
+}
+#bossname { color:#fff; font-size:13px; letter-spacing:2px; margin-bottom:4px; text-shadow:0 0 8px #fff; }
+#bosstrack { width:100%; height:12px; background:rgba(255,255,255,0.1); border-radius:6px; overflow:hidden; }
+#bossbar-fill { height:100%; width:100%; border-radius:6px; transition:width 0.1s; }
+#msg {
+  position:fixed; top:46%; left:50%; transform:translate(-50%,-50%);
+  color:#fff; font-size:clamp(22px,5vmin,30px); text-align:center; line-height:1.6;
+  text-shadow:0 0 16px cyan; display:none; pointer-events:none; width:min(420px,86vw);
+}
+#msg .hint { font-size:clamp(12px,2.6vmin,15px); color:#9ad; text-shadow:none; margin:10px 0 30px; line-height:1.7; }
+#msg .hi { font-size:clamp(14px,3vmin,18px); color:#ffd700; text-shadow:0 0 10px #ffd700; }
+#msg button {
+  margin-top:10px; display:block; width:100%; padding:10px 24px; background:rgba(0,0,0,0.5);
+  border:2px solid cyan; color:cyan; font-size:clamp(16px,3.4vmin,20px); cursor:pointer;
+  border-radius:6px; pointer-events:all;
+}
+#msg button:first-of-type { margin-top:44px; }
+#msg button:hover { background:rgba(0,255,255,0.15); }
+#msg .auto-btn { border-color:#ffaa00; color:#ffaa00; }
+#msg .auto-btn:hover { background:rgba(255,170,0,0.15); }
+#bombBtn {
+  position:fixed; bottom:16px; right:16px; width:62px; height:62px; border-radius:50%;
+  background:rgba(0,0,0,0.55); border:2px solid #ffaa00; color:#ffaa00;
+  font-size:20px; line-height:1.1; cursor:pointer; z-index:5; display:none;
+  text-shadow:0 0 8px #ffaa00; touch-action:manipulation;
+}
+#bombBtn.empty { opacity:0.35; border-color:#666; color:#888; text-shadow:none; }
+#bombBtn:not(.empty):hover { background:rgba(255,170,0,0.18); }
+#bombCount { display:block; font-size:13px; font-weight:bold; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div class="stat">❤️ <span id="lives">3</span> <span id="firestat"></span></div>
+  <div class="stat">🏆 <span id="score">0</span></div>
+  <div class="stat">⏱ <span id="time">0:00</span></div>
+  <div class="stat" id="wavestat">Wave <span id="wave">1</span> <span id="waveprog"></span></div>
+  <button id="pauseBtn" title="一時停止 (P / Esc)">⏸</button>
+</div>
+<div id="stage"><canvas id="c"></canvas></div>
+<button id="bombBtn" title="ボム (Space / B)">💣<span id="bombCount">0</span></button>
+<div id="bossbar">
+  <div id="bossname">BOSS</div>
+  <div id="bosstrack"><div id="bossbar-fill"></div></div>
+</div>
+<div id="msg">
+  <div id="msgText">ジオメトリック<br>シューター</div>
+  <div class="hint" id="msgHint">タップ / ドラッグ / WASD・矢印キーで移動<br>照準と射撃は自動 ・ P / Esc で一時停止<br>💣ボム: Space / B / 画面右下ボタン（ボス撃破で獲得）</div>
+  <button onclick="startGame(false)">スタート</button>
+  <button class="auto-btn" onclick="startGame(true)">🤖 オートプレイ</button>
+</div>
+
+<script>
+'use strict';
+const canvas    = document.getElementById('c');
+const ctx       = canvas.getContext('2d');
+const stage     = document.getElementById('stage');
+const livesEl   = document.getElementById('lives');
+const scoreEl   = document.getElementById('score');
+const waveEl    = document.getElementById('wave');
+const waveStatEl= document.getElementById('wavestat');
+const timeEl    = document.getElementById('time');
+const waveProgEl= document.getElementById('waveprog');
+const fireStatEl= document.getElementById('firestat');
+const msgDiv    = document.getElementById('msg');
+const msgText   = document.getElementById('msgText');
+const msgHint   = document.getElementById('msgHint');
+const bossBarEl = document.getElementById('bossbar');
+const bossFill  = document.getElementById('bossbar-fill');
+const pauseBtn  = document.getElementById('pauseBtn');
+const bombBtn   = document.getElementById('bombBtn');
+const bombCountEl = document.getElementById('bombCount');
+
+// ===== 固定論理解像度（全デバイス共通の広さ） =====
+const W = 700, H = 700;
+let scale = 1;
+function resize(){
+  const size = Math.max(200, Math.min(stage.clientWidth, stage.clientHeight) - 8);
+  const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.style.width  = size + 'px';
+  canvas.style.height = size + 'px';
+  canvas.width  = Math.round(size * dpr);
+  canvas.height = Math.round(size * dpr);
+  scale = canvas.width / W;
+  if(!running || paused){ draw(); if(paused) drawPauseOverlay(); }
+}
+
+// --- Constants ---
+const PLAYER_SPD  = 4.5;
+const BULLET_SPD  = 12;
+const STEP = 1000/60; // 固定タイムステップ（リフレッシュレート非依存）
+// n角形の敵: HPは n-2 (3≦n≦12)。大きいほど遅く・硬く・高得点
+const TYPES = [];
+for(let n=3;n<=12;n++){
+  const hp=n-2;
+  TYPES.push({ sides:n, hp, speed:1.5/hp, score:hp, r:13+(n-3)*1.5 });
+}
+
+// --- State ---
+const player = { x:W/2, y:H/2, tx:W/2, ty:H/2, r:14, shootCd:0, invincible:0 };
+let bullets=[], enemies=[], particles=[], floatTexts=[];
+let score=0, lives=3, wave=1, running=false, paused=false, autoPlay=false, hiScore=0;
+let spawnTimer=0, spawnInterval=90, waveKills=0, waveTarget=10;
+let flashTimer=0, flashHue=0, flashMode='normal'; // 'normal'|'damage'|'boss'
+let boss=null, bossSpawned=false;
+let bombs=0, bombUses=0, shockwaves=[], rareQueue=[];
+let nearestCache=null;
+let last=0, acc=0, lastFirePct=-1;
+let playFrames=0, lastSec=-1;
+
+// --- Color helpers ---
+function gamingColor(offset=0){ return `hsl(${(Date.now()/8+offset)%360},100%,60%)`; }
+function randColor(){
+  return `hsl(${Math.random()*360|0},${Math.min(70+3*(wave-1),100)}%,${Math.min(50+2*(wave-1),70)}%)`;
+}
+function flashRgba(alpha){
+  if(flashMode==='boss') return `hsla(${(Date.now()/8+flashTimer*7)%360},100%,60%,${alpha})`;
+  if(flashMode==='damage') return `rgba(255,255,255,${alpha*0.22})`; // 被ダメ: 撃破時と同系統の白
+  return `hsla(${flashHue},60%,45%,${alpha*0.22})`;
+}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+// --- UI helpers ---
+function shootInterval(){ return lives===1 ? Math.min(10,wave) : 11; }
+function updateFireStat(){
+  const pct=Math.round(11/shootInterval()*100);
+  if(pct===lastFirePct) return;
+  lastFirePct=pct;
+  fireStatEl.textContent = pct===100 ? '' : `🔥${pct}%`;
+  fireStatEl.style.color = pct>200?'#ff4466':pct>150?'#ffaa00':'#aaa';
+}
+function updateBossBar(){
+  bossFill.style.width = (boss.hp/boss.maxHp*100)+'%';
+  bossFill.style.background = gamingColor(boss.hueOff);
+}
+function fmtTime(s){ return `${s/60|0}:${String(s%60).padStart(2,'0')}`; }
+function updateTime(){
+  const sec=playFrames/60|0;
+  if(sec===lastSec) return;
+  lastSec=sec;
+  timeEl.textContent=fmtTime(sec);
+}
+function updateWaveUI(){
+  waveEl.textContent = wave;
+  waveProgEl.textContent = (bossSpawned && boss) ? '⚠BOSS' : `(${Math.min(waveKills,waveTarget)}/${waveTarget})`;
+  const hot = wave>=11;
+  waveStatEl.style.color = hot ? '#ffaa00' : '';
+  waveStatEl.style.textShadow = hot ? '0 0 8px #ffaa00' : '';
+  waveProgEl.style.color = hot ? '#ffaa00' : '';
+}
+function updateBombUI(){
+  bombCountEl.textContent = bombs;
+  bombBtn.classList.toggle('empty', bombs===0);
+}
+
+// --- Factory helpers ---
+function addFloat(x,y,text,color){ floatTexts.push({x,y,text,color,life:70,maxLife:70}); }
+function addParticles(x,y,color,n=10){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, s=1+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:30+Math.random()*20,maxLife:50,color});
+  }
+}
+
+function spawnBoss(){
+  const side=Math.random()*4|0;
+  const x = side===1?W+30:side===3?-30:W/2;
+  const y = side===0?-30:side===2?H+30:H/2;
+  boss={ x, y, vx:0, vy:0, hp:wave, maxHp:wave,
+    r:20+2*wave, speed:0.5*(1+(wave-1)*0.1), hit:0, hueOff:Math.random()*360 };
+  bossSpawned=true;
+  bossBarEl.style.display='flex';
+  updateBossBar();
+  updateWaveUI();
+}
+
+function spawnShape(n){
+  const side=Math.random()*4|0;
+  const x = side===1?W+20:side===3?-20:Math.random()*W;
+  const y = side===0?-20:side===2?H+20:Math.random()*H;
+  const t=TYPES[n-3];
+  enemies.push({x,y,vx:0,vy:0,hp:t.hp,maxHp:t.hp,sides:n,
+    color:randColor(),score:t.score,r:t.r,speed:t.speed,hit:0});
+}
+// 通常枠: 三角(HP1)は常時、四角(HP2)はwave2から。比率は三角:四角 = 1:1
+function spawnCommon(){
+  spawnShape(wave>=2 && Math.random()<0.5 ? 4 : 3);
+}
+// 上限枠: 五角形以上(n≧5)は各waveにつき最大{wave+3-n}体まで
+// → n角形はwave{n-2}で初登場(1体)し、以後waveごとに上限+1
+function buildRareQueue(){
+  rareQueue.length=0;
+  for(let n=5;n<=12;n++){
+    const quota=wave+3-n;
+    for(let q=0;q<quota;q++) rareQueue.push(n);
+  }
+  for(let i=rareQueue.length-1;i>0;i--){
+    const j=Math.random()*(i+1)|0;
+    [rareQueue[i],rareQueue[j]]=[rareQueue[j],rareQueue[i]];
+  }
+}
+
+// --- Nearest enemy (cached per frame) ---
+function calcNearest(){
+  let best=null, minD=Infinity;
+  for(const e of enemies){
+    const d=Math.hypot(e.x-player.x,e.y-player.y);
+    if(d<minD){minD=d;best=e;}
+  }
+  if(boss){
+    const d=Math.hypot(boss.x-player.x,boss.y-player.y);
+    if(d<minD) best=boss;
+  }
+  nearestCache=best;
+}
+function nearColor(){ return nearestCache ? (nearestCache===boss ? gamingColor(boss.hueOff) : nearestCache.color) : 'white'; }
+
+// --- Auto shoot ---
+function autoShoot(){
+  if(player.shootCd>0){player.shootCd--;return;}
+  if(!nearestCache) return;
+  const dx=nearestCache.x-player.x, dy=nearestCache.y-player.y, len=Math.hypot(dx,dy);
+  bullets.push({x:player.x,y:player.y,vx:dx/len*BULLET_SPD,vy:dy/len*BULLET_SPD,life:100,color:nearColor()});
+  player.shootCd=shootInterval();
+}
+
+// --- Auto play ---
+function autoPlayUpdate(){
+  // ボム判断: 衝突寸前 or 大量に包囲されたら使用（ボムは通常敵のみ有効）
+  if(bombs>0 && shockwaves.length===0 && player.invincible===0 && enemies.length>0){
+    let minGap=Infinity, near=0;
+    for(const e of enemies){
+      const g=Math.hypot(e.x-player.x,e.y-player.y)-e.r-player.r;
+      if(g<minGap) minGap=g;
+      if(g<150) near++;
+    }
+    if(minGap<12 || near>=18) useBomb();
+  }
+  const all=[...enemies,...(boss?[boss]:[])];
+  if(!all.length) return;
+  let fx=0, fy=0;
+  for(const e of all){
+    const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
+    const w=80000/(d*d+1);
+    fx+=dx/d*w; fy+=dy/d*w;
+  }
+  // 中心への引力
+  const cx=W/2-player.x, cy=H/2-player.y, cd=Math.hypot(cx,cy)||1;
+  fx+=cx/cd*15; fy+=cy/cd*15;
+  // 壁反発
+  const margin=60;
+  fx+=Math.max(0,margin-player.x)*3-Math.max(0,player.x-(W-margin))*3;
+  fy+=Math.max(0,margin-player.y)*3-Math.max(0,player.y-(H-margin))*3;
+  // 四隅反発
+  const corners=[{x:0,y:0},{x:W,y:0},{x:0,y:H},{x:W,y:H}];
+  for(const c of corners){
+    const dx=player.x-c.x, dy=player.y-c.y, d=Math.hypot(dx,dy)||1;
+    const w=Math.max(0, 250-d)*8;
+    fx+=dx/d*w; fy+=dy/d*w;
+  }
+  const len=Math.hypot(fx,fy)||1;
+  player.tx=clamp(player.x+fx/len*90,0,W);
+  player.ty=clamp(player.y+fy/len*90,0,H);
+}
+
+// --- Keyboard (PC) ---
+const keys={};
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='p'||k==='escape'){ togglePause(); return; }
+  if(k===' '||k==='b'){ e.preventDefault(); useBomb(); return; }
+  keys[k]=true;
+  if(k.startsWith('arrow')||k===' ') e.preventDefault();
+});
+window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+function keyboardUpdate(){
+  const kx=(keys['arrowright']||keys['d']?1:0)-(keys['arrowleft']||keys['a']?1:0);
+  const ky=(keys['arrowdown']||keys['s']?1:0)-(keys['arrowup']||keys['w']?1:0);
+  if(kx||ky){
+    const l=Math.hypot(kx,ky);
+    player.tx=clamp(player.x+kx/l*60,0,W);
+    player.ty=clamp(player.y+ky/l*60,0,H);
+  }
+}
+
+// --- Take damage ---
+function takeDamage(){
+  lives--;
+  player.invincible=90;
+  if(flashMode!=='boss'){flashTimer=Math.max(flashTimer,40);flashMode='damage';}
+  addFloat(player.x,player.y-24,'❤️ -1','#ff4466');
+  livesEl.textContent=lives;
+  if(lives<=0) endGame();
+}
+
+// --- Bomb ---
+function useBomb(){
+  if(!running || paused || bombs<=0 || shockwaves.length>0) return;
+  bombs--; bombUses++;
+  updateBombUI();
+  const maxR=Math.hypot(Math.max(player.x,W-player.x),Math.max(player.y,H-player.y))+60;
+  shockwaves.push({x:player.x, y:player.y, r:0, speed:26, maxR});
+  flashMode='boss'; // ボス撃破と同じ虹演出（長さは使用回数×1秒）
+  flashTimer=Math.max(flashTimer, bombUses*60);
+  addFloat(player.x,player.y-24,'💥 BOMB','#ffaa00');
+}
+
+function drawShockwave(s){
+  ctx.save();
+  ctx.strokeStyle='#fff'; ctx.shadowBlur=25; ctx.shadowColor='#fff';
+  ctx.globalAlpha=0.9; ctx.lineWidth=6;
+  ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.stroke();
+  ctx.globalAlpha=0.3; ctx.lineWidth=16;
+  ctx.beginPath(); ctx.arc(s.x,s.y,Math.max(0,s.r-16),0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+// ---- Draw ----
+function drawGrid(){
+  ctx.strokeStyle='rgba(0,255,255,0.05)'; ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let x=0;x<=W;x+=50){ctx.moveTo(x,0);ctx.lineTo(x,H);}
+  for(let y=0;y<=H;y+=50){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  ctx.stroke();
+}
+
+function drawStar(x,y,r,pts=5){
+  const ir=r*0.42;
+  ctx.beginPath();
+  for(let i=0;i<pts*2;i++){
+    const a=Math.PI/pts*i-Math.PI/2, rad=i%2?ir:r;
+    i?ctx.lineTo(x+rad*Math.cos(a),y+rad*Math.sin(a)):ctx.moveTo(x+rad*Math.cos(a),y+rad*Math.sin(a));
+  }
+  ctx.closePath();
+}
+
+function drawBoss(){
+  if(!boss) return;
+  const t=Date.now(), col=boss.hit>0?'#fff':gamingColor(boss.hueOff);
+  ctx.save();
+  ctx.strokeStyle=gamingColor(boss.hueOff+60); ctx.lineWidth=1.5;
+  ctx.globalAlpha=0.3+0.2*Math.sin(t/150);
+  ctx.shadowBlur=20; ctx.shadowColor=col;
+  ctx.beginPath(); ctx.arc(boss.x,boss.y,boss.r+10+4*Math.sin(t/200),0,Math.PI*2); ctx.stroke();
+  ctx.globalAlpha=1;
+  ctx.shadowBlur=boss.hit>0?40:20; ctx.shadowColor=col;
+  ctx.strokeStyle=col; ctx.lineWidth=2.5;
+  ctx.save();
+  ctx.translate(boss.x,boss.y); ctx.rotate(t/1200); ctx.translate(-boss.x,-boss.y);
+  drawStar(boss.x,boss.y,boss.r); ctx.stroke();
+  ctx.restore();
+  ctx.shadowBlur=0;
+  for(let i=0;i<boss.maxHp;i++){
+    ctx.fillStyle=i<boss.hp?`hsl(${(t/8+i*(360/boss.maxHp))%360},100%,60%)`:'#333';
+    ctx.beginPath(); ctx.arc(boss.x-(boss.maxHp-1)*7+i*14,boss.y+boss.r+10,4,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawEnemy(e){
+  ctx.save();
+  const col=e.hit>0?'#fff':e.color;
+  ctx.shadowBlur=e.hit>0?30:12; ctx.shadowColor=col; ctx.strokeStyle=col; ctx.lineWidth=2;
+  const rot = e.sides===4 ? Math.PI/4 : -Math.PI/2; // 四角形は水平に、他は頂点を上に
+  ctx.beginPath();
+  for(let i=0;i<e.sides;i++){
+    const a=Math.PI*2/e.sides*i+rot;
+    const px=e.x+e.r*Math.cos(a), py=e.y+e.r*Math.sin(a);
+    i?ctx.lineTo(px,py):ctx.moveTo(px,py);
+  }
+  ctx.closePath(); ctx.stroke();
+  if(e.maxHp>1){
+    ctx.shadowBlur=0;
+    if(e.maxHp<=6){
+      for(let i=0;i<e.maxHp;i++){
+        ctx.fillStyle=i<e.hp?e.color:'#333';
+        ctx.beginPath(); ctx.arc(e.x-(e.maxHp-1)*5+i*10,e.y+e.r+8,3,0,Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle=e.color; ctx.font='bold 13px "Segoe UI",sans-serif'; ctx.textAlign='center';
+      ctx.fillText(e.hp,e.x,e.y+e.r+15);
+    }
+  }
+  ctx.restore();
+}
+
+function drawPlayer(){
+  const {x,y}=player;
+  const nc=nearColor();
+  const dist=Math.hypot(player.tx-x,player.ty-y), steps=dist/4.5|0;
+  if(steps>0){
+    const ddx=(player.tx-x)/steps, ddy=(player.ty-y)/steps;
+    ctx.save();
+    for(let i=1;i<=steps;i++){
+      ctx.globalAlpha=(1-i/steps)*0.6+0.05;
+      ctx.fillStyle=nc; ctx.shadowBlur=6; ctx.shadowColor=nc;
+      ctx.beginPath(); ctx.arc(x+ddx*i,y+ddy*i,2.5*(1-i/steps*0.6),0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.globalAlpha=0.7; ctx.shadowBlur=10; ctx.shadowColor=nc; ctx.fillStyle=nc;
+  ctx.beginPath(); ctx.arc(player.tx,player.ty,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.translate(x,y);
+  if(player.invincible>0 && (player.invincible/4|0)%2===0) ctx.globalAlpha=0.3;
+  ctx.shadowBlur=24; ctx.shadowColor='white'; ctx.strokeStyle='white'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+function drawBullet(b){
+  ctx.save();
+  ctx.shadowBlur=10; ctx.shadowColor=b.color; ctx.fillStyle=b.color;
+  ctx.beginPath(); ctx.arc(b.x,b.y,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawParticle(p){
+  ctx.save(); ctx.globalAlpha=p.life/p.maxLife; ctx.fillStyle=p.color;
+  ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+function drawFloats(){
+  ctx.textAlign='center';
+  for(const f of floatTexts){
+    ctx.save();
+    ctx.globalAlpha=f.life/f.maxLife; ctx.font='bold 20px "Segoe UI",sans-serif';
+    ctx.fillStyle=f.color; ctx.shadowBlur=10; ctx.shadowColor=f.color;
+    ctx.fillText(f.text,f.x,f.y);
+    ctx.restore();
+  }
+}
+
+// ---- Update（1ステップ = 1/60秒相当）----
+function update(){
+  playFrames++;
+  updateTime();
+  if(autoPlay) autoPlayUpdate();
+  else keyboardUpdate();
+
+  const pdx=player.tx-player.x, pdy=player.ty-player.y, pd=Math.hypot(pdx,pdy);
+  if(pd>PLAYER_SPD){player.x+=pdx/pd*PLAYER_SPD;player.y+=pdy/pd*PLAYER_SPD;}
+  else{player.x=player.tx;player.y=player.ty;}
+  if(player.invincible>0) player.invincible--;
+
+  calcNearest();
+  autoShoot();
+  updateFireStat();
+  if(boss) updateBossBar();
+
+  for(const e of enemies){
+    const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
+    e.x+=dx/d*e.speed; e.y+=dy/d*e.speed;
+    if(e.hit>0) e.hit--;
+  }
+  if(boss){
+    const dx=player.x-boss.x, dy=player.y-boss.y, d=Math.hypot(dx,dy)||1;
+    boss.x+=dx/d*boss.speed; boss.y+=dy/d*boss.speed;
+    if(boss.hit>0) boss.hit--;
+  }
+
+  // bullets vs enemies & boss
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.x+=b.vx; b.y+=b.vy; b.life--;
+    if(b.life<=0||b.x<0||b.x>W||b.y<0||b.y>H){bullets.splice(i,1);continue;}
+    let hit=false;
+    if(boss && Math.hypot(b.x-boss.x,b.y-boss.y)<boss.r+4){
+      boss.hp--; boss.hit=8; hit=true;
+      for(let p=0;p<4;p++) addParticles(b.x,b.y,gamingColor(boss.hueOff+p*30),3);
+      if(boss.hp<=0){
+        for(let p=0;p<8;p++) addParticles(boss.x,boss.y,gamingColor(p*45),8);
+        score+=wave; scoreEl.textContent=score;
+        flashMode='boss'; flashTimer=wave*60;
+        addFloat(player.x,player.y-24,'❤️ +1','#00ff99');
+        addFloat(player.x,player.y-48,'💣 +1','#ffaa00');
+        boss=null; bossBarEl.style.display='none';
+        lives=Math.min(lives+1,9); livesEl.textContent=lives;
+        bombs++; updateBombUI();
+      }
+    }
+    if(!hit){
+      for(let j=enemies.length-1;j>=0;j--){
+        const e=enemies[j];
+        if(Math.hypot(b.x-e.x,b.y-e.y)<e.r+4){
+          e.hp--; e.hit=6; hit=true;
+          if(e.hp<=0){
+            addParticles(e.x,e.y,e.color,14);
+            if(flashMode!=='boss'){
+              flashHue=parseInt(e.color.match(/\d+/)[0])||0;
+              flashTimer=Math.max(flashTimer,40); flashMode='normal';
+            }
+            score+=e.score; waveKills++; scoreEl.textContent=score;
+            enemies.splice(j,1);
+            updateWaveUI();
+          }
+          break;
+        }
+      }
+    }
+    if(hit) bullets.splice(i,1);
+  }
+
+  // enemies vs player
+  if(player.invincible===0){
+    for(let j=enemies.length-1;j>=0;j--){
+      if(Math.hypot(enemies[j].x-player.x,enemies[j].y-player.y)<player.r+enemies[j].r-4){
+        addParticles(player.x,player.y,'#ff4466',20);
+        enemies.splice(j,1);
+        takeDamage(); if(!running)return;
+      }
+    }
+    if(boss && Math.hypot(boss.x-player.x,boss.y-player.y)<player.r+boss.r-4){
+      addParticles(player.x,player.y,'#ff4466',20);
+      takeDamage(); if(!running)return;
+    }
+  }
+
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0)particles.splice(i,1);}
+  for(let i=floatTexts.length-1;i>=0;i--){const f=floatTexts[i];f.y-=0.8;f.life--;if(f.life<=0)floatTexts.splice(i,1);}
+
+  // ボムの衝撃波: 波が届いた通常敵を一掃（スコア・撃破数に加算、ボスには無効）
+  if(shockwaves.length){
+    let killed=false;
+    for(let i=shockwaves.length-1;i>=0;i--){
+      const s=shockwaves[i];
+      s.r+=s.speed;
+      for(let j=enemies.length-1;j>=0;j--){
+        const e=enemies[j];
+        if(Math.hypot(e.x-s.x,e.y-s.y)<=s.r+e.r){
+          addParticles(e.x,e.y,e.color,12);
+          score+=e.score; waveKills++; killed=true;
+          enemies.splice(j,1);
+        }
+      }
+      if(s.r>=s.maxR) shockwaves.splice(i,1);
+    }
+    if(killed){ scoreEl.textContent=score; updateWaveUI(); }
+  }
+
+  if(!boss){
+    spawnTimer++;
+    if(spawnTimer>=spawnInterval){
+      spawnTimer=0;
+      const cnt=wave>=3?2:1;
+      for(let i=0;i<cnt;i++) spawnCommon();
+      if(rareQueue.length && Math.random()<0.5) spawnShape(rareQueue.shift());
+    }
+  }
+  if(!bossSpawned && waveKills>=waveTarget) spawnBoss();
+  if(bossSpawned && !boss){
+    wave++; waveKills=0; waveTarget=Math.floor(waveTarget*1.3);
+    spawnInterval=Math.max(20,80-5*(wave-1));
+    bossSpawned=false;
+    buildRareQueue();
+    updateWaveUI();
+  }
+
+  if(flashTimer>0) flashTimer--;
+  else flashMode='normal';
+}
+
+function draw(){
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.clearRect(0,0,W,H);
+  if(flashTimer>0){
+    ctx.fillStyle=flashRgba(flashMode==='boss'?Math.min(flashTimer/60,1)*0.35:flashTimer/20*0.3);
+    ctx.fillRect(0,0,W,H);
+  }
+  drawGrid();
+  particles.forEach(drawParticle);
+  bullets.forEach(drawBullet);
+  enemies.forEach(drawEnemy);
+  drawBoss();
+  shockwaves.forEach(drawShockwave);
+  drawPlayer();
+  drawFloats();
+}
+
+function drawPauseOverlay(){
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,H);
+  ctx.save();
+  ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.shadowBlur=16; ctx.shadowColor='cyan';
+  ctx.font='bold 34px "Segoe UI",sans-serif';
+  ctx.fillText('一時停止中',W/2,H/2);
+  ctx.font='16px "Segoe UI",sans-serif';
+  ctx.fillText('▶ ボタン または P / Esc で再開',W/2,H/2+36);
+  ctx.restore();
+}
+
+// ---- 固定タイムステップのメインループ ----
+function loop(ts){
+  if(!running || paused) return;
+  if(!last) last=ts;
+  let dt=ts-last; last=ts;
+  if(dt>200) dt=STEP; // タブ復帰などの巨大なdtを無視
+  acc+=dt;
+  let n=0;
+  while(acc>=STEP && n<4 && running){ update(); acc-=STEP; n++; }
+  if(n===4) acc=0; // 処理落ち時のスパイラル防止
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function togglePause(){
+  if(!running) return;
+  paused=!paused;
+  pauseBtn.textContent = paused ? '▶' : '⏸';
+  if(paused){ draw(); drawPauseOverlay(); }
+  else { last=0; acc=0; requestAnimationFrame(loop); }
+}
+pauseBtn.addEventListener('click',togglePause);
+bombBtn.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  useBomb();
+  bombBtn.blur();
+});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden && running && !paused) togglePause();
+});
+
+function startGame(auto=false){
+  bullets=[]; enemies=[]; particles=[]; floatTexts=[]; boss=null; bossSpawned=false;
+  score=0; lives=3; wave=1; running=true; paused=false; autoPlay=auto;
+  spawnTimer=0; spawnInterval=80; waveKills=0; waveTarget=10; flashTimer=0; flashMode='normal';
+  last=0; acc=0; lastFirePct=-1;
+  playFrames=0; lastSec=-1; timeEl.textContent='0:00';
+  bombs=0; bombUses=0; shockwaves=[];
+  buildRareQueue();
+  player.x=W/2; player.y=H/2; player.tx=W/2; player.ty=H/2; player.shootCd=0; player.invincible=0;
+  livesEl.textContent=lives; scoreEl.textContent=score;
+  updateWaveUI(); updateFireStat(); updateBombUI();
+  bombBtn.style.display='block';
+  pauseBtn.textContent='⏸';
+  bossBarEl.style.display='none'; msgDiv.style.display='none';
+  requestAnimationFrame(loop);
+}
+
+function endGame(){
+  running=false;
+  bombBtn.style.display='none';
+  hiScore=Math.max(hiScore,score);
+  msgText.innerHTML=`ゲームオーバー<br>スコア: ${score}<br><span class="hi">🏆 ハイスコア: ${hiScore}${score>=hiScore&&score>0?' 更新!':''}</span>`;
+  msgHint.innerHTML=`到達ウェーブ: ${wave} ・ プレイ時間: ${fmtTime(playFrames/60|0)}`;
+  msgDiv.style.display='block';
+}
+
+// ---- 入力（マウス・タッチ・ペン共通：ドラッグ対応）----
+let dragging=false;
+function setTarget(e){
+  const r=canvas.getBoundingClientRect();
+  player.tx=clamp((e.clientX-r.left)/r.width*W,0,W);
+  player.ty=clamp((e.clientY-r.top)/r.height*H,0,H);
+}
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(running && !paused && !autoPlay){
+    dragging=true; setTarget(e);
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+  }
+});
+canvas.addEventListener('pointermove',e=>{
+  if(dragging && running && !paused && !autoPlay) setTarget(e);
+});
+window.addEventListener('pointerup',()=>{dragging=false;});
+window.addEventListener('pointercancel',()=>{dragging=false;});
+
+// ---- 初期化 ----
+window.addEventListener('resize',resize);
+resize();
+draw();
+msgDiv.style.display='block';
+</script>
+</body>
+</html>

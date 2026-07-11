@@ -1,26 +1,87 @@
 * {
-    background-color:rgb(30, 34, 34);
+    box-sizing: border-box;
+    font-family: "Gen Interface JP", sans-serif;
+    background-color:rgb(10, 20, 20);
     color: white;
     text-align: center;
     cursor: wait;
 }
+@font-face {
+font-family:'misakigothic';
+src: url('misaki_gothic_2nd.ttf') format('truetype');
+}
+h1 {
+    font-family: 'misakigothic';
+    font-size: 32px;
+    letter-spacing: 4px;
+}
+h1:hover, h2:hover {
+    color: red;
+    transition: all 10s;
+}
 a {
     display: block;
+    padding: 8px;
     font-size: large;
     color: goldenrod;
-    background-color: rgb(30, 36, 36);
+    text-decoration: underline rgba(218, 165, 32, 0.5);
+    background-color: rgb(10, 22, 22);
+    border: 2px solid rgb(10, 20, 20);
     cursor: pointer;
+    transition: all 0.1s;
 }
 a:hover {
     color: gold;
     font-size: x-large;
 }
+.understoodbox {
+    width: fit-content;
+    margin: 128px auto;
+    border: 2px solid goldenrod;
+    border-radius: 8px;
+    padding: 8px;
+}
+.understood {
+    text-align: left;
+    position: relative;
+    background-color: transparent;
+    left: 36px;
+    transition: all 0.5s;
+    cursor: help;
+}
+.understoodbox:hover {
+    border: 2px solid white;
+}
+.understood:hover {
+    left: 0;
+}
 footer {
     position: fixed;
     bottom: 0;
     width: 100%;
-    background-color: rgb(30, 34, 34);
-    text-align: left;
+    background-color: rgb(10, 20, 20);
     padding: 10px;
     cursor: not-allowed;
+}
+.footercontents {
+    text-align: left;
+    cursor: not-allowed;
+}
+.footercontents:hover {
+    color: blue;
+    transition: all 10s;
+}
+.footerforphone {
+    display: none;
+    cursor: not-allowed;
+}
+@media (max-width: 600px) {
+    .footerforphone {
+        display: inline-block;
+        text-align: center;
+        margin-right: 16px;
+    }
+    .footercontents {
+        display: none;
+    }
 }

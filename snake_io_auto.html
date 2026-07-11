@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SNAKE.IO — FULL AUTO</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:#06061a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;font-family:'Courier New',monospace;color:#fff;user-select:none;-webkit-user-select:none;touch-action:manipulation;overflow:hidden;padding:8px}
+#title{font-size:13px;letter-spacing:5px;color:#334;margin-bottom:8px;white-space:nowrap}
+#wrap{position:relative;max-width:100%}
+canvas{display:block;border-radius:6px;border:1px solid #111130}
+#lb{position:absolute;top:8px;right:8px;background:rgba(6,6,26,.88);border:1px solid #1a1a3a;border-radius:8px;padding:10px 12px;min-width:148px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer}
+#lb h3{font-size:9px;color:#335;letter-spacing:4px;margin-bottom:8px;text-align:center;pointer-events:none}
+.entry{display:flex;align-items:center;gap:5px;margin:4px 0;font-size:11px;line-height:1;pointer-events:none}
+.rank{color:#334;width:14px;text-align:right;font-size:10px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sname{flex:1}
+.sscore{color:#ffd740;font-size:10px}
+.row{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:100%}
+button{background:#0c0c28;border:1px solid #223;color:#446;padding:0;width:76px;min-height:34px;font-family:'Courier New',monospace;font-size:10px;border-radius:5px;cursor:pointer;letter-spacing:2px;transition:.15s;text-align:center;touch-action:manipulation}
+button:hover{border-color:#446;color:#88f}
+button.active{border-color:#446;color:#aaf;background:#141438}
+#stats{font-size:9px;color:#223;margin-top:6px;letter-spacing:2px;text-align:center}
+@media(max-width:520px){
+  #title{font-size:11px;letter-spacing:3px;margin-bottom:6px}
+  #lb{padding:6px 8px;min-width:112px}
+  #lb h3{margin-bottom:5px;letter-spacing:3px}
+  .entry{font-size:10px;margin:3px 0}
+  .row{gap:5px;margin-top:5px}
+  button{width:31%;max-width:96px;min-height:38px}
+}
+@media(prefers-reduced-motion:reduce){
+  #lb{backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+</style>
+</head>
+<body>
+<div id="title">🐍 SNAKE.IO — FULL AUTO</div>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="lb"><h3 id="lbh">RANKING</h3><div id="entries"></div></div>
+</div>
+<div class="row">
+  <button id="bSlow">SLOW</button>
+  <button id="bNorm" class="active">NORMAL</button>
+  <button id="bFast">FAST</button>
+</div>
+<div class="row">
+  <button id="bCap50">SCARCE</button>
+  <button id="bCap100" class="active">NORMAL</button>
+  <button id="bCap200">PLENTY</button>
+</div>
+<div class="row">
+  <button id="bColor">🎨 COLOR</button>
+  <button id="bFull">⛶ FULL</button>
+</div>
+<div id="stats">—</div>
+
+<script>
+// ---- 画面サイズに合わせてグリッドを決定（起動時に1回） ----
+const dpr=Math.min(window.devicePixelRatio||1,2);
+const availW=Math.min(window.innerWidth-24,900);
+const availH=Math.max(240,window.innerHeight-205);
+const CELL=availW<520?7:9;
+const COLS=Math.min(100,Math.max(34,availW/CELL|0));
+const ROWS=Math.min(85,Math.max(30,availH/CELL|0));
+const W=COLS*CELL,H=ROWS*CELL,N=COLS*ROWS;
+const AREA_RATIO=N/4400; // 元の 80x55 を基準にスケール
+
+const canvas=document.getElementById('c');
+canvas.width=W*dpr; canvas.height=H*dpr;
+const ctx=canvas.getContext('2d');
+ctx.scale(dpr,dpr);
+
+// 表示サイズをウィンドウにフィット（回転・リサイズ・全画面に追従）
+function fit(){
+  const fw=window.innerWidth-24;
+  const fh=Math.max(200,window.innerHeight-(document.fullscreenElement?120:205));
+  const s=Math.min(fw/W,fh/H,1.6);
+  canvas.style.width=(W*s)+'px';
+  canvas.style.height=(H*s)+'px';
+}
+fit();
+window.addEventListener('resize',fit);
+window.addEventListener('orientationchange',()=>setTimeout(fit,120));
+document.addEventListener('fullscreenchange',()=>setTimeout(fit,120));
+
+const gi=(x,y)=>y*COLS+x;
+const inB=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
+const DIRS=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+const COLORS=['#ff4466','#44ff88','#4499ff','#ffcc00','#ff44ee','#44ffdd','#ff8833','#99ff44','#dd44ff','#44ccff','#ffff44','#ff6699'];
+const NAMES=['Alpha','Beta','Gamma','Delta','Epsilon','Zeta','Eta','Theta','Iota','Kappa','Lambda','Mu'];
+const SNAKE_COUNT=Math.min(12,Math.max(6,Math.round(12*AREA_RATIO)));
+const FOOD_CAPS=[50,100,200].map(v=>Math.max(15,Math.round(v*AREA_RATIO)));
+
+const grid=new Uint8Array(N);
+const foods=new Set();
+const foodColors=new Map();
+const deathFoods=new Set();
+const visArr=new Uint32Array(N);
+
+let tick=0, speed=3, foodCap=FOOD_CAPS[1], colorfulFood=false;
+let visGen=1, foodSpawnedThisTick=false;
+
+function randHue(){return Math.random()*360|0;}
+
+function rrect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
+function countSpace(x,y,lim){
+  const stamp=visGen++;
+  const q=[gi(x,y)];
+  visArr[gi(x,y)]=stamp;
+  let cnt=0;
+  while(q.length&&cnt<lim){
+    const idx=q.pop(); cnt++;
+    const cx=idx%COLS, cy=idx/COLS|0;
+    for(let i=0;i<4;i++){
+      const nx=cx+DIRS[i].x, ny=cy+DIRS[i].y;
+      if(!inB(nx,ny))continue;
+      const ni=gi(nx,ny);
+      if(visArr[ni]===stamp||grid[ni])continue;
+      visArr[ni]=stamp;
+      q.push(ni);
+    }
+  }
+  return cnt;
+}
+
+function spawnFood(){
+  if(foods.size>foodCap){
+    if(tick%3!==0||foodSpawnedThisTick)return;
+    foodSpawnedThisTick=true;
+  }
+  for(let t=0;t<40;t++){
+    const x=Math.random()*COLS|0, y=Math.random()*ROWS|0;
+    const idx=gi(x,y);
+    if(!grid[idx]&&!foods.has(idx)){
+      foods.add(idx);
+      foodColors.set(idx,randHue());
+      return;
+    }
+  }
+}
+
+class Snake{
+  constructor(id){
+    this.id=id; this.color=COLORS[id]; this.name=NAMES[id];
+    this.body=[]; this.dir=DIRS[0];
+    this.score=0; this.alive=false; this.timer=Math.random()*80|0;
+  }
+  trySpawn(){
+    for(let t=0;t<300;t++){
+      const x=3+(Math.random()*(COLS-6)|0), y=3+(Math.random()*(ROWS-6)|0);
+      if(!grid[gi(x,y)]){
+        this.body=[{x,y}]; this.dir=DIRS[Math.random()*4|0];
+        grid[gi(x,y)]=this.id+1; this.alive=true; this.score=0; return;
+      }
+    }
+  }
+  die(){
+    for(let i=0;i<this.body.length;i++){
+      const idx=gi(this.body[i].x,this.body[i].y);
+      if(grid[idx]===this.id+1){
+        grid[idx]=0;
+        if(i%2===0){deathFoods.add(idx); foodColors.set(idx,randHue());}
+      }
+    }
+    this.body=[]; this.alive=false;
+    this.timer=50+(Math.random()*80|0);
+  }
+  think(){
+    const h=this.body[0];
+    const safe=[];
+    for(let i=0;i<4;i++){
+      const d=DIRS[i];
+      if(d.x===-this.dir.x&&d.y===-this.dir.y)continue;
+      const nx=h.x+d.x, ny=h.y+d.y;
+      if(inB(nx,ny)&&!grid[gi(nx,ny)])safe.push(d);
+    }
+    if(!safe.length)return this.dir;
+    if(safe.length===1)return safe[0];
+
+    let fBest=-1, fDist=Infinity;
+    for(const fi of foods){
+      const d=Math.abs(fi%COLS-h.x)+Math.abs((fi/COLS|0)-h.y);
+      if(d<fDist){fDist=d;fBest=fi;}
+    }
+
+    let target=null, targetDist=Infinity;
+    if(this.body.length>=10){
+      for(const s of snakes){
+        if(s===this||!s.alive||s.body.length*2>this.body.length)continue;
+        const d=Math.abs(s.body[0].x-h.x)+Math.abs(s.body[0].y-h.y);
+        if(d<28&&d<targetDist){targetDist=d;target=s;}
+      }
+    }
+
+    let goalX=-1,goalY=-1,goalW=3;
+    if(target){
+      goalX=Math.max(0,Math.min(COLS-1,target.body[0].x+target.dir.x*5));
+      goalY=Math.max(0,Math.min(ROWS-1,target.body[0].y+target.dir.y*5));
+      goalW=10;
+    } else if(fBest>=0){
+      goalX=fBest%COLS; goalY=fBest/COLS|0;
+    }
+
+    let best=null, bestScore=-Infinity;
+    for(const d of safe){
+      const nx=h.x+d.x, ny=h.y+d.y;
+      const sc=countSpace(nx,ny,80)*2
+        -(goalX>=0?(Math.abs(nx-goalX)+Math.abs(ny-goalY))*goalW:0)
+        +Math.random()*4;
+      if(sc>bestScore){bestScore=sc;best=d;}
+    }
+    return best;
+  }
+  update(){
+    if(!this.alive){if(--this.timer<=0)this.trySpawn();return;}
+    this.dir=this.think();
+    const h=this.body[0];
+    const nx=h.x+this.dir.x, ny=h.y+this.dir.y;
+    if(!inB(nx,ny)||grid[gi(nx,ny)]){this.die();return;}
+    const ni=gi(nx,ny);
+    const ate=foods.has(ni);
+    this.body.unshift({x:nx,y:ny});
+    grid[ni]=this.id+1;
+    if(ate){
+      foods.delete(ni); foodColors.delete(ni);
+      this.score++; spawnFood();
+    } else {
+      const t=this.body.pop();
+      const ti=gi(t.x,t.y);
+      if(grid[ti]===this.id+1)grid[ti]=0;
+    }
+  }
+  draw(){
+    if(!this.alive||!this.body.length)return;
+    ctx.shadowBlur=10; ctx.shadowColor=this.color;
+    const len=this.body.length;
+    for(let i=len-1;i>=0;i--){
+      const {x,y}=this.body[i];
+      ctx.globalAlpha=Math.max(.12,1-(i/len)*.78);
+      ctx.fillStyle=this.color;
+      const pad=i===0?.5:1.5, r=i===0?2.5:1.5;
+      rrect(x*CELL+pad,y*CELL+pad,CELL-pad*2,CELL-pad*2,r);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1; ctx.shadowBlur=0;
+    const {x,y}=this.body[0];
+    const ex=x*CELL+CELL/2, ey=y*CELL+CELL/2;
+    const {x:dx,y:dy}=this.dir;
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.arc(ex+dx*1.5-dy*2,ey+dy*1.5+dx*2,1.2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex+dx*1.5+dy*2,ey+dy*1.5-dx*2,1.2,0,Math.PI*2); ctx.fill();
+  }
+}
+
+for(let i=0;i<Math.max(20,Math.round(50*AREA_RATIO));i++)spawnFood();
+const snakes=Array.from({length:SNAKE_COUNT},(_,i)=>new Snake(i));
+
+// ランキング：タップ/クリックで開閉（スマホでは初期状態コンパクト）
+let lbCollapsed=window.innerWidth<520;
+document.getElementById('lb').addEventListener('click',()=>{lbCollapsed=!lbCollapsed;updateLB();});
+
+function updateLB(){
+  const alive=snakes.filter(s=>s.alive).sort((a,b)=>b.score-a.score);
+  const show=lbCollapsed?3:10;
+  document.getElementById('lbh').textContent=lbCollapsed?'TOP 3 ▾':'RANKING ▴';
+  document.getElementById('entries').innerHTML=alive.slice(0,show).map((s,i)=>`
+    <div class="entry">
+      <span class="rank">${i+1}</span>
+      <span class="dot" style="background:${s.color};box-shadow:0 0 5px ${s.color}"></span>
+      <span class="sname" style="color:${s.color}">${s.name}</span>
+      <span class="sscore">${s.score}</span>
+    </div>`).join('');
+  document.getElementById('stats').textContent=`${alive.length} ACTIVE  ·  ${foods.size} FOOD  ·  ${COLS}×${ROWS}`;
+}
+
+['bSlow','bNorm','bFast'].forEach((id,i)=>{
+  document.getElementById(id).onclick=()=>{
+    speed=[6,3,1][i];
+    ['bSlow','bNorm','bFast'].forEach((b,j)=>document.getElementById(b).className=j===i?'active':'');
+  };
+});
+['bCap50','bCap100','bCap200'].forEach((id,i)=>{
+  document.getElementById(id).onclick=()=>{
+    foodCap=FOOD_CAPS[i];
+    ['bCap50','bCap100','bCap200'].forEach((b,j)=>document.getElementById(b).className=j===i?'active':'');
+  };
+});
+document.getElementById('bColor').onclick=()=>{
+  colorfulFood=!colorfulFood;
+  document.getElementById('bColor').className=colorfulFood?'active':'';
+};
+document.getElementById('bFull').onclick=()=>{
+  if(document.fullscreenElement){document.exitFullscreen();}
+  else if(document.body.requestFullscreen){document.body.requestFullscreen();}
+};
+
+(function loop(){
+  requestAnimationFrame(loop);
+
+  ctx.fillStyle='#06061a'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#0d0d28';
+  for(let x=0;x<COLS;x++)for(let y=0;y<ROWS;y++)ctx.fillRect(x*CELL+4,y*CELL+4,1,1);
+
+  if(tick%speed===0){
+    foodSpawnedThisTick=false;
+    for(const s of snakes)s.update();
+    for(const idx of deathFoods){foods.add(idx);}
+    deathFoods.clear();
+  }
+  if(tick%20===0)updateLB();
+
+  const pulse=.5+.5*Math.sin(tick*.12);
+  const rad=2+pulse*.6;
+  for(const fi of foods){
+    const hue=colorfulFood?(foodColors.get(fi)!==undefined?foodColors.get(fi):45):45;
+    const col=colorfulFood
+      ?'hsla('+hue+',100%,60%,'+(0.65+pulse*0.35)+')'
+      :'rgba(255,215,64,'+(0.65+pulse*0.35)+')';
+    ctx.shadowBlur=7+pulse*6; ctx.shadowColor=col; ctx.fillStyle=col;
+    ctx.beginPath();
+    ctx.arc((fi%COLS)*CELL+CELL/2,(fi/COLS|0)*CELL+CELL/2,rad,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.shadowBlur=0;
+
+  for(const s of snakes)s.draw();
+  tick++;
+})();
+</script>
+</body>
+</html>

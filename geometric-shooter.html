@@ -58,6 +58,12 @@ canvas { display:block; cursor:crosshair; touch-action:none; }
 #bombBtn.empty { opacity:0.35; border-color:#666; color:#888; text-shadow:none; }
 #bombBtn:not(.empty):hover { background:rgba(255,170,0,0.18); }
 #bombCount { display:block; font-size:13px; font-weight:bold; }
+#soundBtn {
+  position:fixed; bottom:16px; left:16px; width:44px; height:44px; border-radius:50%;
+  background:rgba(0,0,0,0.55); border:1px solid rgba(0,255,255,0.5); color:cyan;
+  font-size:18px; cursor:pointer; z-index:6;
+}
+#soundBtn:hover { background:rgba(0,255,255,0.12); }
 </style>
 </head>
 <body>
@@ -70,6 +76,7 @@ canvas { display:block; cursor:crosshair; touch-action:none; }
 </div>
 <div id="stage"><canvas id="c"></canvas></div>
 <button id="bombBtn" title="ボム (Space / B)">💣<span id="bombCount">0</span></button>
+<button id="soundBtn" title="効果音 ON/OFF">🔇</button>
 <div id="bossbar">
   <div id="bossname">BOSS</div>
   <div id="bosstrack"><div id="bossbar-fill"></div></div>
@@ -101,6 +108,26 @@ const bossFill  = document.getElementById('bossbar-fill');
 const pauseBtn  = document.getElementById('pauseBtn');
 const bombBtn   = document.getElementById('bombBtn');
 const bombCountEl = document.getElementById('bombCount');
+const soundBtn  = document.getElementById('soundBtn');
+
+// ============================================================
+// ===== 効果音の設定 =====
+// ↓↓↓ ここに音声ファイルのパス(またはURL)を書いてください ↓↓↓
+const BOSS_KILL_SE_PATH = './sounds/din_voice.mp3';
+// 例: 'sounds/boss_kill.mp3'（このHTMLと同じ場所にsoundsフォルダを置く場合）
+// 例: 'https://example.com/se/boss_kill.mp3'（Web上のファイルを使う場合）
+// ↑↑↑ ここに音声ファイルのパスを書く ↑↑↑
+// ============================================================
+let soundOn=false; // デフォルトはOFF
+const bossKillSE=new Audio(BOSS_KILL_SE_PATH);
+bossKillSE.volume=0.8; // 音量 (0.0〜1.0)
+function playBossKillSE(){
+  if(!soundOn) return;
+  try{
+    bossKillSE.currentTime=0;
+    bossKillSE.play().catch(()=>{}); // ファイルが無い/再生不可でもゲームは止めない
+  }catch(_){}
+}
 
 // ===== 固定論理解像度（全デバイス共通の広さ） =====
 const W = 700, H = 700;
@@ -265,7 +292,7 @@ function autoPlayUpdate(){
       if(g<minGap) minGap=g;
       if(g<150) near++;
     }
-    if(minGap<12 || near>=18) useBomb();
+    if(minGap<3 || near>=50) useBomb();
   }
   const all=[...enemies,...(boss?[boss]:[])];
   if(!all.length) return;
@@ -286,7 +313,7 @@ function autoPlayUpdate(){
   const corners=[{x:0,y:0},{x:W,y:0},{x:0,y:H},{x:W,y:H}];
   for(const c of corners){
     const dx=player.x-c.x, dy=player.y-c.y, d=Math.hypot(dx,dy)||1;
-    const w=Math.max(0, 250-d)*8;
+    const w=Math.max(0, 250-d)*4;
     fx+=dx/d*w; fy+=dy/d*w;
   }
   const len=Math.hypot(fx,fy)||1;
@@ -505,6 +532,7 @@ function update(){
         flashMode='boss'; flashTimer=wave*60;
         addFloat(player.x,player.y-24,'❤️ +1','#00ff99');
         addFloat(player.x,player.y-48,'💣 +1','#ffaa00');
+        playBossKillSE();
         boss=null; bossBarEl.style.display='none';
         lives=Math.min(lives+1,9); livesEl.textContent=lives;
         bombs++; updateBombUI();
@@ -643,6 +671,17 @@ function togglePause(){
   else { last=0; acc=0; requestAnimationFrame(loop); }
 }
 pauseBtn.addEventListener('click',togglePause);
+soundBtn.addEventListener('click',()=>{
+  soundOn=!soundOn;
+  soundBtn.textContent=soundOn?'🔊':'🔇';
+  if(soundOn){
+    // モバイルの自動再生制限を解除するため、ユーザー操作の中で一度無音再生しておく
+    bossKillSE.muted=true;
+    bossKillSE.play().then(()=>{
+      bossKillSE.pause(); bossKillSE.currentTime=0; bossKillSE.muted=false;
+    }).catch(()=>{ bossKillSE.muted=false; });
+  }
+});
 bombBtn.addEventListener('pointerdown',e=>{
   e.preventDefault();
   useBomb();
@@ -664,6 +703,7 @@ function startGame(auto=false){
   livesEl.textContent=lives; scoreEl.textContent=score;
   updateWaveUI(); updateFireStat(); updateBombUI();
   bombBtn.style.display='block';
+  soundBtn.style.display='none';
   pauseBtn.textContent='⏸';
   bossBarEl.style.display='none'; msgDiv.style.display='none';
   requestAnimationFrame(loop);
@@ -672,6 +712,7 @@ function startGame(auto=false){
 function endGame(){
   running=false;
   bombBtn.style.display='none';
+  soundBtn.style.display='block';
   hiScore=Math.max(hiScore,score);
   msgText.innerHTML=`ゲームオーバー<br>スコア: ${score}<br><span class="hi">🏆 ハイスコア: ${hiScore}${score>=hiScore&&score>0?' 更新!':''}</span>`;
   msgHint.innerHTML=`到達ウェーブ: ${wave} ・ プレイ時間: ${fmtTime(playFrames/60|0)}`;

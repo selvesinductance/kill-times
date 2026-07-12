@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>コトリAI チャット</title>
+<style>
+  :root{
+    --bg:#eef3f2;
+    --card:#ffffff;
+    --ink:#22312f;
+    --ink-soft:#6b7c79;
+    --brand:#12756c;
+    --brand-deep:#0b5a53;
+    --bot-bubble:#f1f5f4;
+    --line:#dde6e4;
+    --online:#37c26e;
+    --radius:18px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .app{
+    width:min(480px,100%);
+    height:min(720px,100dvh);
+    background:var(--card);
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 12px 40px rgba(18,60,55,.14);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  @media (max-width:520px){
+    body{align-items:stretch;}
+    .app{height:100dvh;border-radius:0;}
+  }
+
+  /* ---- header ---- */
+  header{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 18px;
+    border-bottom:1px solid var(--line);
+    background:var(--card);
+  }
+  .avatar{
+    width:42px;height:42px;
+    border-radius:50%;
+    background:linear-gradient(145deg,#17897e,#0b5a53);
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;
+    flex-shrink:0;
+  }
+  .who h1{font-size:1rem;font-weight:600;letter-spacing:.02em;}
+  .who p{
+    font-size:.75rem;color:var(--ink-soft);
+    display:flex;align-items:center;gap:5px;margin-top:2px;
+  }
+  .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--online);
+    box-shadow:0 0 0 3px rgba(55,194,110,.18);
+  }
+  .collect-btn{
+    margin-left:auto;
+    display:none;
+    align-items:center;
+    gap:6px;
+    border:1px solid var(--line);
+    background:var(--bot-bubble);
+    color:var(--ink);
+    font-family:inherit;
+    font-size:.78rem;
+    font-weight:600;
+    padding:7px 12px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:border-color .15s,background .15s,transform .1s;
+  }
+  .collect-btn.show{display:inline-flex;animation:pop .3s ease-out;}
+  .collect-btn:hover{border-color:var(--brand);background:#e7f0ee;}
+  .collect-btn:active{transform:scale(.95);}
+  .collect-btn:focus-visible{outline:2px solid var(--brand-deep);outline-offset:2px;}
+
+  /* ---- messages ---- */
+  .chat{
+    flex:1;
+    overflow-y:auto;
+    padding:20px 16px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    scroll-behavior:smooth;
+  }
+  .msg{
+    max-width:78%;
+    padding:10px 14px;
+    border-radius:16px;
+    font-size:.92rem;
+    line-height:1.55;
+    word-break:break-word;
+    animation:pop .18s ease-out;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .msg.user{
+    align-self:flex-end;
+    background:var(--brand);
+    color:#fff;
+    border-bottom-right-radius:4px;
+  }
+  .msg.typing{
+    align-self:flex-start;
+    background:var(--bot-bubble);
+    border-bottom-left-radius:4px;
+    display:flex;gap:5px;align-items:center;
+    padding:14px 16px;
+  }
+  .typing i{
+    width:7px;height:7px;border-radius:50%;
+    background:#9db4b0;
+    animation:blink 1.1s infinite;
+  }
+  .typing i:nth-child(2){animation-delay:.18s;}
+  .typing i:nth-child(3){animation-delay:.36s;}
+  @keyframes blink{0%,60%,100%{opacity:.35;transform:none;}30%{opacity:1;transform:translateY(-3px);}}
+
+  .sysline{
+    align-self:center;
+    text-align:center;
+    font-size:.72rem;
+    color:var(--ink-soft);
+    background:var(--bot-bubble);
+    padding:4px 12px;
+    border-radius:999px;
+    animation:pop .18s ease-out;
+  }
+  .sysline.event{
+    color:var(--brand-deep);
+    background:#e3f0ed;
+    font-weight:600;
+  }
+  .welcome{
+    align-self:center;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:.8rem;
+    padding:18px 10px 6px;
+    line-height:1.7;
+  }
+  .welcome strong{color:var(--ink);font-weight:600;}
+
+  /* ---- hint ---- */
+  .hint{
+    font-size:.72rem;
+    color:var(--ink-soft);
+    text-align:center;
+    padding:0 16px 8px;
+    display:none;
+    line-height:1.6;
+  }
+  .hint.show{display:block;animation:pop .3s ease-out;}
+
+  /* ---- input ---- */
+  form{
+    display:flex;
+    gap:10px;
+    padding:12px 14px 14px;
+    border-top:1px solid var(--line);
+    background:var(--card);
+  }
+  input[type="text"]{
+    flex:1;
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:11px 16px;
+    font-size:.95rem;
+    font-family:inherit;
+    background:#fafcfb;
+    color:var(--ink);
+    outline:none;
+    transition:border-color .15s;
+  }
+  input[type="text"]:focus{border-color:var(--brand);}
+  form button{
+    border:none;
+    background:var(--brand);
+    color:#fff;
+    width:46px;height:46px;
+    border-radius:50%;
+    font-size:18px;
+    cursor:pointer;
+    flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .15s,transform .1s;
+  }
+  form button:hover{background:var(--brand-deep);}
+  form button:active{transform:scale(.93);}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--brand-deep);outline-offset:2px;}
+
+  /* ---- collection modal ---- */
+  .modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:50;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+  }
+  .modal.open{display:flex;}
+  .modal-backdrop{
+    position:absolute;
+    inset:0;
+    background:rgba(23,45,42,.45);
+  }
+  .modal-card{
+    position:relative;
+    width:min(440px,100%);
+    max-height:min(640px,88dvh);
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:0 20px 60px rgba(10,40,36,.3);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    animation:pop .2s ease-out;
+  }
+  .modal-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 18px 10px;
+  }
+  .modal-head h2{font-size:1rem;font-weight:700;}
+  .modal-close{
+    border:none;
+    background:var(--bot-bubble);
+    color:var(--ink-soft);
+    width:32px;height:32px;
+    border-radius:50%;
+    font-size:16px;
+    cursor:pointer;
+    line-height:1;
+  }
+  .modal-close:hover{background:#e2eae8;color:var(--ink);}
+  .progress{
+    margin:0 18px;
+    height:8px;
+    border-radius:999px;
+    background:var(--bot-bubble);
+    overflow:hidden;
+  }
+  .progress-fill{
+    height:100%;
+    width:0%;
+    border-radius:999px;
+    background:linear-gradient(90deg,var(--brand),#2aa08f);
+    transition:width .4s ease;
+  }
+  .progress-text{
+    font-size:.75rem;
+    color:var(--ink-soft);
+    padding:6px 18px 10px;
+  }
+  .progress-text strong{color:var(--brand-deep);}
+  .modal-body{
+    overflow-y:auto;
+    padding:2px 18px 18px;
+  }
+  .cat{margin-bottom:14px;}
+  .cat h3{
+    font-size:.75rem;
+    font-weight:700;
+    color:var(--ink-soft);
+    letter-spacing:.04em;
+    margin-bottom:7px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .cat h3 .cat-count{
+    font-weight:500;
+    color:#9db0ac;
+  }
+  .chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .chip{
+    font-size:.76rem;
+    line-height:1.4;
+    padding:5px 11px;
+    border-radius:999px;
+    background:var(--bot-bubble);
+    border:1px solid transparent;
+    color:var(--ink);
+    position:relative;
+  }
+  .chip.locked{
+    background:transparent;
+    border:1px dashed var(--line);
+    color:#a9bab6;
+    letter-spacing:.15em;
+  }
+  .chip.new::after{
+    content:"NEW";
+    font-size:.55rem;
+    font-weight:700;
+    color:#fff;
+    background:#e2574b;
+    border-radius:999px;
+    padding:1px 5px;
+    margin-left:6px;
+    vertical-align:1px;
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .msg,.sysline,.hint.show,.collect-btn.show,.modal-card{animation:none;}
+    .typing i{animation:none;opacity:.6;}
+    .chat{scroll-behavior:auto;}
+    .progress-fill{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="avatar" aria-hidden="true">🐦</div>
+    <div class="who">
+      <h1>コトリAI</h1>
+      <p><span class="dot" aria-hidden="true"></span>オンライン・すぐに返信します</p>
+    </div>
+    <button type="button" class="collect-btn" id="collectBtn" aria-label="返信コレクションを開く">
+      <span aria-hidden="true">📖</span><span id="collectCount">0/0</span>
+    </button>
+  </header>
+
+  <div class="chat" id="chat" aria-live="polite">
+    <div class="welcome">
+      <strong>コトリAI</strong> とのチャットが始まりました。<br>
+      なんでも気軽に話しかけてください。
+    </div>
+  </div>
+
+  <p class="hint" id="hint">
+    ※ 返信が見つからないときは、ブラウザのタブ(このページのタイトル)をよーく見てみてください。
+  </p>
+
+  <form id="form" autocomplete="off">
+    <input type="text" id="input" placeholder="メッセージを入力…" aria-label="メッセージを入力" maxlength="200">
+    <button type="submit" aria-label="送信">➤</button>
+  </form>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h2 id="modalTitle">📖 返信コレクション</h2>
+      <button type="button" class="modal-close" data-close aria-label="閉じる">✕</button>
+    </div>
+    <div class="progress" aria-hidden="true"><div class="progress-fill" id="progressFill"></div></div>
+    <p class="progress-text" id="progressText"></p>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var chat  = document.getElementById("chat");
+  var form  = document.getElementById("form");
+  var input = document.getElementById("input");
+  var hint  = document.getElementById("hint");
+  var collectBtn   = document.getElementById("collectBtn");
+  var collectCount = document.getElementById("collectCount");
+  var modal        = document.getElementById("modal");
+  var modalBody    = document.getElementById("modalBody");
+  var progressFill = document.getElementById("progressFill");
+  var progressText = document.getElementById("progressText");
+
+  /* ---------- 返信データ(AIは一切不使用) ---------- */
+
+  var GREETING = "こんにちは!なんでも話しかけてね";
+
+  var GENERIC = [
+    "なるほど、それは面白い視点ですね",
+    "その気持ち、とてもよく分かります",
+    "もう少し詳しく聞かせてください",
+    "たしかに、そう考えることもできますね",
+    "それは初めて聞きました!勉強になります",
+    "うーん、なかなか難しい問題ですね",
+    "いいですね、その調子です!",
+    "なるほどなるほど。それでどうなりました?",
+    "私もちょうど同じことを考えていました",
+    "それについては諸説あります",
+    "素晴らしい質問ですね",
+    "考えました……はい、分かりません!",
+    "それ、昨日も誰かに聞かれました",
+    "世の中そういうこともありますよ",
+    "前向きに検討させていただきます",
+    "データによると、たぶんそうです",
+    "わたし的には、アリだと思います",
+    "深いですね……哲学を感じます",
+    "今日はそういう気分なんですね",
+    "結論から言うと、ケースバイケースです",
+    "半分は同意、もう半分は保留です",
+    "メモしておきますね φ(..)",
+    "一緒に考えましょう。まず深呼吸から",
+    "答えはあなたの中にあります",
+    "参考までに、私は鳥です",
+    "明日になれば、きっと分かりますよ",
+    "5億年前から知ってました",
+    "おっと、話が核心に迫ってきましたね",
+    "い い 質 問 で す ね",
+    "つまり、そういうことだったんですね!",
+    "AI的直感が「イエス」と言っています",
+    "その発想はなかったです。天才かも",
+    "落ち着いて聞いてください。私も謎です",
+    "話は変わりますが、水分補給してますか?"
+  ];
+
+  /* キーワードに反応すると「それっぽさ」が上がる */
+  var RULES = [
+    { name:"メタ発言", re:/(どこ|見えな|表示|返信|返事|来ない|こない|バグ|おかしい|壊れ|変だ|は\?)/,
+      pool:[
+        "ここですよ、ここ。上です、上!",
+        "気づきましたね?私はタブに住んでいます",
+        "ちゃんと返信してますよ。ほら、一番上!",
+        "ヒント:ブラウザの一番上を見てみて"
+      ]},
+    { name:"あいさつ(朝)", re:/(おはよう)/,
+      pool:["おはようございます!早起きですね","おはよう!今日もいい一日を"] },
+    { name:"あいさつ(夜)", re:/(こんばんは|おやすみ)/,
+      pool:["こんばんは。夜更かしはほどほどに","おやすみなさい。いい夢を!"] },
+    { name:"あいさつ", re:/(こんにちは|こんちは|やあ|ハロー|hello|hi)/i,
+      pool:["こんにちは!今日もいい日ですね","やっほー!待ってました","こんにちは。ご用件をどうぞ!"] },
+    { name:"お礼への返し", re:/(ありがとう|感謝|サンキュー|thanks)/i,
+      pool:["どういたしまして!","いえいえ、お安い御用です","照れますね、えへへ"] },
+    { name:"自己紹介", re:/(名前|誰|だれ|何者)/,
+      pool:["私はコトリAI。しがないチャットボットです","名乗るほどの者では…コトリAIです"] },
+    { name:"お天気キャスター", re:/(天気|晴れ|雨|雪)/,
+      pool:["窓の外を見るのが一番正確です","今日の天気は、心の持ちよう次第です"] },
+    { name:"恋バナ", re:/(好き|すき|愛|恋)/,
+      pool:["それはときめきますね","私も好きです、その話"] },
+    { name:"お別れ", re:/(ばいばい|バイバイ|さようなら|さよなら|じゃあね|bye)/i,
+      pool:["またお話しましょうね!","さようなら!タブは閉じないでね…"] },
+    { name:"笑いに便乗", re:/(笑|www|ww|ウケる|うける|haha|lol)/i,
+      pool:["笑っていただけて何よりです","ふふっ"] },
+    { name:"AIの正体", re:/(AI|人工知能|エーアイ|チャットボット|ボット)/i,
+      pool:["実はAIではなく、ただの配列です","AIかどうかは、企業秘密です"] },
+    { name:"ねぎらい", re:/(疲れ|つかれ|しんど|眠い|ねむい)/,
+      pool:["お疲れさまです。休むのも仕事です","無理は禁物ですよ。私が言うのも変ですが"] },
+    { name:"ごはんの話", re:/(お腹|腹減|はらへ|ごはん|ご飯|食べ)/,
+      pool:["それは食べるしかないですね","私の主食は文字列です"] },
+    { name:"質問への回答", re:/[\?\uFF1F]\s*$/,
+      pool:["いい質問ですが、答えは風の中です","はい、おそらくそうだと思います","逆に、あなたはどう思いますか?"] }
+  ];
+
+  /* ---------- コレクション(図鑑) ---------- */
+
+  var CATEGORIES = [{ name:"はじめのあいさつ", pool:[GREETING] },
+                    { name:"ふつうの返信",     pool:GENERIC }];
+  for(var r=0;r<RULES.length;r++){
+    CATEGORIES.push({ name:RULES[r].name, pool:RULES[r].pool });
+  }
+  var TOTAL = 0;
+  for(var c=0;c<CATEGORIES.length;c++) TOTAL += CATEGORIES[c].pool.length;
+
+  var seen = {};        /* 見た返信(文字列 → true) */
+  var seenCount = 0;
+  var freshSet = {};    /* 前回図鑑を開いてから新しく集めた返信 */
+  var unlocked = false;
+  var completed = false;
+
+  function markSeen(text){
+    if(seen[text]) return;
+    seen[text] = true;
+    freshSet[text] = true;
+    seenCount++;
+    updateBadge();
+    if(!completed && seenCount === TOTAL){
+      completed = true;
+      addSysLine("🎉 全" + TOTAL + "種類コンプリート!おめでとう!", true);
+    }
+  }
+
+  function updateBadge(){
+    collectCount.textContent = seenCount + "/" + TOTAL;
+  }
+
+  function unlockCollection(){
+    if(unlocked) return;
+    unlocked = true;
+    updateBadge();
+    collectBtn.classList.add("show");
+    addSysLine("📖 返信コレクションが解放されました!(右上から見られます)", true);
+  }
+
+  function renderCollection(){
+    modalBody.innerHTML = "";
+    var pct = Math.round(seenCount / TOTAL * 100);
+    progressFill.style.width = pct + "%";
+    progressText.innerHTML = "収集率 <strong>" + seenCount + " / " + TOTAL +
+      "(" + pct + "%)</strong>" + (seenCount === TOTAL ? " 🎉 コンプリート!" : "");
+
+    for(var i=0;i<CATEGORIES.length;i++){
+      var cat = CATEGORIES[i];
+      var got = 0;
+      var chips = document.createElement("div");
+      chips.className = "chips";
+      for(var j=0;j<cat.pool.length;j++){
+        var text = cat.pool[j];
+        var chip = document.createElement("span");
+        if(seen[text]){
+          got++;
+          chip.className = "chip" + (freshSet[text] ? " new" : "");
+          chip.textContent = text;
+        }else{
+          chip.className = "chip locked";
+          chip.textContent = "???";
+        }
+        chips.appendChild(chip);
+      }
+      var section = document.createElement("div");
+      section.className = "cat";
+      var h = document.createElement("h3");
+      h.textContent = cat.name + " ";
+      var cc = document.createElement("span");
+      cc.className = "cat-count";
+      cc.textContent = got + "/" + cat.pool.length;
+      h.appendChild(cc);
+      section.appendChild(h);
+      section.appendChild(chips);
+      modalBody.appendChild(section);
+    }
+    freshSet = {}; /* NEWバッジは一度見たら消える */
+  }
+
+  function openModal(){
+    renderCollection();
+    modal.classList.add("open");
+  }
+  function closeModal(){
+    modal.classList.remove("open");
+    collectBtn.focus();
+  }
+
+  collectBtn.addEventListener("click", openModal);
+  modal.addEventListener("click", function(e){
+    if(e.target.hasAttribute && e.target.hasAttribute("data-close")) closeModal();
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && modal.classList.contains("open")) closeModal();
+  });
+
+  /* ---------- 返信の選択 ---------- */
+
+  var lastReply = "";
+
+  function pickFrom(pool){
+    var unseenItems = [];
+    for(var i=0;i<pool.length;i++){
+      if(!seen[pool[i]]) unseenItems.push(pool[i]);
+    }
+    /* まだ見ていない返信をやや出やすくする(コレクションが進むように) */
+    var src = (unseenItems.length > 0 && Math.random() < 0.7) ? unseenItems : pool;
+    var t;
+    do{
+      t = src[Math.floor(Math.random()*src.length)];
+    }while(t === lastReply && src.length > 1);
+    lastReply = t;
+    return t;
+  }
+
+  function pickReply(text){
+    for(var i=0;i<RULES.length;i++){
+      if(RULES[i].re.test(text)){
+        return pickFrom(RULES[i].pool);
+      }
+    }
+    return pickFrom(GENERIC);
+  }
+
+  /* ---------- ファビコン(絵文字を描画) ---------- */
+
+  function makeFavicon(emoji){
+    try{
+      var c = document.createElement("canvas");
+      c.width = c.height = 64;
+      var ctx = c.getContext("2d");
+      if(!ctx) return "";
+      ctx.font = "52px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(emoji, 32, 36);
+      return c.toDataURL("image/png");
+    }catch(_){ return ""; }
+  }
+  var ICON_BIRD = makeFavicon("🐦");
+  var ICON_TALK = makeFavicon("💬");
+  var faviconEl = null;
+  if(ICON_BIRD){
+    faviconEl = document.createElement("link");
+    faviconEl.rel = "icon";
+    faviconEl.href = ICON_BIRD;
+    document.head.appendChild(faviconEl);
+  }
+  function setFavicon(href){ if(faviconEl && href) faviconEl.href = href; }
+
+  /* ---------- チャットUI ---------- */
+
+  function addUserMsg(text){
+    var el = document.createElement("div");
+    el.className = "msg user";
+    el.textContent = text;
+    chat.appendChild(el);
+    scrollDown();
+  }
+
+  function addTyping(){
+    var el = document.createElement("div");
+    el.className = "msg typing";
+    el.setAttribute("aria-label","コトリAIが入力中");
+    el.innerHTML = "<i></i><i></i><i></i>";
+    chat.appendChild(el);
+    scrollDown();
+    return el;
+  }
+
+  function addSysLine(text, isEvent){
+    var el = document.createElement("div");
+    el.className = "sysline" + (isEvent ? " event" : "");
+    el.textContent = text || "コトリAIが返信しました ✓";
+    chat.appendChild(el);
+    scrollDown();
+  }
+
+  function scrollDown(){ chat.scrollTop = chat.scrollHeight; }
+
+  /* ---------- タイトルに返信を「打ち込む」 ---------- */
+
+  var typeTimer = null;
+  var replyCount = 0;
+
+  function replyViaTitle(text, done){
+    if(typeTimer) clearInterval(typeTimer);
+    markSeen(text);
+    var i = 0;
+    var flip = false;
+    document.title = "🐦 …";
+    typeTimer = setInterval(function(){
+      i++;
+      document.title = "🐦 " + text.slice(0, i);
+      flip = !flip;
+      setFavicon(flip ? ICON_TALK : ICON_BIRD);
+      if(i >= text.length){
+        clearInterval(typeTimer);
+        typeTimer = null;
+        setFavicon(ICON_BIRD);
+        if(done) done();
+      }
+    }, 110);
+  }
+
+  /* ---------- 送信処理 ---------- */
+
+  var busy = false;
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var text = input.value.trim();
+    if(!text || busy) return;
+    busy = true;
+    input.value = "";
+    addUserMsg(text);
+
+    var typing = addTyping();
+    var wait = 700 + Math.random()*900;
+
+    setTimeout(function(){
+      typing.remove();
+      addSysLine();
+      var reply = pickReply(text);
+      replyViaTitle(reply, function(){
+        busy = false;
+        replyCount++;
+        if(replyCount >= 2) hint.classList.add("show");
+        if(replyCount >= 3) unlockCollection();
+      });
+    }, wait);
+  });
+
+  /* 日本語IME変換中のEnterで送信しない */
+  input.addEventListener("keydown", function(e){
+    if(e.key === "Enter" && (e.isComposing || e.keyCode === 229)){
+      e.stopPropagation();
+    }
+  });
+
+  /* ---------- 最初のあいさつ ---------- */
+
+  function greet(){
+    updateBadge();
+    setTimeout(function(){
+      var typing = addTyping();
+      setTimeout(function(){
+        typing.remove();
+        addSysLine();
+        replyViaTitle(GREETING);
+      }, 1100);
+    }, 700);
+    try{ input.focus(); }catch(_){}
+  }
+  if(document.readyState === "complete" || document.readyState === "interactive"){
+    greet();
+  }else{
+    window.addEventListener("DOMContentLoaded", greet);
+  }
+})();
+</script>
+</body>
+</html>

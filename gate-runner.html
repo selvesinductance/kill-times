@@ -1,36 +1,74 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>🚪 ゲートランナー 2³²</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>🚪 ゲートランナー — 数式ゲートで動物を増やせ！</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; padding: 0; background: #fff; }
-  #root { min-height: 100vh; }
+  html, body { margin: 0; padding: 0; }
+  #app {
+    min-height: 100vh; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center;
+    font-family: system-ui, sans-serif; padding: 16px 12px 32px;
+    transition: background 0.6s; overflow: hidden;
+  }
+  @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  /* 揺れは残すが振幅を小さく・ゆっくりに（光の明滅は一切なし） */
+  @keyframes bigshake {
+    0% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-4px,2px) rotate(-0.3deg); }
+    50% { transform: translate(3px,-3px) rotate(0.25deg); } 75% { transform: translate(-2px,-2px) rotate(-0.2deg); }
+    100% { transform: translate(0,0) rotate(0); }
+  }
+  /* ゆっくりした揺らぎ（旧グリッチの代替。色の点滅なし） */
+  @keyframes wobble {
+    0%,100% { transform: translate(0,0) rotate(0deg); }
+    25% { transform: translate(-2px,1px) rotate(-1.2deg); }
+    50% { transform: translate(2px,-1px) rotate(1deg); }
+    75% { transform: translate(-1px,-1px) rotate(-0.8deg); }
+  }
+  /* 穏やかな呼吸（不透明度は 0.75〜1 の範囲・2秒周期） */
+  @keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
+  @keyframes floatchar {
+    from { opacity: 0; transform: scale(0.3) rotate(0deg); }
+    30% { opacity: 1; }
+    to { opacity: 0.2; transform: scale(1.5) rotate(18deg); }
+  }
+  /* トロイの木馬が左からトコトコ入ってくる */
+  @keyframes trot {
+    from { transform: translateX(-46vw) rotate(0deg); }
+    40% { transform: translateX(-24vw) rotate(-4deg); }
+    70% { transform: translateX(-8vw) rotate(4deg); }
+    to { transform: translateX(0) rotate(0deg); }
+  }
+  /* 異常事態の赤フレーム: 2秒周期でゆっくり脈動（点滅ではない） */
+  @keyframes framepulse {
+    0%,100% { opacity: 0.65; box-shadow: inset 0 0 26px rgba(211,47,47,0.35); }
+    50% { opacity: 1; box-shadow: inset 0 0 52px rgba(211,47,47,0.55); }
+  }
+  button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; font-family: inherit; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-iteration-count: 1 !important; animation-duration: 0.01s !important; transition: none !important; }
+  }
 </style>
-</head>
-<body>
-<div id="root"></div>
-
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-<script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useMemo } = React;
-
+<div id="app"></div>
+<script>
+"use strict";
+(function () {
 // ============================================================
-//  🚪 ゲートランナー 2³² — 数式ゲートで動物を増やせ！
+//  🚪 ゲートランナー — 数式ゲートで動物を増やせ！（Vanilla JS 単一ファイル版）
 //  ・数式は全64種類（三角関数・対数・微積分・ビット演算入り）
-//  ・|n| が 2³² を超えると「オーバーフロー」で強制終了
-//  ・0除算 / 定義域エラー(√負, log負 など)は「バグ」で強制終了
-//  ・毎ステージ、片方のゲートは必ず減少、もう片方は必ず±0か増加
-//    （ただし…罠やオーバーフロー餌にすり替わっていることがある）
+//  ・|n| が 2³² を超えると「オーバーフロー」→ ブルースクリーン強制終了
+//  ・0除算 / 定義域エラー(√負, log負 など)→ トロイの木馬に侵入され強制終了
+//  ※ 光過敏対策: 高速な明滅・色反転フラッシュは不使用
 // ============================================================
 
 const LIMIT = 4294967296; // 2^32
 const STAGE_COUNT = 12;
 const START_N = 5;
+const HALF_LIMIT = 2147483648; // 2^31
 const ANIMALS = ["🐶","🐱","🐰","🐻","🐼","🐨","🐯","🦊","🐸","🐵","🐔","🐧","🐷","🦁","🐮","🐹"];
 const SPEEDS = [
   { key: "slow", label: "ゆったり", time: 10, emoji: "🐢" },
@@ -218,492 +256,549 @@ function rankOf(n) {
   return ["👻", "反転世界の住人"];
 }
 
-const GLITCH_POOL = "▓░▒█◆◇÷0∞ΞΨ%$#@!?エラ一バグ壊★†NaNヷｦ";
+// 0除算クラッシュで画面に湧く文字（🐴多め＝トロイの木馬）
+const GLITCH_POOL = "🐴🐴🐴🐴🐴🎠▓░÷0?！🐴🐴ヒヒーン🐴";
+const TITLE_TEXT = "ゲートランナー";
+const TITLE_COLORS = ["#ff5d8f", "#ff9f1c", "#ffd23f", "#4cd964", "#37b6ff", "#a06bff", "#ff7b54"];
+const TITLE_FONT = "'Mochiy Pop One', 'Hiragino Maru Gothic ProN', 'ヒラギノ丸ゴ ProN W4', 'HG丸ｺﾞｼｯｸM-PRO', sans-serif";
 
-// ===== どうぶつグリッド =====
-function AnimalGrid({ count, animal }) {
+// ===== 称号コレクション（全7種） =====
+const TITLES = [
+  { id: "overflow", icon: "🖥️", name: "限界突破エンジニア", hint: "2³² の壁を突破してみよう" },
+  { id: "div0",     icon: "🐴", name: "宇宙を割った者",     hint: "0 で割ってみよう" },
+  { id: "domain",   icon: "🌀", name: "虚数世界の迷子",     hint: "√ や log に入れちゃダメな数を…" },
+  { id: "negative", icon: "👻", name: "反物質ブリーダー",   hint: "マイナスの数でクリアしよう" },
+  { id: "zero",     icon: "🕳️", name: "虚無の飼育員",       hint: "ぴったり 0 匹でクリアしよう" },
+  { id: "one",      icon: "🐺", name: "一匹狼マスター",     hint: "ぴったり 1 匹でクリアしよう" },
+  { id: "giant",    icon: "🌌", name: "int32を超えし者",    hint: "2³¹（約21.5億）以上でクリアしよう" },
+];
+
+// ============================================================
+//  localStorage 永続化（例外環境ではメモリ動作にフォールバック）
+// ============================================================
+const LS_BEST = "gateRunner.best";
+const LS_TITLES = "gateRunner.titles";
+function lsGet(key, fallback) {
+  try {
+    const v = window.localStorage.getItem(key);
+    return v == null ? fallback : JSON.parse(v);
+  } catch (e) { return fallback; }
+}
+function lsSet(key, val) {
+  try { window.localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* メモリ動作にフォールバック */ }
+}
+
+// ============================================================
+//  ゲーム状態
+// ============================================================
+const state = {
+  phase: "start", // start|play|feedback|result|overflow|zerodiv
+  count: START_N,
+  stage: 0,
+  pair: null,
+  animal: "🐶",
+  feedback: null,
+  history: [],
+  speed: SPEEDS[1],
+  timeLeft: SPEEDS[1].time,
+  crash: null,
+  crashReady: false,
+  spinner: "4294967296",
+  best: (function () { const b = lsGet(LS_BEST, null); return typeof b === "number" ? b : null; })(),
+  earnedTitles: (function () { const t = lsGet(LS_TITLES, []); return Array.isArray(t) ? t : []; })(),
+  glitchChars: [],
+};
+let runEarned = []; // 今回のプレイで獲得した称号ID
+
+// タイマー類
+let tickTimer = null;
+let fbTimer = null;
+let crashReadyTimer = null;
+let spinnerTimer = null;
+
+function clearGameTimers() {
+  clearInterval(tickTimer);
+  clearTimeout(fbTimer);
+  clearTimeout(crashReadyTimer);
+  clearInterval(spinnerTimer);
+}
+
+// 称号を獲得（今回分の記録＋コレクションに追加＋保存）
+function earnTitle(id) {
+  if (!runEarned.includes(id)) runEarned.push(id);
+  if (!state.earnedTitles.includes(id)) {
+    state.earnedTitles = [...state.earnedTitles, id];
+    lsSet(LS_TITLES, state.earnedTitles);
+  }
+}
+
+// ============================================================
+//  ゲーム進行
+// ============================================================
+function startGame() {
+  clearGameTimers();
+  runEarned = [];
+  state.animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  state.count = START_N;
+  state.stage = 0;
+  state.history = [];
+  state.feedback = null;
+  state.crash = null;
+  state.crashReady = false;
+  state.pair = makeGates(START_N, [], 0);
+  state.timeLeft = state.speed.time;
+  state.phase = "play";
+  render();
+  startTimer();
+}
+
+function goHome() {
+  clearGameTimers();
+  state.count = START_N;
+  state.stage = 0;
+  state.history = [];
+  state.pair = null;
+  state.feedback = null;
+  state.crash = null;
+  state.crashReady = false;
+  state.phase = "start";
+  render();
+}
+
+function startTimer() {
+  clearInterval(tickTimer);
+  state.timeLeft = state.speed.time;
+  updateTimerDOM();
+  tickTimer = setInterval(() => {
+    if (state.phase !== "play") { clearInterval(tickTimer); return; }
+    if (state.timeLeft <= 0.1) {
+      clearInterval(tickTimer);
+      state.timeLeft = 0;
+      updateTimerDOM();
+      // 時間切れ → 悪い方を自動選択
+      doChoose(pickWorse(state.pair, state.count), true);
+      return;
+    }
+    state.timeLeft = +(state.timeLeft - 0.1).toFixed(1);
+    updateTimerDOM();
+  }, 100);
+}
+
+function nextStage(nextCount, nextStageIdx, avoid) {
+  if (nextStageIdx >= STAGE_COUNT) {
+    // 特殊クリア称号の判定
+    if (nextCount < 0) earnTitle("negative");
+    if (nextCount === 0) earnTitle("zero");
+    if (nextCount === 1) earnTitle("one");
+    if (nextCount >= HALF_LIMIT) earnTitle("giant");
+    if (state.best === null || nextCount > state.best) {
+      state.best = nextCount;
+      lsSet(LS_BEST, state.best);
+    }
+    state.phase = "result";
+    render();
+    return;
+  }
+  state.pair = makeGates(nextCount, avoid, nextStageIdx);
+  state.stage = nextStageIdx;
+  state.phase = "play";
+  render();
+  startTimer();
+}
+
+function doChoose(op, viaTimeout) {
+  clearInterval(tickTimer);
+  const prev = state.count;
+  const res = evalOp(op, prev);
+
+  if (res.type === "div0" || res.type === "nan") {
+    earnTitle(res.type === "div0" ? "div0" : "domain");
+    state.history = [...state.history, { stage: state.stage + 1, label: op.label, prev, crash: "zero", timeout: viaTimeout }];
+    state.crash = { kind: res.type, label: op.label, prev };
+    enterCrash("zerodiv");
+    return;
+  }
+  if (res.type === "overflow") {
+    earnTitle("overflow");
+    state.history = [...state.history, { stage: state.stage + 1, label: op.label, prev, crash: "overflow", timeout: viaTimeout }];
+    state.crash = { kind: "overflow", label: op.label, prev, sign: res.sign };
+    enterCrash("overflow");
+    return;
+  }
+
+  const next = res.value;
+  state.history = [...state.history, { stage: state.stage + 1, label: op.label, prev, next, timeout: viaTimeout }];
+  const avoid = [op.label, ...state.pair.map(p => p.label)];
+  state.count = next;
+  state.feedback = { diff: next - prev, label: op.label, prev, next };
+  state.phase = "feedback";
+  render();
+  clearTimeout(fbTimer);
+  fbTimer = setTimeout(() => {
+    state.feedback = null;
+    nextStage(next, state.stage + 1, avoid);
+  }, 1000);
+}
+
+function choose(op) { if (state.phase === "play") doChoose(op, false); }
+
+// クラッシュ演出開始（overflow / zerodiv 共通）
+function enterCrash(kind) {
+  state.phase = kind;
+  state.crashReady = false;
+  if (kind === "zerodiv") {
+    const pool = Array.from(GLITCH_POOL); // 絵文字(サロゲートペア)対応
+    state.glitchChars = Array.from({ length: 30 }, () => ({
+      ch: pool[Math.floor(Math.random() * pool.length)],
+      x: Math.random() * 90, y: Math.random() * 88,
+      d: Math.random() * 1.4, s: 16 + Math.random() * 26, r: Math.random() * 60 - 30,
+    }));
+  }
+  render();
+  // 2.1秒後に結果画面へ（ゆっくり脈動 → 結果）
+  clearTimeout(crashReadyTimer);
+  crashReadyTimer = setTimeout(() => {
+    state.crashReady = true;
+    clearInterval(spinnerTimer);
+    render();
+  }, 2100);
+  // オーバーフローの数字スロット演出
+  clearInterval(spinnerTimer);
+  if (kind === "overflow") {
+    spinnerTimer = setInterval(() => {
+      if (state.crashReady) { clearInterval(spinnerTimer); return; }
+      let s = "";
+      for (let i = 0; i < 10; i++) s += Math.floor(Math.random() * 10);
+      state.spinner = s;
+      const el = document.getElementById("spinner");
+      if (el) el.textContent = s;
+    }, 85);
+  }
+}
+
+// ============================================================
+//  タイマーの部分更新（ティックでは全再描画しない）
+// ============================================================
+function updateTimerDOM() {
+  const bar = document.getElementById("timer-bar");
+  const txt = document.getElementById("timer-text");
+  const stageBar = document.getElementById("stage-bar");
+  if (!bar || !txt) return;
+  const barPct = (state.timeLeft / state.speed.time) * 100;
+  const barColor = state.timeLeft <= state.speed.time * 0.25 ? "#c62828" : state.timeLeft <= state.speed.time * 0.5 ? "#ef6c00" : "#7b1fa2";
+  bar.style.width = barPct + "%";
+  bar.style.background = barColor;
+  txt.textContent = state.timeLeft.toFixed(1) + "s";
+  txt.style.color = barColor;
+  if (stageBar) stageBar.style.width = ((state.stage / STAGE_COUNT) * 100) + "%";
+}
+
+// ============================================================
+//  描画（フェーズ単位でHTMLを組み立て）
+// ============================================================
+const app = document.getElementById("app");
+
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function animalGridHTML(count, animal) {
   const abs = Math.abs(count);
   const neg = count < 0;
   const display = Math.min(abs, 120);
   const size = abs > 60 ? 15 : abs > 30 ? 21 : 27;
-  return (
-    <div style={{ position: "relative", padding: 6, maxWidth: 360, margin: "0 auto" }}>
-      {neg && (
-        <div style={{ textAlign: "center", fontSize: 13, color: "#c62828", fontWeight: 700, marginBottom: 4 }}>
-          👻 マイナス{fmt(abs)}匹（反転世界！）
-        </div>
-      )}
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 2, filter: neg ? "hue-rotate(180deg)" : "none", opacity: neg ? 0.8 : 1 }}>
-        {Array.from({ length: display }, (_, i) => (
-          <span key={i} style={{ fontSize: size, lineHeight: 1, animation: `pop 0.3s ease ${Math.min(i * 0.012, 1.2)}s both`, transform: neg ? "scaleX(-1)" : "none" }}>
-            {animal}
-          </span>
-        ))}
-        {display === 0 && <span style={{ fontSize: 32, opacity: 0.4 }}>🕳️</span>}
-      </div>
-      {abs > 120 && (
-        <div style={{ fontSize: 12, color: "#888", textAlign: "center", marginTop: 4 }}>
-          …ほか {fmt(abs - 120)} 匹{jpUnit(abs) ? `（全部で約${jpUnit(abs)}匹）` : ""}
-        </div>
-      )}
-    </div>
-  );
+  let spans = "";
+  for (let i = 0; i < display; i++) {
+    const delay = Math.min(i * 0.012, 1.2);
+    spans += `<span style="font-size:${size}px;line-height:1;animation:pop 0.3s ease ${delay}s both;transform:${neg ? "scaleX(-1)" : "none"}">${animal}</span>`;
+  }
+  if (display === 0) spans = `<span style="font-size:32px;opacity:0.4">🕳️</span>`;
+  return `<div style="position:relative;padding:6px;max-width:360px;margin:0 auto">
+    ${neg ? `<div style="text-align:center;font-size:13px;color:#c62828;font-weight:700;margin-bottom:4px">👻 マイナス${fmt(abs)}匹（反転世界！）</div>` : ""}
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;filter:${neg ? "hue-rotate(180deg)" : "none"};opacity:${neg ? 0.8 : 1}">${spans}</div>
+    ${abs > 120 ? `<div style="font-size:12px;color:#888;text-align:center;margin-top:4px">…ほか ${fmt(abs - 120)} 匹${jpUnit(abs) ? `（全部で約${jpUnit(abs)}匹）` : ""}</div>` : ""}
+  </div>`;
 }
 
-// ===== 履歴 =====
-function HistoryList({ history }) {
-  if (!history.length) return null;
-  return (
-    <div style={{ margin: "16px auto 0", maxWidth: 340, textAlign: "left", background: "rgba(0,0,0,0.05)", borderRadius: 12, padding: "12px 16px" }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#777", marginBottom: 6 }}>ログ</div>
-      {history.map((h, i) => (
-        <div key={i} style={{ fontSize: 12.5, padding: "3px 0", display: "flex", justifyContent: "space-between", gap: 8, fontFamily: "ui-monospace, Menlo, monospace" }}>
-          <span style={{
-            color: h.crash === "overflow" ? "#e65100" : h.crash ? "#ad1457" : h.next >= h.prev ? "#2e7d32" : "#c62828",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {h.stage}. {fmt(h.prev)} → {h.label} → {h.crash === "overflow" ? "💥OVERFLOW" : h.crash ? "🌀ERROR" : fmt(h.next)}
-          </span>
-          {h.timeout && <span style={{ color: "#c62828", fontSize: 11, flexShrink: 0 }}>⏰</span>}
-        </div>
-      ))}
-    </div>
-  );
+function historyHTML(history) {
+  if (!history.length) return "";
+  const rows = history.map(h => {
+    const color = h.crash === "overflow" ? "#e65100" : h.crash ? "#ad1457" : h.next >= h.prev ? "#2e7d32" : "#c62828";
+    const right = h.crash === "overflow" ? "💥OVERFLOW" : h.crash ? "🌀ERROR" : fmt(h.next);
+    return `<div style="font-size:12.5px;padding:3px 0;display:flex;justify-content:space-between;gap:8px;font-family:ui-monospace,Menlo,monospace">
+      <span style="color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.stage}. ${fmt(h.prev)} → ${esc(h.label)} → ${right}</span>
+      ${h.timeout ? `<span style="color:#c62828;font-size:11px;flex-shrink:0">⏰</span>` : ""}
+    </div>`;
+  }).join("");
+  return `<div style="margin:16px auto 0;max-width:340px;text-align:left;background:rgba(0,0,0,0.05);border-radius:12px;padding:12px 16px">
+    <div style="font-size:12px;font-weight:700;color:#777;margin-bottom:6px">ログ</div>${rows}</div>`;
 }
 
-function App() {
-  const [phase, setPhase] = useState("start"); // start|play|feedback|timeout|result|overflow|zerodiv
-  const [count, setCount] = useState(START_N);
-  const [stage, setStage] = useState(0);
-  const [pair, setPair] = useState(null);
-  const [animal, setAnimal] = useState("🐶");
-  const [feedback, setFeedback] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [speed, setSpeed] = useState(SPEEDS[1]);
-  const [timeLeft, setTimeLeft] = useState(SPEEDS[1].time);
-  const [crash, setCrash] = useState(null);
-  const [crashReady, setCrashReady] = useState(false);
-  const [spinner, setSpinner] = useState("4294967296");
-  const [best, setBest] = useState(null); // セッション内ベスト
+function titleCollectionHTML(earned, justEarned, dark) {
+  const rows = TITLES.map(t => {
+    const got = earned.includes(t.id);
+    const isNew = justEarned.includes(t.id);
+    const bg = isNew ? (dark ? "rgba(255,213,79,0.22)" : "rgba(255,213,79,0.4)") : "none";
+    const iconStyle = `font-size:16px;filter:${got ? "none" : "grayscale(1)"};opacity:${got ? 1 : 0.45}`;
+    const body = got
+      ? `<span style="font-weight:700;color:${dark ? "#fff" : "#333"}">${t.name}${isNew ? `<span style="margin-left:6px;font-size:10.5px;font-weight:900;color:#e65100;background:#ffd54f;border-radius:6px;padding:1px 6px">NEW!</span>` : ""}</span>`
+      : `<span style="color:${dark ? "rgba(255,255,255,0.55)" : "#999"}">？？？ <span style="font-size:11px">（${t.hint}）</span></span>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 4px;font-size:12.5px;border-radius:8px;background:${bg}">
+      <span style="${iconStyle}">${got ? t.icon : "🔒"}</span>${body}</div>`;
+  }).join("");
+  const header = `🏅 称号コレクション <span style="font-family:ui-monospace,monospace">${earned.length}/${TITLES.length}</span>${earned.length === TITLES.length ? " 🎊コンプリート！" : ""}`;
+  return `<div style="margin:14px auto 0;max-width:350px;text-align:left;border-radius:12px;padding:12px 14px;background:${dark ? "rgba(255,255,255,0.10)" : "rgba(123,31,162,0.07)"};border:${dark ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(123,31,162,0.18)"}">
+    <div style="font-size:12.5px;font-weight:800;color:${dark ? "#fff" : "#6a1b9a"};margin-bottom:8px">${header}</div>${rows}</div>`;
+}
 
-  const tickRef = useRef(null);
-  const fbRef = useRef(null);
-  const countRef = useRef(START_N);
-  const stageRef = useRef(0);
-  const historyRef = useRef([]);
-  const pairRef = useRef(null);
-  const phaseRef = useRef("start");
-  phaseRef.current = phase;
+function headerHTML() {
+  const letters = TITLE_TEXT.split("").map((c, i) =>
+    `<span style="color:${TITLE_COLORS[i % TITLE_COLORS.length]};display:inline-block;transform:rotate(${i % 2 ? 3.5 : -3.5}deg) translateY(${i % 2 ? 1.5 : -1.5}px);text-shadow:0 2px 0 rgba(0,0,0,0.15), 0 0 6px rgba(255,255,255,0.6)">${c}</span>`
+  ).join("");
+  return `<h1 style="margin:0 0 8px;font-size:27px;letter-spacing:1px;font-weight:800;font-family:${TITLE_FONT};user-select:none;text-align:center">
+    <span style="margin-right:4px">🚪</span>${letters}</h1>`;
+}
 
-  // ---- タイマー ----
-  useEffect(() => {
-    if (phase !== "play") return;
-    clearInterval(tickRef.current);
-    setTimeLeft(speed.time);
-    tickRef.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 0.1) {
-          clearInterval(tickRef.current);
-          setPhase(p => (p === "play" ? "timeout" : p));
-          return 0;
-        }
-        return +(t - 0.1).toFixed(1);
-      });
-    }, 100);
-    return () => clearInterval(tickRef.current);
-  }, [phase, stage, speed]);
+function startHTML() {
+  const speedBtns = SPEEDS.map(s => {
+    const on = state.speed.key === s.key;
+    return `<button data-action="speed" data-key="${s.key}" style="font-size:14px;padding:9px 14px;border-radius:12px;cursor:pointer;font-weight:700;border:${on ? "3px solid #7b1fa2" : "3px solid #ddd"};background:${on ? "#f3e5f5" : "#fff"};color:#333">
+      ${s.emoji} ${s.label}<br><span style="font-size:12px;color:#7b1fa2">${s.time}秒</span></button>`;
+  }).join("");
+  const statusLine = (state.best !== null || state.earnedTitles.length > 0)
+    ? `<div style="font-size:13px;color:#7b1fa2;font-weight:700;margin-bottom:10px">${state.best !== null ? `🏆 セッションベスト: ${fmt(state.best)} 匹　` : ""}🏅 称号: ${state.earnedTitles.length}/${TITLES.length}</div>`
+    : "";
+  return `<div style="text-align:center;margin-top:18px;animation:slideUp 0.4s ease;max-width:380px">
+    <div style="font-size:48px;margin-bottom:10px">🐶🐱🐰🐻🐼</div>
+    <p style="font-size:14.5px;color:#444;line-height:1.8;margin:0 0 10px">数式ゲートを選んで動物を増やそう！<br>全${STAGE_COUNT}ステージ・数式は<b>64種類</b>（三角関数・log・微積分も！）</p>
+    <div style="text-align:left;background:#fff;border-radius:14px;padding:12px 16px;font-size:13px;color:#555;line-height:1.9;box-shadow:0 2px 10px rgba(123,31,162,0.12)">
+      <div>🚪 毎回、片方は<b style="color:#2e7d32">必ず±0か増加</b>、もう片方は<b style="color:#c62828">必ず減少</b>。どっちがどっちかは計算で見抜け！</div>
+      <div>💥 <b style="color:#e65100">n が 2³² (約43億) を超える</b>とオーバーフローで強制終了</div>
+      <div>🌀 <b style="color:#ad1457">0除算・√(負の数)・log(負の数)</b> はバグって強制終了</div>
+      <div>⏰ 時間切れは<b>悪い方</b>が自動で選ばれる</div>
+    </div>
+    <div style="margin:16px 0 6px;font-size:13px;color:#777;font-weight:700">制限時間</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px">${speedBtns}</div>
+    ${statusLine}
+    <button data-action="start" style="font-size:20px;padding:14px 52px;border-radius:16px;border:none;background:linear-gradient(135deg,#7b1fa2,#9c27b0);color:#fff;cursor:pointer;font-weight:800;box-shadow:0 4px 14px rgba(123,31,162,0.4)">スタート！</button>
+  </div>`;
+}
 
-  // ---- 時間切れ → 悪い方を自動選択 ----
-  useEffect(() => {
-    if (phase !== "timeout" || !pairRef.current) return;
-    doChoose(pickWorse(pairRef.current, countRef.current), true);
-  }, [phase]);
-
-  // ---- クラッシュ演出タイマー ----
-  useEffect(() => {
-    if (phase !== "overflow" && phase !== "zerodiv") return;
-    setCrashReady(false);
-    const t = setTimeout(() => setCrashReady(true), 2100);
-    return () => clearTimeout(t);
-  }, [phase]);
-
-  // ---- オーバーフローの数字スロット演出 ----
-  useEffect(() => {
-    if (phase !== "overflow" || crashReady) return;
-    const iv = setInterval(() => {
-      let s = "";
-      for (let i = 0; i < 10; i++) s += Math.floor(Math.random() * 10);
-      setSpinner(s);
-    }, 55);
-    return () => clearInterval(iv);
-  }, [phase, crashReady]);
-
-  // ---- 0除算のグリッチ文字 ----
-  const glitchChars = useMemo(() => {
-    if (phase !== "zerodiv") return [];
-    return Array.from({ length: 42 }, () => ({
-      ch: GLITCH_POOL[Math.floor(Math.random() * GLITCH_POOL.length)],
-      x: Math.random() * 92, y: Math.random() * 92,
-      d: Math.random() * 1.4, s: 13 + Math.random() * 30, r: Math.random() * 90 - 45,
-    }));
-  }, [phase]);
-
-  const nextStage = (nextCount, nextStageIdx, avoid) => {
-    if (nextStageIdx >= STAGE_COUNT) {
-      setBest(b => (b === null || nextCount > b ? nextCount : b));
-      setPhase("result");
-      return;
-    }
-    const np = makeGates(nextCount, avoid, nextStageIdx);
-    setPair(np); pairRef.current = np;
-    setStage(nextStageIdx); stageRef.current = nextStageIdx;
-    setPhase("play");
-  };
-
-  const doChoose = (op, viaTimeout) => {
-    clearInterval(tickRef.current);
-    const prev = countRef.current;
-    const res = evalOp(op, prev);
-
-    if (res.type === "div0" || res.type === "nan") {
-      const h = [...historyRef.current, { stage: stageRef.current + 1, label: op.label, prev, crash: "zero", timeout: viaTimeout }];
-      historyRef.current = h; setHistory(h);
-      setCrash({ kind: res.type, label: op.label, prev });
-      setPhase("zerodiv");
-      return;
-    }
-    if (res.type === "overflow") {
-      const h = [...historyRef.current, { stage: stageRef.current + 1, label: op.label, prev, crash: "overflow", timeout: viaTimeout }];
-      historyRef.current = h; setHistory(h);
-      setCrash({ kind: "overflow", label: op.label, prev, sign: res.sign });
-      setPhase("overflow");
-      return;
-    }
-
-    const next = res.value;
-    const h = [...historyRef.current, { stage: stageRef.current + 1, label: op.label, prev, next, timeout: viaTimeout }];
-    countRef.current = next; historyRef.current = h;
-    setCount(next); setHistory(h);
-    setFeedback({ diff: next - prev, label: op.label, prev, next });
-    setPhase("feedback");
-    clearTimeout(fbRef.current);
-    fbRef.current = setTimeout(() => {
-      setFeedback(null);
-      nextStage(next, stageRef.current + 1, [op.label, ...pairRef.current.map(p => p.label)]);
-    }, 1000);
-  };
-
-  const choose = op => { if (phaseRef.current === "play") doChoose(op, false); };
-
-  const startGame = () => {
-    clearInterval(tickRef.current); clearTimeout(fbRef.current);
-    setAnimal(ANIMALS[Math.floor(Math.random() * ANIMALS.length)]);
-    setCount(START_N); countRef.current = START_N;
-    setStage(0); stageRef.current = 0;
-    setHistory([]); historyRef.current = [];
-    setFeedback(null); setCrash(null); setCrashReady(false);
-    const p = makeGates(START_N, [], 0);
-    setPair(p); pairRef.current = p;
-    setTimeLeft(speed.time);
-    setPhase("play");
-  };
-
-  const isGood = feedback && feedback.diff >= 0;
-  const barPct = (timeLeft / speed.time) * 100;
-  const barColor = timeLeft <= speed.time * 0.25 ? "#c62828" : timeLeft <= speed.time * 0.5 ? "#ef6c00" : "#7b1fa2";
-  const crashing = (phase === "overflow" || phase === "zerodiv") && !crashReady;
+function playHTML() {
+  const count = state.count;
   const unit = jpUnit(count);
+  const barPct = (state.timeLeft / state.speed.time) * 100;
+  const barColor = state.timeLeft <= state.speed.time * 0.25 ? "#c62828" : state.timeLeft <= state.speed.time * 0.5 ? "#ef6c00" : "#7b1fa2";
+  const fb = state.feedback;
+  const isGood = fb && fb.diff >= 0;
 
-  return (
-    <div style={{
-      minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center",
-      fontFamily: "system-ui, sans-serif", padding: "16px 12px 32px",
-      background: phase === "zerodiv" && crashReady
-        ? "#0d0d14"
-        : phase === "overflow" && crashReady
-          ? "linear-gradient(180deg, #2a0800 0%, #1a1a1a 100%)"
-          : "linear-gradient(180deg, #f3e5f5 0%, #fff 100%)",
-      transition: "background 0.6s",
-      animation: crashing ? "bigshake 0.25s linear infinite" : "none",
-      overflow: "hidden",
-    }}>
-      <style>{`
-        @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-        @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-        @keyframes bigshake {
-          0% { transform: translate(0,0) rotate(0); } 20% { transform: translate(-8px,4px) rotate(-0.6deg); }
-          40% { transform: translate(7px,-5px) rotate(0.5deg); } 60% { transform: translate(-5px,-4px) rotate(-0.4deg); }
-          80% { transform: translate(6px,5px) rotate(0.6deg); } 100% { transform: translate(0,0) rotate(0); }
-        }
-        @keyframes redflash { 0%,100% { opacity: 0; } 50% { opacity: 0.55; } }
-        @keyframes invertflash { 0%,100% { opacity: 0; } 50% { opacity: 1; } }
-        @keyframes glitchjit {
-          0%,100% { transform: translate(0,0) skewX(0); text-shadow: 2px 0 #ff2266, -2px 0 #22ffee; }
-          25% { transform: translate(-3px,2px) skewX(-6deg); text-shadow: -3px 0 #ff2266, 3px 0 #22ffee; }
-          50% { transform: translate(3px,-2px) skewX(4deg); text-shadow: 2px 2px #ffee22, -2px -2px #22ffee; }
-          75% { transform: translate(-2px,-3px) skewX(8deg); text-shadow: -2px 0 #ff2266, 2px 0 #22ffee; }
-        }
-        @keyframes flicker { 0%,19%,21%,23%,80%,100% { opacity: 1; } 20%,22%,55% { opacity: 0.2; } }
-        @keyframes floatchar {
-          from { opacity: 0; transform: scale(0.3) rotate(0deg); }
-          30% { opacity: 1; }
-          to { opacity: 0.15; transform: scale(1.6) rotate(25deg); }
-        }
-        button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-        @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01s !important; } }
-      `}</style>
+  const feedbackHTML = fb
+    ? `<div style="text-align:center;margin:10px 0;font-size:20px;font-weight:800;color:${isGood ? "#2e7d32" : "#c62828"};font-family:ui-monospace,Menlo,monospace;animation:${isGood ? "pulse 0.5s ease" : "shake 0.4s ease"};word-break:break-all">
+        ${fmt(fb.prev)} → ${esc(fb.label)} → ${fmt(fb.next)} ${isGood ? "🎉" : "💀"}</div>`
+    : "";
 
-      {/* ==== クラッシュ用オーバーレイ ==== */}
-      {crashing && phase === "overflow" && (
-        <div style={{ position: "fixed", inset: 0, background: "#ff1500", pointerEvents: "none", animation: "redflash 0.3s linear infinite", zIndex: 50 }} />
-      )}
-      {crashing && phase === "zerodiv" && (
-        <>
-          <div style={{ position: "fixed", inset: 0, background: "#fff", mixBlendMode: "difference", pointerEvents: "none", animation: "invertflash 0.22s steps(2) infinite", zIndex: 50 }} />
-          {glitchChars.map((g, i) => (
-            <span key={i} style={{
-              position: "fixed", left: `${g.x}%`, top: `${g.y}%`, fontSize: g.s, zIndex: 51,
-              color: ["#ff2266", "#22ffee", "#ffee22", "#c62828"][i % 4], fontWeight: 900,
-              transform: `rotate(${g.r}deg)`, pointerEvents: "none",
-              animation: `floatchar 1.2s ease ${g.d}s both`, fontFamily: "ui-monospace, monospace",
-            }}>{g.ch}</span>
-          ))}
-        </>
-      )}
+  const buttonsHTML = state.phase === "play"
+    ? `<div style="display:flex;gap:14px;margin-top:14px">
+        ${state.pair.map((g, i) => {
+          const fs = g.label.length > 9 ? 17 : g.label.length > 6 ? 20 : 24;
+          return `<button data-action="gate" data-i="${i}" style="flex:1;font-weight:800;padding:26px 6px;border-radius:20px;font-size:${fs}px;border:3px solid #ce93d8;background:#fff;color:#4a148c;cursor:pointer;transition:transform 0.1s;line-height:1.3;font-family:ui-monospace,Menlo,monospace;word-break:keep-all;box-shadow:0 3px 10px rgba(123,31,162,0.15)">${esc(g.label)}</button>`;
+        }).join("")}
+      </div>
+      <div style="text-align:center;font-size:11.5px;color:#aaa;margin-top:10px">片方は必ず⬆(±0含む)、片方は必ず⬇ …でも罠かも？</div>`
+    : "";
 
-      <h2 style={{
-        margin: "0 0 6px", fontSize: 21, letterSpacing: 1,
-        color: crashReady && (phase === "overflow" || phase === "zerodiv") ? "#eee" : "#333",
-        transition: "color 0.6s",
-      }}>
-        🚪 ゲートランナー <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 17, color: "#7b1fa2" }}>2³²</span>
-      </h2>
-
-      {/* ================= スタート ================= */}
-      {phase === "start" && (
-        <div style={{ textAlign: "center", marginTop: 18, animation: "slideUp 0.4s ease", maxWidth: 380 }}>
-          <div style={{ fontSize: 48, marginBottom: 10 }}>🐶🐱🐰🐻🐼</div>
-          <p style={{ fontSize: 14.5, color: "#444", lineHeight: 1.8, margin: "0 0 10px" }}>
-            数式ゲートを選んで動物を増やそう！<br />
-            全{STAGE_COUNT}ステージ・数式は<b>64種類</b>（三角関数・log・微積分も！）
-          </p>
-          <div style={{ textAlign: "left", background: "#fff", borderRadius: 14, padding: "12px 16px", fontSize: 13, color: "#555", lineHeight: 1.9, boxShadow: "0 2px 10px rgba(123,31,162,0.12)" }}>
-            <div>🚪 毎回、片方は<b style={{ color: "#2e7d32" }}>必ず±0か増加</b>、もう片方は<b style={{ color: "#c62828" }}>必ず減少</b>。どっちがどっちかは計算で見抜け！</div>
-            <div>💥 <b style={{ color: "#e65100" }}>n が 2³² (約43億) を超える</b>とオーバーフローで強制終了</div>
-            <div>🌀 <b style={{ color: "#ad1457" }}>0除算・√(負の数)・log(負の数)</b> はバグって強制終了</div>
-            <div>⏰ 時間切れは<b>悪い方</b>が自動で選ばれる</div>
-          </div>
-          <div style={{ margin: "16px 0 6px", fontSize: 13, color: "#777", fontWeight: 700 }}>制限時間</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 20 }}>
-            {SPEEDS.map(s => (
-              <button key={s.key} onClick={() => setSpeed(s)} style={{
-                fontSize: 14, padding: "9px 14px", borderRadius: 12, cursor: "pointer", fontWeight: 700,
-                border: speed.key === s.key ? "3px solid #7b1fa2" : "3px solid #ddd",
-                background: speed.key === s.key ? "#f3e5f5" : "#fff", color: "#333",
-              }}>
-                {s.emoji} {s.label}<br /><span style={{ fontSize: 12, color: "#7b1fa2" }}>{s.time}秒</span>
-              </button>
-            ))}
-          </div>
-          {best !== null && (
-            <div style={{ fontSize: 13, color: "#7b1fa2", fontWeight: 700, marginBottom: 10 }}>
-              🏆 セッションベスト: {fmt(best)} 匹
-            </div>
-          )}
-          <button onClick={startGame} style={{ fontSize: 20, padding: "14px 52px", borderRadius: 16, border: "none", background: "linear-gradient(135deg,#7b1fa2,#9c27b0)", color: "#fff", cursor: "pointer", fontWeight: 800, boxShadow: "0 4px 14px rgba(123,31,162,0.4)" }}>
-            スタート！
-          </button>
-        </div>
-      )}
-
-      {/* ================= プレイ中 ================= */}
-      {(phase === "play" || phase === "feedback" || phase === "timeout") && pair && (
-        <div style={{ width: "100%", maxWidth: 400, animation: "slideUp 0.3s ease" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "6px 0 4px", padding: "0 4px" }}>
-            <span style={{ fontSize: 13, color: "#777" }}>ステージ {stage + 1}/{STAGE_COUNT}</span>
-            <span style={{ fontSize: 12, color: "#bbb", fontFamily: "ui-monospace, monospace" }}>MAX 2³²</span>
-          </div>
-
-          {/* n 表示 */}
-          <div style={{ textAlign: "center", background: "#fff", borderRadius: 14, padding: "8px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", marginBottom: 8 }}>
-            <span style={{ fontSize: 24, fontWeight: 800, fontFamily: "ui-monospace, Menlo, monospace", fontVariantNumeric: "tabular-nums", color: count < 0 ? "#c62828" : "#333" }}>
-              {animal} n = {fmt(count)}
-            </span>
-            {unit && <span style={{ fontSize: 13, color: "#9c27b0", fontWeight: 700, marginLeft: 8 }}>≈{unit}匹</span>}
-          </div>
-
-          {/* タイマー */}
-          <div style={{ width: "100%", height: 8, background: "#e0e0e0", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ height: 8, borderRadius: 4, background: barColor, width: `${barPct}%`, transition: "width 0.1s linear, background 0.3s" }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <div style={{ flex: 1, height: 4, background: "#eee", borderRadius: 2, marginTop: 8, marginRight: 10 }}>
-              <div style={{ height: 4, background: "#7b1fa2", borderRadius: 2, width: `${(stage / STAGE_COUNT) * 100}%`, transition: "width 0.3s" }} />
-            </div>
-            <span style={{ fontSize: 14, fontWeight: 800, color: barColor, fontFamily: "ui-monospace, monospace" }}>{timeLeft.toFixed(1)}s</span>
-          </div>
-
-          <AnimalGrid count={count} animal={animal} />
-
-          {feedback && (
-            <div style={{
-              textAlign: "center", margin: "10px 0", fontSize: 20, fontWeight: 800,
-              color: isGood ? "#2e7d32" : "#c62828", fontFamily: "ui-monospace, Menlo, monospace",
-              animation: isGood ? "pulse 0.5s ease" : "shake 0.4s ease", wordBreak: "break-all",
-            }}>
-              {fmt(feedback.prev)} → {feedback.label} → {fmt(feedback.next)} {isGood ? "🎉" : "💀"}
-            </div>
-          )}
-
-          {phase === "play" && (
-            <>
-              <div style={{ display: "flex", gap: 14, marginTop: 14 }}>
-                {pair.map((g, i) => (
-                  <button key={i} onClick={() => choose(g)} style={{
-                    flex: 1, fontWeight: 800, padding: "26px 6px", borderRadius: 20,
-                    fontSize: g.label.length > 9 ? 17 : g.label.length > 6 ? 20 : 24,
-                    border: "3px solid #ce93d8", background: "#fff", color: "#4a148c",
-                    cursor: "pointer", transition: "transform 0.1s", lineHeight: 1.3,
-                    fontFamily: "ui-monospace, Menlo, monospace", wordBreak: "keep-all",
-                    boxShadow: "0 3px 10px rgba(123,31,162,0.15)",
-                  }}
-                    onPointerDown={e => (e.currentTarget.style.transform = "scale(0.93)")}
-                    onPointerUp={e => (e.currentTarget.style.transform = "scale(1)")}
-                    onPointerLeave={e => (e.currentTarget.style.transform = "scale(1)")}
-                  >
-                    {g.label}
-                  </button>
-                ))}
-              </div>
-              <div style={{ textAlign: "center", fontSize: 11.5, color: "#aaa", marginTop: 10 }}>
-                片方は必ず⬆(±0含む)、片方は必ず⬇ …でも罠かも？
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ================= オーバーフロー演出 ================= */}
-      {phase === "overflow" && !crashReady && (
-        <div style={{ textAlign: "center", marginTop: 60 }}>
-          <div style={{ fontSize: 15, color: "#c62828", fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>
-            {fmt(crash.prev)} → {crash.label} → ⚠️
-          </div>
-          <div style={{
-            fontSize: 42, fontWeight: 900, color: "#e65100", margin: "16px 0",
-            fontFamily: "ui-monospace, Menlo, monospace", fontVariantNumeric: "tabular-nums",
-            animation: "glitchjit 0.15s steps(2) infinite",
-          }}>
-            {spinner}
-          </div>
-          <div style={{ fontSize: 60, animation: "pulse 0.3s ease infinite" }}>💥</div>
-        </div>
-      )}
-
-      {/* ================= オーバーフロー結果 ================= */}
-      {phase === "overflow" && crashReady && (
-        <div style={{ textAlign: "center", marginTop: 12, animation: "slideUp 0.4s ease", color: "#eee", maxWidth: 380, width: "100%" }}>
-          <div style={{ fontSize: 56 }}>☢️</div>
-          <h3 style={{ margin: "4px 0", fontSize: 26, color: "#ff9800", letterSpacing: 2, animation: "glitchjit 2s steps(2) infinite" }}>
-            OVERFLOW!!
-          </h3>
-          <p style={{ fontSize: 14, lineHeight: 1.8, color: "#ffcc80", margin: "8px 0" }}>
-            {fmt(crash.prev)} に <b style={{ fontFamily: "ui-monospace, monospace" }}>{crash.label}</b> をしたら…<br />
-            |n| が <b style={{ fontFamily: "ui-monospace, monospace" }}>2³² = 4,294,967,296</b> を突破！{crash.sign < 0 && "（マイナス方向に！）"}<br />
-            動物たちはビットの彼方へ消えました。
-          </p>
-          <div style={{ display: "inline-block", background: "rgba(255,152,0,0.15)", border: "1px solid #ff9800", borderRadius: 10, padding: "6px 16px", fontSize: 13, color: "#ffb74d", fontWeight: 700, margin: "4px 0 8px" }}>
-            🏅 称号「限界突破エンジニア」を獲得
-          </div>
-          <div style={{ fontSize: 12.5, color: "#999" }}>ステージ {history.length}/{STAGE_COUNT} で爆発</div>
-          <HistoryList history={history} />
-          <button onClick={startGame} style={{ fontSize: 17, padding: "12px 40px", borderRadius: 14, border: "none", background: "#ff9800", color: "#1a1a1a", cursor: "pointer", fontWeight: 800, marginTop: 16 }}>
-            もう一回！
-          </button>
-        </div>
-      )}
-
-      {/* ================= 0除算/定義域エラー演出 ================= */}
-      {phase === "zerodiv" && !crashReady && (
-        <div style={{ textAlign: "center", marginTop: 70 }}>
-          <div style={{
-            fontSize: 34, fontWeight: 900, fontFamily: "ui-monospace, Menlo, monospace",
-            color: "#ad1457", animation: "glitchjit 0.12s steps(2) infinite",
-          }}>
-            {crash.kind === "div0" ? `${fmt(crash.prev)} ÷ 0 = ？？` : `${crash.label} … ？？`}
-          </div>
-          <div style={{ fontSize: 54, marginTop: 18, animation: "flicker 0.6s linear infinite" }}>🌀</div>
-        </div>
-      )}
-
-      {/* ================= 0除算/定義域エラー結果（ターミナル風） ================= */}
-      {phase === "zerodiv" && crashReady && (
-        <div style={{ marginTop: 12, animation: "slideUp 0.4s ease", maxWidth: 380, width: "100%" }}>
-          <div style={{
-            background: "#000", border: "1px solid #333", borderRadius: 10, padding: "14px 16px",
-            fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, lineHeight: 1.9, textAlign: "left",
-            boxShadow: "0 0 24px rgba(255,34,102,0.35)", animation: "flicker 3s linear infinite",
-          }}>
-            <div style={{ color: "#888" }}>&gt; n = {fmt(crash.prev)}</div>
-            <div style={{ color: "#888" }}>&gt; apply <span style={{ color: "#22ffee" }}>{crash.label}</span></div>
-            <div style={{ color: "#ff2266", fontWeight: 800, animation: "glitchjit 1.5s steps(2) infinite" }}>
-              &gt; FATAL ERROR: {crash.kind === "div0" ? "ZeroDivisionError" : "MathDomainError"}
-            </div>
-            <div style={{ color: "#ffee22" }}>
-              &gt; {crash.kind === "div0"
-                ? "0で割ってはいけません。宇宙の法則が乱れました。"
-                : "√や log に入れてはいけない数を入れました。虚数の世界に落ちました。"}
-            </div>
-            <div style={{ color: "#888" }}>&gt; 動物たちは文字化けして消えました… {"▓▒░"}</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ display: "inline-block", background: "rgba(255,34,102,0.12)", border: "1px solid #ad1457", borderRadius: 10, padding: "6px 16px", fontSize: 13, color: "#ff6699", fontWeight: 700, margin: "12px 0 0" }}>
-              🏅 称号「{crash.kind === "div0" ? "宇宙を割った者" : "虚数世界の迷子"}」を獲得
-            </div>
-            <div style={{ fontSize: 12.5, color: "#999", marginTop: 6 }}>ステージ {history.length}/{STAGE_COUNT} でクラッシュ</div>
-            <div style={{ color: "#ccc" }}><HistoryList history={history} /></div>
-            <button onClick={startGame} style={{ fontSize: 17, padding: "12px 40px", borderRadius: 14, border: "1px solid #ff2266", background: "transparent", color: "#ff6699", cursor: "pointer", fontWeight: 800, marginTop: 16, fontFamily: "ui-monospace, monospace" }}>
-              &gt; RESTART_
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ================= クリア結果 ================= */}
-      {phase === "result" && (() => {
-        const [medal, title] = rankOf(count);
-        return (
-          <div style={{ textAlign: "center", marginTop: 14, animation: "slideUp 0.4s ease", maxWidth: 380, width: "100%" }}>
-            <div style={{ fontSize: 46 }}>🎊</div>
-            <h3 style={{ margin: "0 0 2px", fontSize: 21 }}>全ステージクリア！</h3>
-            <p style={{ fontSize: 30, fontWeight: 800, color: "#7b1fa2", margin: "6px 0 0", fontFamily: "ui-monospace, Menlo, monospace", wordBreak: "break-all" }}>
-              {animal} × {fmt(count)}
-            </p>
-            {unit && <div style={{ fontSize: 15, color: "#9c27b0", fontWeight: 700 }}>（約{unit}匹！）</div>}
-            <div style={{ display: "inline-block", background: "#f3e5f5", border: "2px solid #ce93d8", borderRadius: 12, padding: "6px 18px", fontSize: 15, fontWeight: 800, color: "#6a1b9a", margin: "10px 0 4px" }}>
-              {medal} ランク: {title}
-            </div>
-            {best !== null && (
-              <div style={{ fontSize: 13, color: count >= best ? "#e65100" : "#999", fontWeight: 700 }}>
-                {count >= best ? "🏆 セッションベスト更新！" : `セッションベスト: ${fmt(best)} 匹`}
-              </div>
-            )}
-            <AnimalGrid count={count} animal={animal} />
-            <HistoryList history={history} />
-            <button onClick={startGame} style={{ fontSize: 18, padding: "12px 44px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#7b1fa2,#9c27b0)", color: "#fff", cursor: "pointer", fontWeight: 800, marginTop: 14, boxShadow: "0 4px 14px rgba(123,31,162,0.4)" }}>
-              もう一回！
-            </button>
-          </div>
-        );
-      })()}
+  return `<div style="width:100%;max-width:400px;animation:slideUp 0.3s ease">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 4px;padding:0 4px">
+      <span style="font-size:13px;color:#777">ステージ ${state.stage + 1}/${STAGE_COUNT}</span>
+      <span style="font-size:12px;color:#bbb;font-family:ui-monospace,monospace">MAX 2³²</span>
     </div>
-  );
+    <div style="text-align:center;background:#fff;border-radius:14px;padding:8px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:8px">
+      <span style="font-size:24px;font-weight:800;font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;color:${count < 0 ? "#c62828" : "#333"}">${state.animal} n = ${fmt(count)}</span>
+      ${unit ? `<span style="font-size:13px;color:#9c27b0;font-weight:700;margin-left:8px">≈${unit}匹</span>` : ""}
+    </div>
+    <div style="width:100%;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden">
+      <div id="timer-bar" style="height:8px;border-radius:4px;background:${barColor};width:${barPct}%;transition:width 0.1s linear, background 0.3s"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <div style="flex:1;height:4px;background:#eee;border-radius:2px;margin-top:8px;margin-right:10px">
+        <div id="stage-bar" style="height:4px;background:#7b1fa2;border-radius:2px;width:${(state.stage / STAGE_COUNT) * 100}%;transition:width 0.3s"></div>
+      </div>
+      <span id="timer-text" style="font-size:14px;font-weight:800;color:${barColor};font-family:ui-monospace,monospace">${state.timeLeft.toFixed(1)}s</span>
+    </div>
+    ${animalGridHTML(count, state.animal)}
+    ${feedbackHTML}
+    ${buttonsHTML}
+  </div>`;
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+function crashFrameHTML() {
+  return `<div style="position:fixed;inset:0;pointer-events:none;z-index:49;box-sizing:border-box;border:10px solid #d32f2f;border-radius:4px;animation:framepulse 2s ease-in-out infinite"></div>`;
+}
+
+function glitchOverlayHTML() {
+  return state.glitchChars.map(g =>
+    `<span style="position:fixed;left:${g.x}%;top:${g.y}%;font-size:${g.s}px;z-index:51;color:#8d6e63;font-weight:900;transform:rotate(${g.r}deg);pointer-events:none;animation:floatchar 1.4s ease ${g.d}s both;font-family:ui-monospace,monospace">${g.ch}</span>`
+  ).join("");
+}
+
+function overflowCrashHTML() {
+  const c = state.crash;
+  return `<div style="text-align:center;margin-top:60px">
+    <div style="font-size:15px;color:#c62828;font-weight:800;font-family:ui-monospace,monospace">${fmt(c.prev)} → ${esc(c.label)} → ⚠️</div>
+    <div id="spinner" style="font-size:42px;font-weight:900;color:#e65100;margin:16px 0;font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;animation:wobble 0.9s ease-in-out infinite">${state.spinner}</div>
+    <div style="font-size:58px;animation:pulse 0.9s ease infinite">💥</div>
+    <div style="font-size:13px;color:#888;margin-top:14px;font-family:ui-monospace,monospace">メモリ限界を突破しています…</div>
+  </div>`;
+}
+
+function overflowResultHTML() {
+  const c = state.crash;
+  return `<div style="margin-top:10px;animation:slideUp 0.5s ease;color:#fff;max-width:400px;width:100%">
+    <div style="text-align:left;padding:18px 8px 6px;font-family:'Segoe UI','Hiragino Sans',system-ui,sans-serif">
+      <div style="font-size:76px;line-height:1;font-weight:300">:(</div>
+      <p style="font-size:15px;line-height:1.9;margin:18px 0 10px">この牧場は問題が発生したため、再起動が必要となりました。<br>動物データを回収しています…</p>
+      <div style="font-size:22px;font-weight:600;margin:6px 0 16px">100% 完了</div>
+      <div style="font-size:12px;line-height:1.9;color:#cfe6ff;font-family:ui-monospace,Menlo,monospace;background:rgba(0,0,0,0.14);border-radius:8px;padding:10px 12px">
+        停止コード: <b>INTEGER_OVERFLOW_2_32</b><br>
+        失敗した処理: ${fmt(c.prev)} → ${esc(c.label)}<br>
+        |n| が 4,294,967,296 (2³²) を超えました${c.sign < 0 ? "（マイナス方向）" : ""}。<br>
+        🐾 動物たちはビットの彼方へ消えました。
+      </div>
+    </div>
+    <div style="text-align:center">
+      <div style="display:inline-block;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.5);border-radius:10px;padding:6px 16px;font-size:13px;color:#fff;font-weight:700;margin:10px 0 0">🏅 称号「限界突破エンジニア」を獲得</div>
+      <div style="font-size:12.5px;color:#cfe6ff;margin-top:6px">ステージ ${state.history.length}/${STAGE_COUNT} でクラッシュ</div>
+      ${historyHTML(state.history)}
+      ${titleCollectionHTML(state.earnedTitles, runEarned, true)}
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+        <button data-action="replay" style="font-size:16px;padding:12px 30px;border-radius:14px;border:none;background:#fff;color:#0067b8;cursor:pointer;font-weight:800">もう一回！</button>
+        <button data-action="home" style="font-size:16px;padding:12px 24px;border-radius:14px;border:2px solid rgba(255,255,255,0.7);background:transparent;color:#fff;cursor:pointer;font-weight:800">🏠 ホームへ</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function zerodivCrashHTML() {
+  const c = state.crash;
+  const headline = c.kind === "div0" ? `${fmt(c.prev)} ÷ 0 = ？？` : `${esc(c.label)} … ？？`;
+  return `<div style="text-align:center;margin-top:56px;width:100%;overflow:hidden">
+    <div style="font-size:32px;font-weight:900;font-family:ui-monospace,Menlo,monospace;color:#ad1457;animation:wobble 0.8s ease-in-out infinite;word-break:break-all">${headline}</div>
+    <div style="font-size:15px;color:#8d6e63;font-weight:800;margin:20px 0 4px">計算の穴から、なにかが侵入…！</div>
+    <div style="font-size:64px;animation:trot 1.6s ease-out both">🐴</div>
+  </div>`;
+}
+
+function zerodivResultHTML() {
+  const c = state.crash;
+  const threatName = c.kind === "div0" ? "Trojan.DivideByZero" : "Trojan.MathDomain";
+  const desc = c.kind === "div0"
+    ? "0で割ってできた「穴」から木馬が侵入。動物たちはぜんぶ木馬にすり替えられました…"
+    : "√ や log に入れてはいけない数のスキマから木馬が侵入。動物たちは連れ去られました…";
+  const titleName = c.kind === "div0" ? "宇宙を割った者" : "虚数世界の迷子";
+  return `<div style="margin-top:12px;animation:slideUp 0.4s ease;max-width:390px;width:100%">
+    <div style="background:#f7f8fb;border-radius:12px;overflow:hidden;text-align:left;box-shadow:0 10px 34px rgba(0,0,0,0.55);color:#2b2b2b;font-family:'Segoe UI','Hiragino Sans',system-ui,sans-serif">
+      <div style="background:#b23b3b;color:#fff;padding:9px 14px;font-weight:800;font-size:13.5px;display:flex;justify-content:space-between;align-items:center">
+        <span>⚠️ セキュリティ警告 — どうぶつ防衛システム</span><span style="opacity:0.8;font-weight:400">✕</span>
+      </div>
+      <div style="padding:14px 16px;font-size:13.5px;line-height:1.9">
+        <div style="text-align:center;font-size:46px;margin:2px 0 6px;animation:breathe 2s ease-in-out infinite">🐴</div>
+        <div style="text-align:center;font-weight:900;font-size:16px;color:#b23b3b;margin-bottom:8px">トロイの木馬を検出しました！</div>
+        <div style="background:#fff;border:1px solid #e0e0e6;border-radius:8px;padding:8px 12px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px">
+          脅威名: <b style="color:#b23b3b">${threatName}</b><br>侵入経路: ${fmt(c.prev)} → ${esc(c.label)}
+        </div>
+        <p style="margin:10px 0 4px">${desc}</p>
+        <div style="text-align:center;font-size:22px;letter-spacing:2px">🐴🐴🐴🐴🐴</div>
+      </div>
+    </div>
+    <div style="text-align:center">
+      <div style="display:inline-block;background:rgba(178,59,59,0.15);border:1px solid #d98080;border-radius:10px;padding:6px 16px;font-size:13px;color:#ffb3b3;font-weight:700;margin:12px 0 0">🏅 称号「${titleName}」を獲得</div>
+      <div style="font-size:12.5px;color:#aaa;margin-top:6px">ステージ ${state.history.length}/${STAGE_COUNT} でクラッシュ</div>
+      <div style="color:#ccc">${historyHTML(state.history)}</div>
+      ${titleCollectionHTML(state.earnedTitles, runEarned, true)}
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+        <button data-action="replay" style="font-size:16px;padding:12px 30px;border-radius:14px;border:none;background:#b23b3b;color:#fff;cursor:pointer;font-weight:800">駆除して再挑戦！</button>
+        <button data-action="home" style="font-size:16px;padding:12px 24px;border-radius:14px;border:2px solid #888;background:transparent;color:#ddd;cursor:pointer;font-weight:800">🏠 ホームへ</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function resultHTML() {
+  const count = state.count;
+  const rk = rankOf(count);
+  const medal = rk[0], title = rk[1];
+  const unit = jpUnit(count);
+  const specialTitles = TITLES.filter(t => runEarned.includes(t.id)).map(t =>
+    `<div style="margin:4px 0"><span style="display:inline-block;background:#fff8e1;border:2px solid #ffd54f;border-radius:12px;padding:5px 16px;font-size:14px;font-weight:800;color:#e65100;animation:pop 0.5s ease">${t.icon} 称号「${t.name}」を獲得！</span></div>`
+  ).join("");
+  const bestLine = state.best !== null
+    ? `<div style="font-size:13px;color:${count >= state.best ? "#e65100" : "#999"};font-weight:700">${count >= state.best ? "🏆 セッションベスト更新！" : `セッションベスト: ${fmt(state.best)} 匹`}</div>`
+    : "";
+  return `<div style="text-align:center;margin-top:14px;animation:slideUp 0.4s ease;max-width:380px;width:100%">
+    <div style="font-size:46px">🎊</div>
+    <h3 style="margin:0 0 2px;font-size:21px">全ステージクリア！</h3>
+    <p style="font-size:30px;font-weight:800;color:#7b1fa2;margin:6px 0 0;font-family:ui-monospace,Menlo,monospace;word-break:break-all">${state.animal} × ${fmt(count)}</p>
+    ${unit ? `<div style="font-size:15px;color:#9c27b0;font-weight:700">（約${unit}匹！）</div>` : ""}
+    <div style="display:inline-block;background:#f3e5f5;border:2px solid #ce93d8;border-radius:12px;padding:6px 18px;font-size:15px;font-weight:800;color:#6a1b9a;margin:10px 0 4px">${medal} ランク: ${title}</div>
+    ${specialTitles}
+    ${bestLine}
+    ${animalGridHTML(count, state.animal)}
+    ${historyHTML(state.history)}
+    ${titleCollectionHTML(state.earnedTitles, runEarned, false)}
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:14px">
+      <button data-action="replay" style="font-size:17px;padding:12px 34px;border-radius:14px;border:none;background:linear-gradient(135deg,#7b1fa2,#9c27b0);color:#fff;cursor:pointer;font-weight:800;box-shadow:0 4px 14px rgba(123,31,162,0.4)">もう一回！</button>
+      <button data-action="home" style="font-size:17px;padding:12px 24px;border-radius:14px;border:3px solid #ce93d8;background:#fff;color:#6a1b9a;cursor:pointer;font-weight:800">🏠 ホームへ</button>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const crashing = (state.phase === "overflow" || state.phase === "zerodiv") && !state.crashReady;
+  // 背景（bug結果画面のみブルースクリーン/暗転）
+  app.style.background = state.phase === "zerodiv" && state.crashReady
+    ? "#1b1b22"
+    : state.phase === "overflow" && state.crashReady
+      ? "#0067b8"
+      : "linear-gradient(180deg, #f3e5f5 0%, #fff 100%)";
+  app.style.animation = crashing ? "bigshake 0.25s linear infinite" : "none";
+
+  let html = "";
+  if (crashing) html += crashFrameHTML();
+  if (crashing && state.phase === "zerodiv") html += glitchOverlayHTML();
+  html += headerHTML();
+
+  if (state.phase === "start") html += startHTML();
+  else if (state.phase === "play" || state.phase === "feedback") html += playHTML();
+  else if (state.phase === "overflow") html += state.crashReady ? overflowResultHTML() : overflowCrashHTML();
+  else if (state.phase === "zerodiv") html += state.crashReady ? zerodivResultHTML() : zerodivCrashHTML();
+  else if (state.phase === "result") html += resultHTML();
+
+  app.innerHTML = html;
+  bindEvents();
+}
+
+function bindEvents() {
+  app.querySelectorAll("[data-action]").forEach(elm => {
+    const action = elm.getAttribute("data-action");
+    if (action === "start" || action === "replay") {
+      elm.addEventListener("click", startGame);
+    } else if (action === "home") {
+      elm.addEventListener("click", goHome);
+    } else if (action === "speed") {
+      elm.addEventListener("click", () => {
+        const key = elm.getAttribute("data-key");
+        const s = SPEEDS.find(x => x.key === key);
+        if (s) { state.speed = s; state.timeLeft = s.time; render(); }
+      });
+    } else if (action === "gate") {
+      const i = +elm.getAttribute("data-i");
+      elm.addEventListener("click", () => choose(state.pair[i]));
+      elm.addEventListener("pointerdown", e => (e.currentTarget.style.transform = "scale(0.93)"));
+      elm.addEventListener("pointerup", e => (e.currentTarget.style.transform = "scale(1)"));
+      elm.addEventListener("pointerleave", e => (e.currentTarget.style.transform = "scale(1)"));
+    }
+  });
+}
+
+// 起動
+render();
+})();
 </script>
-</body>
-</html>

@@ -72,7 +72,7 @@ body{margin:0;background:var(--bg);color:var(--tx);overflow:hidden;
     <span id="acc">access: pending…</span>
   </div>
 </div>
-<input id="mob" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="タイピング入力">
+<input id="mob" type="text" inputmode="url" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="タイピング入力">
 <script>
 (function(){
 var pick=function(a){return a[(Math.random()*a.length)|0]};
@@ -218,6 +218,30 @@ function typeChunk(n){refill();
   if(tk.p>=tk.t.length)q.shift();}
  scr.scrollTop=scr.scrollHeight;stats();}
 var actx=null,noiseBuf=null,soundOn=false;
+/* ===== サウンド設定 =====================================
+   ここの数値を書き換えると音のバランスを自分で調整できます。
+   (書き換えたらファイルを保存してブラウザをリロード)
+   gain = 音量 (0〜1。0.05前後が目安、0にするとその音は消える)
+   freq = 周波数 Hz (大きいほど高い音)
+   実際にはこの値に毎回わずかなランダム揺れが加わります
+   ======================================================== */
+var SOUND={
+ /* --- 通常キーのタイプ音 --- */
+ keyHiGain:.05,   /* 高い「カチッ」の音量 */
+ keyHiFreq:6200,  /* 高い音の周波数 */
+ keyLoGain:.022,  /* 低い「コト」(下支え)の音量 */
+ keyLoFreq:950,   /* 低い音の周波数 */
+ /* --- エンター(実行)の音: 高→低の2連打+きらめき --- */
+ ent1Gain:.5,   /* 1音目(高い方)の音量 */
+ ent1Freq:6000,   /* 1音目の周波数 */
+ entLo1Gain:.06,  /* 1音目の低音下支えの音量 */
+ ent2Gain:.05,   /* 2音目(低い方)の音量 */
+ ent2Freq:9000,   /* 2音目の周波数 */
+ entLo2Gain:.04,  /* 2音目の低音下支えの音量 */
+ entGapMs:62,     /* 1音目と2音目の間隔(ミリ秒) */
+ sparkGain:.1,   /* 最高音「チッ」(きらめき)の音量。0で消える */
+ sparkFreq:15000  /* きらめきの周波数 */
+};
 function initAudio(){if(actx)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
  actx=new AC();var len=(actx.sampleRate*.012)|0;
  noiseBuf=actx.createBuffer(1,len,actx.sampleRate);
@@ -228,11 +252,17 @@ function click(){if(!soundOn||!actx||!noiseBuf)return;
  if(actx.state==='suspended')actx.resume();
  alt=!alt;
  var s=actx.createBufferSource();s.buffer=noiseBuf;
- s.playbackRate.value=(alt?1.15:.92)+(Math.random()*.16-.08);
+ s.playbackRate.value=(alt?1.5:1.25)+(Math.random()*.2-.1); /* 再生ピッチ(キーごとに高低が交互) */
  var f=actx.createBiquadFilter();f.type='bandpass';
- f.frequency.value=4200+Math.random()*1600;f.Q.value=.9;
- var g=actx.createGain();g.gain.value=.055+Math.random()*.02;
- s.connect(f);f.connect(g);g.connect(actx.destination);s.start();}
+ f.frequency.value=SOUND.keyHiFreq+Math.random()*2400;f.Q.value=1;
+ var g=actx.createGain();g.gain.value=SOUND.keyHiGain+Math.random()*.02;
+ s.connect(f);f.connect(g);g.connect(actx.destination);s.start();
+ var s2=actx.createBufferSource();s2.buffer=noiseBuf;
+ s2.playbackRate.value=(alt?.55:.48)+(Math.random()*.08-.04);
+ var f2=actx.createBiquadFilter();f2.type='bandpass';
+ f2.frequency.value=SOUND.keyLoFreq+Math.random()*250;f2.Q.value=.8;
+ var g2=actx.createGain();g2.gain.value=SOUND.keyLoGain+Math.random()*.008;
+ s2.connect(f2);f2.connect(g2);g2.connect(actx.destination);s2.start();}
 function stroke(){if(booting||running)return;
  typeChunk(3+((Math.random()*4)|0));click();
  if(hintOn){hint.style.opacity=0;hintOn=false;}}
@@ -241,15 +271,57 @@ function clearAll(){if(runTimer){clearInterval(runTimer);runTimer=null;running=f
  out.innerHTML='';q=[];blocks=[];ages=[];lineCount=0;chars=0;newLine();stats();}
 function thunk(){if(!soundOn||!actx||!noiseBuf)return;
  if(actx.state==='suspended')actx.resume();
- var s=actx.createBufferSource();s.buffer=noiseBuf;s.playbackRate.value=.5;
- var f=actx.createBiquadFilter();f.type='bandpass';f.frequency.value=1100;f.Q.value=.8;
- var g=actx.createGain();g.gain.value=.09;
- s.connect(f);f.connect(g);g.connect(actx.destination);s.start();}
+ var t0=actx.currentTime;
+ var hit=function(t,rate,freq,hi,lo){
+  var s=actx.createBufferSource();s.buffer=noiseBuf;
+  s.playbackRate.value=rate;
+  var f=actx.createBiquadFilter();f.type='bandpass';
+  f.frequency.value=freq;f.Q.value=1.1;
+  var g=actx.createGain();g.gain.value=hi;
+  s.connect(f);f.connect(g);g.connect(actx.destination);s.start(t);
+  var s2=actx.createBufferSource();s2.buffer=noiseBuf;s2.playbackRate.value=.6;
+  var f2=actx.createBiquadFilter();f2.type='bandpass';f2.frequency.value=1300;f2.Q.value=.8;
+  var g2=actx.createGain();g2.gain.value=lo; /* 低音下支え */
+  s2.connect(f2);f2.connect(g2);g2.connect(actx.destination);s2.start(t);};
+ /* 1音目(高)→2音目(低)。音量・周波数・間隔は冒頭のSOUNDで調整 */
+ hit(t0,2.1+(Math.random()*.14-.07),SOUND.ent1Freq+Math.random()*1200,SOUND.ent1Gain,SOUND.entLo1Gain);
+ hit(t0+SOUND.entGapMs/1000,1.6+(Math.random()*.14-.07),SOUND.ent2Freq+Math.random()*800,SOUND.ent2Gain,SOUND.entLo2Gain);
+ /* きらめき(最高音)。SOUND.sparkGain を 0 にすると消える */
+ if(SOUND.sparkGain>0){
+  var sp=actx.createBufferSource();sp.buffer=noiseBuf;
+  sp.playbackRate.value=2.8+(Math.random()*.2-.1);
+  var fp=actx.createBiquadFilter();fp.type='bandpass';
+  fp.frequency.value=SOUND.sparkFreq+Math.random()*1000;fp.Q.value=1.2;
+  var gp=actx.createGain();gp.gain.value=SOUND.sparkGain;
+  sp.connect(fp);fp.connect(gp);gp.connect(actx.destination);sp.start(t0);}}
 function hx(n){var s='',i;for(i=0;i<n;i++)s+=((Math.random()*16)|0).toString(16);return s;}
 function finishLine(){refill();
  while(q.length&&!q[0].n)typeChunk(q[0].t.length-q[0].p);
  if(q.length&&q[0].n)typeChunk(1);}
-var PROGS=[
+var aptProg=function(){
+ var p=pick(N)+'-'+pick(['tools','core','utils','daemon']);
+ var deps=[],i,nd=3+((Math.random()*3)|0);
+ for(i=0;i<nd;i++)deps.push('lib'+pick(N)+(Math.random()<.5?'-dev':String((Math.random()*9)|0)));
+ var mb=(Math.random()*80+4).toFixed(1);
+ var ver=function(){return (1+((Math.random()*5)|0))+'.'+((Math.random()*10)|0)+'.'+((Math.random()*20)|0)+'-'+(1+((Math.random()*4)|0));};
+ var L=[[T('$ ','pr'),T('sudo apt install '+p)],
+  [T('   Reading package lists... ','com'),T('Done','ok')],
+  [T('   Building dependency tree... ','com'),T('Done','ok')],
+  [T('   The following additional packages will be installed:','com')],
+  [T('     '+deps.join(' '))],
+  [T('   0 upgraded, ','com'),T(String(nd+1),'num'),T(' newly installed, 0 to remove.','com')],
+  [T('   Need to get ','com'),T(mb+' MB','num'),T(' of archives.','com')]];
+ var ng=2+((Math.random()*3)|0);
+ for(i=0;i<ng;i++)L.push([T('   Get:'+(i+1)+' ','com'),T('http://archive.ubuntu.com jammy/main '),T(deps[i%deps.length]+' amd64 ','warn'),T('['+(Math.random()*9+.2).toFixed(1)+' MB]','num')]);
+ L.push([T('   Fetched '+mb+' MB in '+(1+((Math.random()*5)|0))+'s ','com'),T('('+(Math.random()*30+4).toFixed(1)+' MB/s)','num')]);
+ for(i=0;i<Math.min(3,nd);i++)L.push([T('   Unpacking '+deps[i]+' ('+ver()+') ...','com')]);
+ L.push([T('   Unpacking '+p+' ('+ver()+') ...','com')]);
+ for(i=0;i<Math.min(2,nd);i++)L.push([T('   Setting up '+deps[i]+' ('+ver()+') ...','com')]);
+ L.push([T('   Setting up '+p+' ('+ver()+') ...','com')],
+  [T('   Processing triggers for man-db (2.10.2-1) ...','com')],
+  [T('✔ '+p+' installed','ok')],[]);
+ return L;};
+var PROGS=[aptProg,aptProg,
 function(){var L=[[T('$ ','pr'),T('make build --release')]],i,n=2+((Math.random()*3)|0);
  for(i=0;i<n;i++)L.push([T('   compiling ','com'),T(pick(N)+'-'+pick(N)+' '),T('v'+(1+((Math.random()*4)|0))+'.'+((Math.random()*9)|0)+'.'+((Math.random()*20)|0),'num')]);
  L.push([T('✔ finished ','ok'),T('release [optimized] in '+(Math.random()*8+1).toFixed(2)+'s','com')],[]);return L;},
@@ -313,16 +385,19 @@ window.addEventListener('keydown',function(e){
  recent=true;setTimeout(function(){recent=false},80);
  stroke();});
 mob.addEventListener('input',function(){mob.value='';if(!recent)stroke();});
-runBtn.addEventListener('click',function(){runCommand();});
+runBtn.addEventListener('click',function(e){runCommand();if(e.detail)this.blur();});
 scr.addEventListener('pointerdown',function(e){e.preventDefault();
- try{mob.focus({preventScroll:true});}catch(err){mob.focus();}
+ if(e.pointerType==='touch'){try{mob.focus({preventScroll:true});}catch(err){mob.focus();}}
+ else if(document.activeElement===mob)mob.blur();
  stroke();});
-sndBtn.addEventListener('click',function(){initAudio();soundOn=!soundOn;
- sndBtn.textContent='sound: '+(soundOn?'on':'off');if(soundOn)click();});
-clrBtn.addEventListener('click',function(){clearAll();});
-fsBtn.addEventListener('click',function(){
+sndBtn.addEventListener('click',function(e){initAudio();soundOn=!soundOn;
+ sndBtn.textContent='sound: '+(soundOn?'on':'off');if(soundOn)click();
+ if(e.detail)this.blur();});
+clrBtn.addEventListener('click',function(e){clearAll();if(e.detail)this.blur();});
+fsBtn.addEventListener('click',function(e){
  if(document.fullscreenElement){document.exitFullscreen();}
- else if(document.documentElement.requestFullscreen){document.documentElement.requestFullscreen().catch(function(){});}});
+ else if(document.documentElement.requestFullscreen){document.documentElement.requestFullscreen().catch(function(){});}
+ if(e.detail)this.blur();});
 var BOOT=[
  [T('mainframe bios ','com'),T('v4.2.0','num'),T(' … '),T('ok','ok')],
  [T('mounting /dev/keyboard … '),T('ok','ok')],

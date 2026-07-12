@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 
 // ============================================================
-//  🚪 ゲートランナー 2³² — 数式ゲートで動物を増やせ！
+//  🚪 ゲートランナー — 数式ゲートで動物を増やせ！
 //  ・数式は全64種類（三角関数・対数・微積分・ビット演算入り）
-//  ・|n| が 2³² を超えると「オーバーフロー」で強制終了
-//  ・0除算 / 定義域エラー(√負, log負 など)は「バグ」で強制終了
+//  ・|n| が 2³² を超えると「オーバーフロー」→ ブルースクリーン強制終了
+//  ・0除算 / 定義域エラー(√負, log負 など)→ トロイの木馬に侵入され強制終了
 //  ・毎ステージ、片方のゲートは必ず減少、もう片方は必ず±0か増加
 //    （ただし…罠やオーバーフロー餌にすり替わっていることがある）
+//  ※ 光過敏対策: 高速な明滅・色反転フラッシュは不使用
 // ============================================================
 
 const LIMIT = 4294967296; // 2^32
@@ -199,7 +200,22 @@ function rankOf(n) {
   return ["👻", "反転世界の住人"];
 }
 
-const GLITCH_POOL = "▓░▒█◆◇÷0∞ΞΨ%$#@!?エラ一バグ壊★†NaNヷｦ";
+// 0除算クラッシュで画面に湧く文字（🐴多め＝トロイの木馬）
+const GLITCH_POOL = "🐴🐴🐴🐴🐴🎠▓░÷0?！🐴🐴ヒヒーン🐴";
+const TITLE_TEXT = "ゲートランナー";
+const TITLE_COLORS = ["#ff5d8f", "#ff9f1c", "#ffd23f", "#4cd964", "#37b6ff", "#a06bff", "#ff7b54"];
+
+// ===== 称号コレクション（全7種） =====
+const TITLES = [
+  { id: "overflow", icon: "🖥️", name: "限界突破エンジニア", hint: "2³² の壁を突破してみよう" },
+  { id: "div0",     icon: "🐴", name: "宇宙を割った者",     hint: "0 で割ってみよう" },
+  { id: "domain",   icon: "🌀", name: "虚数世界の迷子",     hint: "√ や log に入れちゃダメな数を…" },
+  { id: "negative", icon: "👻", name: "反物質ブリーダー",   hint: "マイナスの数でクリアしよう" },
+  { id: "zero",     icon: "🕳️", name: "虚無の飼育員",       hint: "ぴったり 0 匹でクリアしよう" },
+  { id: "one",      icon: "🐺", name: "一匹狼マスター",     hint: "ぴったり 1 匹でクリアしよう" },
+  { id: "giant",    icon: "🌌", name: "int32を超えし者",    hint: "2³¹（約21.5億）以上でクリアしよう" },
+];
+const HALF_LIMIT = 2147483648; // 2^31
 
 // ===== どうぶつグリッド =====
 function AnimalGrid({ count, animal }) {
@@ -252,6 +268,45 @@ function HistoryList({ history }) {
   );
 }
 
+// ===== 称号コレクション表示 =====
+// earned: 獲得済みID配列 / justEarned: 今回のプレイで獲得したID配列 / dark: 暗い背景用
+function TitleCollection({ earned, justEarned, dark }) {
+  return (
+    <div style={{
+      margin: "14px auto 0", maxWidth: 350, textAlign: "left", borderRadius: 12, padding: "12px 14px",
+      background: dark ? "rgba(255,255,255,0.10)" : "rgba(123,31,162,0.07)",
+      border: dark ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(123,31,162,0.18)",
+    }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: dark ? "#fff" : "#6a1b9a", marginBottom: 8 }}>
+        🏅 称号コレクション <span style={{ fontFamily: "ui-monospace, monospace" }}>{earned.length}/{TITLES.length}</span>
+        {earned.length === TITLES.length && " 🎊コンプリート！"}
+      </div>
+      {TITLES.map(t => {
+        const got = earned.includes(t.id);
+        const isNew = justEarned.includes(t.id);
+        return (
+          <div key={t.id} style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "3px 4px", fontSize: 12.5,
+            borderRadius: 8, background: isNew ? (dark ? "rgba(255,213,79,0.22)" : "rgba(255,213,79,0.4)") : "none",
+          }}>
+            <span style={{ fontSize: 16, filter: got ? "none" : "grayscale(1)", opacity: got ? 1 : 0.45 }}>
+              {got ? t.icon : "🔒"}
+            </span>
+            {got ? (
+              <span style={{ fontWeight: 700, color: dark ? "#fff" : "#333" }}>
+                {t.name}
+                {isNew && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 900, color: "#e65100", background: "#ffd54f", borderRadius: 6, padding: "1px 6px" }}>NEW!</span>}
+              </span>
+            ) : (
+              <span style={{ color: dark ? "rgba(255,255,255,0.55)" : "#999" }}>？？？ <span style={{ fontSize: 11 }}>（{t.hint}）</span></span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function App() {
   const [phase, setPhase] = useState("start"); // start|play|feedback|timeout|result|overflow|zerodiv
   const [count, setCount] = useState(START_N);
@@ -266,9 +321,11 @@ export default function App() {
   const [crashReady, setCrashReady] = useState(false);
   const [spinner, setSpinner] = useState("4294967296");
   const [best, setBest] = useState(null); // セッション内ベスト（artifactではlocalStorage不可のためメモリ保持）
+  const [earnedTitles, setEarnedTitles] = useState([]); // 獲得済み称号ID（セッション内）
 
   const tickRef = useRef(null);
   const fbRef = useRef(null);
+  const runEarnedRef = useRef([]); // 今回のプレイで獲得した称号ID
   const countRef = useRef(START_N);
   const stageRef = useRef(0);
   const historyRef = useRef([]);
@@ -315,22 +372,34 @@ export default function App() {
       let s = "";
       for (let i = 0; i < 10; i++) s += Math.floor(Math.random() * 10);
       setSpinner(s);
-    }, 55);
+    }, 85);
     return () => clearInterval(iv);
   }, [phase, crashReady]);
 
   // ---- 0除算のグリッチ文字 ----
   const glitchChars = useMemo(() => {
     if (phase !== "zerodiv") return [];
-    return Array.from({ length: 42 }, () => ({
-      ch: GLITCH_POOL[Math.floor(Math.random() * GLITCH_POOL.length)],
-      x: Math.random() * 92, y: Math.random() * 92,
-      d: Math.random() * 1.4, s: 13 + Math.random() * 30, r: Math.random() * 90 - 45,
+    const pool = Array.from(GLITCH_POOL); // 絵文字(サロゲートペア)対応
+    return Array.from({ length: 30 }, () => ({
+      ch: pool[Math.floor(Math.random() * pool.length)],
+      x: Math.random() * 90, y: Math.random() * 88,
+      d: Math.random() * 1.4, s: 16 + Math.random() * 26, r: Math.random() * 60 - 30,
     }));
   }, [phase]);
 
+  // 称号を獲得（今回分の記録＋コレクションに追加）
+  const earnTitle = id => {
+    if (!runEarnedRef.current.includes(id)) runEarnedRef.current = [...runEarnedRef.current, id];
+    setEarnedTitles(prev => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
   const nextStage = (nextCount, nextStageIdx, avoid) => {
     if (nextStageIdx >= STAGE_COUNT) {
+      // 特殊クリア称号の判定
+      if (nextCount < 0) earnTitle("negative");
+      if (nextCount === 0) earnTitle("zero");
+      if (nextCount === 1) earnTitle("one");
+      if (nextCount >= HALF_LIMIT) earnTitle("giant");
       setBest(b => (b === null || nextCount > b ? nextCount : b));
       setPhase("result");
       return;
@@ -347,6 +416,7 @@ export default function App() {
     const res = evalOp(op, prev);
 
     if (res.type === "div0" || res.type === "nan") {
+      earnTitle(res.type === "div0" ? "div0" : "domain");
       const h = [...historyRef.current, { stage: stageRef.current + 1, label: op.label, prev, crash: "zero", timeout: viaTimeout }];
       historyRef.current = h; setHistory(h);
       setCrash({ kind: res.type, label: op.label, prev });
@@ -354,6 +424,7 @@ export default function App() {
       return;
     }
     if (res.type === "overflow") {
+      earnTitle("overflow");
       const h = [...historyRef.current, { stage: stageRef.current + 1, label: op.label, prev, crash: "overflow", timeout: viaTimeout }];
       historyRef.current = h; setHistory(h);
       setCrash({ kind: "overflow", label: op.label, prev, sign: res.sign });
@@ -378,6 +449,7 @@ export default function App() {
 
   const startGame = () => {
     clearInterval(tickRef.current); clearTimeout(fbRef.current);
+    runEarnedRef.current = [];
     setAnimal(ANIMALS[Math.floor(Math.random() * ANIMALS.length)]);
     setCount(START_N); countRef.current = START_N;
     setStage(0); stageRef.current = 0;
@@ -387,6 +459,17 @@ export default function App() {
     setPair(p); pairRef.current = p;
     setTimeLeft(speed.time);
     setPhase("play");
+  };
+
+  // タイトル画面へ戻る（難易度を選び直せる）
+  const goHome = () => {
+    clearInterval(tickRef.current); clearTimeout(fbRef.current);
+    setCount(START_N); countRef.current = START_N;
+    setStage(0); stageRef.current = 0;
+    setHistory([]); historyRef.current = [];
+    setPair(null); pairRef.current = null;
+    setFeedback(null); setCrash(null); setCrashReady(false);
+    setPhase("start");
   };
 
   const isGood = feedback && feedback.diff >= 0;
@@ -400,67 +483,96 @@ export default function App() {
       minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center",
       fontFamily: "system-ui, sans-serif", padding: "16px 12px 32px",
       background: phase === "zerodiv" && crashReady
-        ? "#0d0d14"
+        ? "#1b1b22"
         : phase === "overflow" && crashReady
-          ? "linear-gradient(180deg, #2a0800 0%, #1a1a1a 100%)"
+          ? "#0067b8"
           : "linear-gradient(180deg, #f3e5f5 0%, #fff 100%)",
       transition: "background 0.6s",
       animation: crashing ? "bigshake 0.25s linear infinite" : "none",
       overflow: "hidden",
     }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@800&display=swap');
         @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+        /* 揺れは残すが振幅を小さく・ゆっくりに（光の明滅は一切なし） */
         @keyframes bigshake {
-          0% { transform: translate(0,0) rotate(0); } 20% { transform: translate(-8px,4px) rotate(-0.6deg); }
-          40% { transform: translate(7px,-5px) rotate(0.5deg); } 60% { transform: translate(-5px,-4px) rotate(-0.4deg); }
-          80% { transform: translate(6px,5px) rotate(0.6deg); } 100% { transform: translate(0,0) rotate(0); }
+          0% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-4px,2px) rotate(-0.3deg); }
+          50% { transform: translate(3px,-3px) rotate(0.25deg); } 75% { transform: translate(-2px,-2px) rotate(-0.2deg); }
+          100% { transform: translate(0,0) rotate(0); }
         }
-        @keyframes redflash { 0%,100% { opacity: 0; } 50% { opacity: 0.55; } }
-        @keyframes invertflash { 0%,100% { opacity: 0; } 50% { opacity: 1; } }
-        @keyframes glitchjit {
-          0%,100% { transform: translate(0,0) skewX(0); text-shadow: 2px 0 #ff2266, -2px 0 #22ffee; }
-          25% { transform: translate(-3px,2px) skewX(-6deg); text-shadow: -3px 0 #ff2266, 3px 0 #22ffee; }
-          50% { transform: translate(3px,-2px) skewX(4deg); text-shadow: 2px 2px #ffee22, -2px -2px #22ffee; }
-          75% { transform: translate(-2px,-3px) skewX(8deg); text-shadow: -2px 0 #ff2266, 2px 0 #22ffee; }
+        /* ゆっくりした揺らぎ（旧グリッチの代替。色の点滅なし） */
+        @keyframes wobble {
+          0%,100% { transform: translate(0,0) rotate(0deg); }
+          25% { transform: translate(-2px,1px) rotate(-1.2deg); }
+          50% { transform: translate(2px,-1px) rotate(1deg); }
+          75% { transform: translate(-1px,-1px) rotate(-0.8deg); }
         }
-        @keyframes flicker { 0%,19%,21%,23%,80%,100% { opacity: 1; } 20%,22%,55% { opacity: 0.2; } }
+        /* 穏やかな呼吸（不透明度は 0.75〜1 の範囲・2秒周期） */
+        @keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
         @keyframes floatchar {
           from { opacity: 0; transform: scale(0.3) rotate(0deg); }
           30% { opacity: 1; }
-          to { opacity: 0.15; transform: scale(1.6) rotate(25deg); }
+          to { opacity: 0.2; transform: scale(1.5) rotate(18deg); }
+        }
+        /* トロイの木馬が左からトコトコ入ってくる */
+        @keyframes trot {
+          from { transform: translateX(-46vw) rotate(0deg); }
+          40% { transform: translateX(-24vw) rotate(-4deg); }
+          70% { transform: translateX(-8vw) rotate(4deg); }
+          to { transform: translateX(0) rotate(0deg); }
+        }
+        /* 異常事態の赤フレーム: 2秒周期でゆっくり脈動（点滅ではない） */
+        @keyframes framepulse {
+          0%,100% { opacity: 0.65; box-shadow: inset 0 0 26px rgba(211,47,47,0.35); }
+          50% { opacity: 1; box-shadow: inset 0 0 52px rgba(211,47,47,0.55); }
         }
         button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-        @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01s !important; } }
+        @media (prefers-reduced-motion: reduce) {
+          * { animation-iteration-count: 1 !important; animation-duration: 0.01s !important; transition: none !important; }
+        }
       `}</style>
 
-      {/* ==== クラッシュ用オーバーレイ ==== */}
-      {crashing && phase === "overflow" && (
-        <div style={{ position: "fixed", inset: 0, background: "#ff1500", pointerEvents: "none", animation: "redflash 0.3s linear infinite", zIndex: 50 }} />
+      {/* ==== 異常事態の赤フレーム（両バグ演出共通・ゆっくり脈動のみ） ==== */}
+      {crashing && (
+        <div style={{
+          position: "fixed", inset: 0, pointerEvents: "none", zIndex: 49, boxSizing: "border-box",
+          border: "10px solid #d32f2f", borderRadius: 4,
+          animation: "framepulse 2s ease-in-out infinite",
+        }} />
       )}
+
+      {/* ==== クラッシュ用オーバーレイ（点滅なし・一回きりのフェード出現のみ） ==== */}
       {crashing && phase === "zerodiv" && (
         <>
-          <div style={{ position: "fixed", inset: 0, background: "#fff", mixBlendMode: "difference", pointerEvents: "none", animation: "invertflash 0.22s steps(2) infinite", zIndex: 50 }} />
           {glitchChars.map((g, i) => (
             <span key={i} style={{
               position: "fixed", left: `${g.x}%`, top: `${g.y}%`, fontSize: g.s, zIndex: 51,
-              color: ["#ff2266", "#22ffee", "#ffee22", "#c62828"][i % 4], fontWeight: 900,
+              color: "#8d6e63", fontWeight: 900,
               transform: `rotate(${g.r}deg)`, pointerEvents: "none",
-              animation: `floatchar 1.2s ease ${g.d}s both`, fontFamily: "ui-monospace, monospace",
+              animation: `floatchar 1.4s ease ${g.d}s both`, fontFamily: "ui-monospace, monospace",
             }}>{g.ch}</span>
           ))}
         </>
       )}
 
-      <h2 style={{
-        margin: "0 0 6px", fontSize: 21, letterSpacing: 1,
-        color: crashReady && (phase === "overflow" || phase === "zerodiv") ? "#eee" : "#333",
-        transition: "color 0.6s",
+      <h1 style={{
+        margin: "0 0 8px", fontSize: 27, letterSpacing: 1, fontWeight: 800,
+        fontFamily: "'Mochiy Pop One', 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'ヒラギノ丸ゴ ProN W4', 'HG丸ｺﾞｼｯｸM-PRO', sans-serif",
+        userSelect: "none",
       }}>
-        🚪 ゲートランナー <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 17, color: "#7b1fa2" }}>2³²</span>
-      </h2>
+        <span style={{ marginRight: 4 }}>🚪</span>
+        {TITLE_TEXT.split("").map((c, i) => (
+          <span key={i} style={{
+            color: TITLE_COLORS[i % TITLE_COLORS.length],
+            display: "inline-block",
+            transform: `rotate(${i % 2 ? 3.5 : -3.5}deg) translateY(${i % 2 ? 1.5 : -1.5}px)`,
+            textShadow: "0 2px 0 rgba(0,0,0,0.15), 0 0 6px rgba(255,255,255,0.6)",
+          }}>{c}</span>
+        ))}
+      </h1>
 
       {/* ================= スタート ================= */}
       {phase === "start" && (
@@ -488,9 +600,10 @@ export default function App() {
               </button>
             ))}
           </div>
-          {best !== null && (
+          {(best !== null || earnedTitles.length > 0) && (
             <div style={{ fontSize: 13, color: "#7b1fa2", fontWeight: 700, marginBottom: 10 }}>
-              🏆 セッションベスト: {fmt(best)} 匹
+              {best !== null && <>🏆 セッションベスト: {fmt(best)} 匹　</>}
+              🏅 称号: {earnedTitles.length}/{TITLES.length}
             </div>
           )}
           <button onClick={startGame} style={{ fontSize: 20, padding: "14px 52px", borderRadius: 16, border: "none", background: "linear-gradient(135deg,#7b1fa2,#9c27b0)", color: "#fff", cursor: "pointer", fontWeight: 800, boxShadow: "0 4px 14px rgba(123,31,162,0.4)" }}>
@@ -566,7 +679,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= オーバーフロー演出 ================= */}
+      {/* ================= オーバーフロー演出（点滅なし） ================= */}
       {phase === "overflow" && !crashReady && (
         <div style={{ textAlign: "center", marginTop: 60 }}>
           <div style={{ fontSize: 15, color: "#c62828", fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>
@@ -575,79 +688,114 @@ export default function App() {
           <div style={{
             fontSize: 42, fontWeight: 900, color: "#e65100", margin: "16px 0",
             fontFamily: "ui-monospace, Menlo, monospace", fontVariantNumeric: "tabular-nums",
-            animation: "glitchjit 0.15s steps(2) infinite",
+            animation: "wobble 0.9s ease-in-out infinite",
           }}>
             {spinner}
           </div>
-          <div style={{ fontSize: 60, animation: "pulse 0.3s ease infinite" }}>💥</div>
-        </div>
-      )}
-
-      {/* ================= オーバーフロー結果 ================= */}
-      {phase === "overflow" && crashReady && (
-        <div style={{ textAlign: "center", marginTop: 12, animation: "slideUp 0.4s ease", color: "#eee", maxWidth: 380, width: "100%" }}>
-          <div style={{ fontSize: 56 }}>☢️</div>
-          <h3 style={{ margin: "4px 0", fontSize: 26, color: "#ff9800", letterSpacing: 2, animation: "glitchjit 2s steps(2) infinite" }}>
-            OVERFLOW!!
-          </h3>
-          <p style={{ fontSize: 14, lineHeight: 1.8, color: "#ffcc80", margin: "8px 0" }}>
-            {fmt(crash.prev)} に <b style={{ fontFamily: "ui-monospace, monospace" }}>{crash.label}</b> をしたら…<br />
-            |n| が <b style={{ fontFamily: "ui-monospace, monospace" }}>2³² = 4,294,967,296</b> を突破！{crash.sign < 0 && "（マイナス方向に！）"}<br />
-            動物たちはビットの彼方へ消えました。
-          </p>
-          <div style={{ display: "inline-block", background: "rgba(255,152,0,0.15)", border: "1px solid #ff9800", borderRadius: 10, padding: "6px 16px", fontSize: 13, color: "#ffb74d", fontWeight: 700, margin: "4px 0 8px" }}>
-            🏅 称号「限界突破エンジニア」を獲得
+          <div style={{ fontSize: 58, animation: "pulse 0.9s ease infinite" }}>💥</div>
+          <div style={{ fontSize: 13, color: "#888", marginTop: 14, fontFamily: "ui-monospace, monospace" }}>
+            メモリ限界を突破しています…
           </div>
-          <div style={{ fontSize: 12.5, color: "#999" }}>ステージ {history.length}/{STAGE_COUNT} で爆発</div>
-          <HistoryList history={history} />
-          <button onClick={startGame} style={{ fontSize: 17, padding: "12px 40px", borderRadius: 14, border: "none", background: "#ff9800", color: "#1a1a1a", cursor: "pointer", fontWeight: 800, marginTop: 16 }}>
-            もう一回！
-          </button>
         </div>
       )}
 
-      {/* ================= 0除算/定義域エラー演出 ================= */}
+      {/* ================= オーバーフロー結果（ブルースクリーン風） ================= */}
+      {phase === "overflow" && crashReady && (
+        <div style={{ marginTop: 10, animation: "slideUp 0.5s ease", color: "#fff", maxWidth: 400, width: "100%" }}>
+          <div style={{ textAlign: "left", padding: "18px 8px 6px", fontFamily: "'Segoe UI', 'Hiragino Sans', system-ui, sans-serif" }}>
+            <div style={{ fontSize: 76, lineHeight: 1, fontWeight: 300 }}>:(</div>
+            <p style={{ fontSize: 15, lineHeight: 1.9, margin: "18px 0 10px" }}>
+              この牧場は問題が発生したため、再起動が必要となりました。<br />
+              動物データを回収しています…
+            </p>
+            <div style={{ fontSize: 22, fontWeight: 600, margin: "6px 0 16px" }}>100% 完了</div>
+            <div style={{ fontSize: 12, lineHeight: 1.9, color: "#cfe6ff", fontFamily: "ui-monospace, Menlo, monospace", background: "rgba(0,0,0,0.14)", borderRadius: 8, padding: "10px 12px" }}>
+              停止コード: <b>INTEGER_OVERFLOW_2_32</b><br />
+              失敗した処理: {fmt(crash.prev)} → {crash.label}<br />
+              |n| が 4,294,967,296 (2³²) を超えました{crash.sign < 0 ? "（マイナス方向）" : ""}。<br />
+              🐾 動物たちはビットの彼方へ消えました。
+            </div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ display: "inline-block", background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.5)", borderRadius: 10, padding: "6px 16px", fontSize: 13, color: "#fff", fontWeight: 700, margin: "10px 0 0" }}>
+              🏅 称号「限界突破エンジニア」を獲得
+            </div>
+            <div style={{ fontSize: 12.5, color: "#cfe6ff", marginTop: 6 }}>ステージ {history.length}/{STAGE_COUNT} でクラッシュ</div>
+            <HistoryList history={history} />
+            <TitleCollection earned={earnedTitles} justEarned={runEarnedRef.current} dark />
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
+              <button onClick={startGame} style={{ fontSize: 16, padding: "12px 30px", borderRadius: 14, border: "none", background: "#fff", color: "#0067b8", cursor: "pointer", fontWeight: 800 }}>
+                もう一回！
+              </button>
+              <button onClick={goHome} style={{ fontSize: 16, padding: "12px 24px", borderRadius: 14, border: "2px solid rgba(255,255,255,0.7)", background: "transparent", color: "#fff", cursor: "pointer", fontWeight: 800 }}>
+                🏠 ホームへ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= 0除算/定義域エラー演出（トロイの木馬・点滅なし） ================= */}
       {phase === "zerodiv" && !crashReady && (
-        <div style={{ textAlign: "center", marginTop: 70 }}>
+        <div style={{ textAlign: "center", marginTop: 56, width: "100%", overflow: "hidden" }}>
           <div style={{
-            fontSize: 34, fontWeight: 900, fontFamily: "ui-monospace, Menlo, monospace",
-            color: "#ad1457", animation: "glitchjit 0.12s steps(2) infinite",
+            fontSize: 32, fontWeight: 900, fontFamily: "ui-monospace, Menlo, monospace",
+            color: "#ad1457", animation: "wobble 0.8s ease-in-out infinite", wordBreak: "break-all",
           }}>
             {crash.kind === "div0" ? `${fmt(crash.prev)} ÷ 0 = ？？` : `${crash.label} … ？？`}
           </div>
-          <div style={{ fontSize: 54, marginTop: 18, animation: "flicker 0.6s linear infinite" }}>🌀</div>
+          <div style={{ fontSize: 15, color: "#8d6e63", fontWeight: 800, margin: "20px 0 4px" }}>
+            計算の穴から、なにかが侵入…！
+          </div>
+          <div style={{ fontSize: 64, animation: "trot 1.6s ease-out both" }}>🐴</div>
         </div>
       )}
 
-      {/* ================= 0除算/定義域エラー結果（ターミナル風） ================= */}
+      {/* ================= 0除算/定義域エラー結果（トロイの木馬検出アラート） ================= */}
       {phase === "zerodiv" && crashReady && (
-        <div style={{ marginTop: 12, animation: "slideUp 0.4s ease", maxWidth: 380, width: "100%" }}>
+        <div style={{ marginTop: 12, animation: "slideUp 0.4s ease", maxWidth: 390, width: "100%" }}>
           <div style={{
-            background: "#000", border: "1px solid #333", borderRadius: 10, padding: "14px 16px",
-            fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, lineHeight: 1.9, textAlign: "left",
-            boxShadow: "0 0 24px rgba(255,34,102,0.35)", animation: "flicker 3s linear infinite",
+            background: "#f7f8fb", borderRadius: 12, overflow: "hidden", textAlign: "left",
+            boxShadow: "0 10px 34px rgba(0,0,0,0.55)", color: "#2b2b2b",
+            fontFamily: "'Segoe UI', 'Hiragino Sans', system-ui, sans-serif",
           }}>
-            <div style={{ color: "#888" }}>&gt; n = {fmt(crash.prev)}</div>
-            <div style={{ color: "#888" }}>&gt; apply <span style={{ color: "#22ffee" }}>{crash.label}</span></div>
-            <div style={{ color: "#ff2266", fontWeight: 800, animation: "glitchjit 1.5s steps(2) infinite" }}>
-              &gt; FATAL ERROR: {crash.kind === "div0" ? "ZeroDivisionError" : "MathDomainError"}
+            {/* ウィンドウのタイトルバー */}
+            <div style={{ background: "#b23b3b", color: "#fff", padding: "9px 14px", fontWeight: 800, fontSize: 13.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>⚠️ セキュリティ警告 — どうぶつ防衛システム</span>
+              <span style={{ opacity: 0.8, fontWeight: 400 }}>✕</span>
             </div>
-            <div style={{ color: "#ffee22" }}>
-              &gt; {crash.kind === "div0"
-                ? "0で割ってはいけません。宇宙の法則が乱れました。"
-                : "√や log に入れてはいけない数を入れました。虚数の世界に落ちました。"}
+            <div style={{ padding: "14px 16px", fontSize: 13.5, lineHeight: 1.9 }}>
+              <div style={{ textAlign: "center", fontSize: 46, margin: "2px 0 6px", animation: "breathe 2s ease-in-out infinite" }}>🐴</div>
+              <div style={{ textAlign: "center", fontWeight: 900, fontSize: 16, color: "#b23b3b", marginBottom: 8 }}>
+                トロイの木馬を検出しました！
+              </div>
+              <div style={{ background: "#fff", border: "1px solid #e0e0e6", borderRadius: 8, padding: "8px 12px", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12.5 }}>
+                脅威名: <b style={{ color: "#b23b3b" }}>{crash.kind === "div0" ? "Trojan.DivideByZero" : "Trojan.MathDomain"}</b><br />
+                侵入経路: {fmt(crash.prev)} → {crash.label}
+              </div>
+              <p style={{ margin: "10px 0 4px" }}>
+                {crash.kind === "div0"
+                  ? "0で割ってできた「穴」から木馬が侵入。動物たちはぜんぶ木馬にすり替えられました…"
+                  : "√ や log に入れてはいけない数のスキマから木馬が侵入。動物たちは連れ去られました…"}
+              </p>
+              <div style={{ textAlign: "center", fontSize: 22, letterSpacing: 2 }}>🐴🐴🐴🐴🐴</div>
             </div>
-            <div style={{ color: "#888" }}>&gt; 動物たちは文字化けして消えました… {"▓▒░"}</div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ display: "inline-block", background: "rgba(255,34,102,0.12)", border: "1px solid #ad1457", borderRadius: 10, padding: "6px 16px", fontSize: 13, color: "#ff6699", fontWeight: 700, margin: "12px 0 0" }}>
+            <div style={{ display: "inline-block", background: "rgba(178,59,59,0.15)", border: "1px solid #d98080", borderRadius: 10, padding: "6px 16px", fontSize: 13, color: "#ffb3b3", fontWeight: 700, margin: "12px 0 0" }}>
               🏅 称号「{crash.kind === "div0" ? "宇宙を割った者" : "虚数世界の迷子"}」を獲得
             </div>
-            <div style={{ fontSize: 12.5, color: "#999", marginTop: 6 }}>ステージ {history.length}/{STAGE_COUNT} でクラッシュ</div>
+            <div style={{ fontSize: 12.5, color: "#aaa", marginTop: 6 }}>ステージ {history.length}/{STAGE_COUNT} でクラッシュ</div>
             <div style={{ color: "#ccc" }}><HistoryList history={history} /></div>
-            <button onClick={startGame} style={{ fontSize: 17, padding: "12px 40px", borderRadius: 14, border: "1px solid #ff2266", background: "transparent", color: "#ff6699", cursor: "pointer", fontWeight: 800, marginTop: 16, fontFamily: "ui-monospace, monospace" }}>
-              &gt; RESTART_
-            </button>
+            <TitleCollection earned={earnedTitles} justEarned={runEarnedRef.current} dark />
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
+              <button onClick={startGame} style={{ fontSize: 16, padding: "12px 30px", borderRadius: 14, border: "none", background: "#b23b3b", color: "#fff", cursor: "pointer", fontWeight: 800 }}>
+                駆除して再挑戦！
+              </button>
+              <button onClick={goHome} style={{ fontSize: 16, padding: "12px 24px", borderRadius: 14, border: "2px solid #888", background: "transparent", color: "#ddd", cursor: "pointer", fontWeight: 800 }}>
+                🏠 ホームへ
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -666,6 +814,14 @@ export default function App() {
             <div style={{ display: "inline-block", background: "#f3e5f5", border: "2px solid #ce93d8", borderRadius: 12, padding: "6px 18px", fontSize: 15, fontWeight: 800, color: "#6a1b9a", margin: "10px 0 4px" }}>
               {medal} ランク: {title}
             </div>
+            {/* 特殊クリアで獲得した称号 */}
+            {TITLES.filter(t => runEarnedRef.current.includes(t.id)).map(t => (
+              <div key={t.id} style={{ margin: "4px 0" }}>
+                <span style={{ display: "inline-block", background: "#fff8e1", border: "2px solid #ffd54f", borderRadius: 12, padding: "5px 16px", fontSize: 14, fontWeight: 800, color: "#e65100", animation: "pop 0.5s ease" }}>
+                  {t.icon} 称号「{t.name}」を獲得！
+                </span>
+              </div>
+            ))}
             {best !== null && (
               <div style={{ fontSize: 13, color: count >= best ? "#e65100" : "#999", fontWeight: 700 }}>
                 {count >= best ? "🏆 セッションベスト更新！" : `セッションベスト: ${fmt(best)} 匹`}
@@ -673,9 +829,15 @@ export default function App() {
             )}
             <AnimalGrid count={count} animal={animal} />
             <HistoryList history={history} />
-            <button onClick={startGame} style={{ fontSize: 18, padding: "12px 44px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#7b1fa2,#9c27b0)", color: "#fff", cursor: "pointer", fontWeight: 800, marginTop: 14, boxShadow: "0 4px 14px rgba(123,31,162,0.4)" }}>
-              もう一回！
-            </button>
+            <TitleCollection earned={earnedTitles} justEarned={runEarnedRef.current} dark={false} />
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14 }}>
+              <button onClick={startGame} style={{ fontSize: 17, padding: "12px 34px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#7b1fa2,#9c27b0)", color: "#fff", cursor: "pointer", fontWeight: 800, boxShadow: "0 4px 14px rgba(123,31,162,0.4)" }}>
+                もう一回！
+              </button>
+              <button onClick={goHome} style={{ fontSize: 17, padding: "12px 24px", borderRadius: 14, border: "3px solid #ce93d8", background: "#fff", color: "#6a1b9a", cursor: "pointer", fontWeight: 800 }}>
+                🏠 ホームへ
+              </button>
+            </div>
           </div>
         );
       })()}

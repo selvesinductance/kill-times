@@ -8,14 +8,21 @@
 }
 @font-face {
 font-family:'misakigothic';
-src: url('misaki_gothic_2nd.ttf') format('truetype');
+src: url('./fonts/misaki_gothic_2nd.ttf') format('truetype');
 }
 h1 {
     font-family: 'misakigothic';
     font-size: 32px;
     letter-spacing: 4px;
 }
-h1:hover, h2:hover {
+h1:hover {
+    color: orange;
+    transition: all 10s;
+}
+h1:active {
+    font-family: 'Wingdings', 'Webdings', 'Zapf Dingbats', 'misakigothic';
+}
+h2:hover {
     color: red;
     transition: all 10s;
 }
@@ -34,9 +41,14 @@ a.content:hover {
     color: gold;
     font-size: x-large;
 }
+.specialthanks {
+    font-size: x-small;
+    color: rgba(255, 255, 255, 0.3);
+    margin-top: -8px;
+}
 .understoodbox {
     width: fit-content;
-    margin: 128px auto;
+    margin: 64px auto;
     border: 2px solid goldenrod;
     border-radius: 8px;
     padding: 8px;
@@ -55,7 +67,19 @@ a.content:hover {
 .understood:hover {
     left: 0;
 }
-.understood:active, h2:active  {
+.releasenotes {
+    margin-bottom: 64px;
+    color: rgb(10, 22, 22);
+}
+.releasenotesli, .releasenotes {
+    text-align: left;
+    color: rgb(10, 22, 22);
+}
+.releasenotes:hover, .releasenotesli:hover {
+    color: rgba(255, 255, 255, 0.5);
+    transition: all 1s;
+}
+.understood:active, h2:active, .specialthanks:active, .releasenotesli:active, .releasenotes:active {
     font-family: misakigothic;
 }
 footer {

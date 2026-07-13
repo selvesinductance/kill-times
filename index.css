@@ -46,6 +46,9 @@ a.content:hover {
     color: rgba(255, 255, 255, 0.3);
     margin-top: -8px;
 }
+.caution {
+    display: none;
+    }
 .understoodbox {
     width: fit-content;
     margin: 64px auto;
@@ -63,21 +66,23 @@ a.content:hover {
 }
 .understoodbox:hover {
     border: 2px solid white;
-}
-.understood:hover {
-    left: 0;
+    .understood {
+        left: 0;
+    }
 }
 .releasenotes {
     margin-bottom: 64px;
-    color: rgb(10, 22, 22);
 }
-.releasenotesli, .releasenotes {
+.releasenotes, .releasenotesli {
     text-align: left;
     color: rgb(10, 22, 22);
-}
-.releasenotes:hover, .releasenotesli:hover {
-    color: rgba(255, 255, 255, 0.5);
     transition: all 1s;
+}
+.releasenotes:hover {
+    color: rgba(255, 255, 255, 0.5);
+    .releasenotesli {
+    color: rgba(255, 255, 255, 0.5);
+    }
 }
 .understood:active, h2:active, .specialthanks:active, .releasenotesli:active, .releasenotes:active {
     font-family: misakigothic;
@@ -102,7 +107,16 @@ footer {
     display: none;
     cursor: not-allowed;
 }
-@media (max-width: 600px) {
+@media (max-width: 610px) {
+    .caution {
+    display: block;
+    font-size: x-small;
+    color: rgba(255, 255, 255, 0.3);
+    margin-top: -8px;
+    }
+    .releasenotes {
+        display: none;
+    }
     .footerforphone {
         display: inline-block;
         text-align: center;
@@ -112,10 +126,14 @@ footer {
         display: none;
     }
 }
+
 .jumpscarebox {
-    margin: 256px auto;
+    height: 256px;
+    padding: 360px 0;
+    margin: 0 20%;
 }
 .jumpscare {
+    display: inline-block;
     font-size: 100px;
     font-weight: x-large;
     position: relative;
@@ -123,8 +141,10 @@ footer {
     transition: all 0.5s;
     cursor:vertical-text;
 }
-.jumpscare:hover {
-    bottom: 200px;
+.jumpscarebox:hover {
+    .jumpscare {
+        bottom: 300px;
+    }
 }
 a.behind {
     text-decoration: none;

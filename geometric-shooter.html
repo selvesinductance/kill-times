@@ -201,10 +201,9 @@ function updateTime(){
 function updateWaveUI(){
   waveEl.textContent = wave;
   waveProgEl.textContent = (bossSpawned && boss) ? '⚠BOSS' : `(${Math.min(waveKills,waveTarget)}/${waveTarget})`;
-  const hot = wave>=11;
-  waveStatEl.style.color = hot ? '#ffaa00' : '';
-  waveStatEl.style.textShadow = hot ? '0 0 8px #ffaa00' : '';
-  waveProgEl.style.color = hot ? '#ffaa00' : '';
+  const col = wave>=18 ? '#ff4466' : wave>=11 ? '#ffaa00' : '';
+  waveStatEl.style.color = col;
+  waveStatEl.style.textShadow = col ? `0 0 8px ${col}` : '';
 }
 function updateBombUI(){
   bombCountEl.textContent = bombs;
@@ -307,14 +306,14 @@ function autoPlayUpdate(){
   const cx=W/2-player.x, cy=H/2-player.y, cd=Math.hypot(cx,cy)||1;
   fx+=cx/cd*15; fy+=cy/cd*15;
   // 壁反発
-  const margin=60;
-  fx+=Math.max(0,margin-player.x)*3-Math.max(0,player.x-(W-margin))*3;
-  fy+=Math.max(0,margin-player.y)*3-Math.max(0,player.y-(H-margin))*3;
+  const margin=70;
+  fx+=Math.max(0,margin-player.x)*4-Math.max(0,player.x-(W-margin))*4;
+  fy+=Math.max(0,margin-player.y)*4-Math.max(0,player.y-(H-margin))*4;
   // 四隅反発
   const corners=[{x:0,y:0},{x:W,y:0},{x:0,y:H},{x:W,y:H}];
   for(const c of corners){
     const dx=player.x-c.x, dy=player.y-c.y, d=Math.hypot(dx,dy)||1;
-    const w=Math.max(0, 250-d)*4;
+    const w=Math.max(0, 200-d)*3;
     fx+=dx/d*w; fy+=dy/d*w;
   }
   const len=Math.hypot(fx,fy)||1;

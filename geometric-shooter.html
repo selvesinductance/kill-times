@@ -535,7 +535,7 @@ function update(){
         addFloat(player.x,player.y-48,'💣 +1','#ffaa00');
         playBossKillSE();
         boss=null; bossBarEl.style.display='none';
-        lives=Math.min(lives+1,9); livesEl.textContent=lives;
+        lives=Math.min(lives+1,99); livesEl.textContent=lives;
         bombs++; updateBombUI();
       }
     }

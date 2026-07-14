@@ -298,9 +298,10 @@ function autoPlayUpdate(){
   if(!all.length) return;
   let fx=0, fy=0;
   for(const e of all){
-    const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
+    const dx=player.x-e.x, dy=player.y-e.y, dc=Math.hypot(dx,dy)||1;
+    const d=Math.max(1, dc-e.r-player.r); // 縁と縁の隙間で評価
     const w=30000*e.hp/(d*d+1);
-    fx+=dx/d*w; fy+=dy/d*w;
+    fx+=dx/dc*w; fy+=dy/dc*w;
   }
   // 中心への引力
   const cx=W/2-player.x, cy=H/2-player.y, cd=Math.hypot(cx,cy)||1;

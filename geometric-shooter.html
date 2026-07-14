@@ -299,7 +299,7 @@ function autoPlayUpdate(){
   let fx=0, fy=0;
   for(const e of all){
     const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy)||1;
-    const w=80000/(d*d+1);
+    const w=30000*e.hp/(d*d+1);
     fx+=dx/d*w; fy+=dy/d*w;
   }
   // 中心への引力

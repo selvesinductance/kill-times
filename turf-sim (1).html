@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>INK TERRITORY — 陣取りバトル・シミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0f16;
+  --panel:#161a26;
+  --panel-2:#1d2233;
+  --line:#2b3346;
+  --text:#dfe4f2;
+  --dim:#7c86a3;
+  --ink-a:#ff6a1f;
+  --ink-a-lo:#a33d0c;
+  --ink-a-hi:#ff9c62;
+  --ink-b:#17c8ff;
+  --ink-b-lo:#0a6f96;
+  --ink-b-hi:#6bdcff;
+  --w1:#ffe14d;
+  --w2:#ff5ec7;
+  --w3:#7cff5e;
+  --w4:#5edcff;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --dot:"DotGothic16","Hiragino Sans","Noto Sans JP",sans-serif;
+  --body:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:14px;
+  line-height:1.7;
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:32px 32px;
+}
+.wrap{max-width:1360px;margin:0 auto;padding:20px 18px 60px}
+
+/* ---- header ---- */
+header{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+h1{
+  font-family:var(--dot);
+  font-size:clamp(22px,3.4vw,34px);
+  letter-spacing:.14em;
+  margin:0;
+  line-height:1.1;
+  text-shadow:2px 2px 0 var(--ink-a-lo),4px 4px 0 rgba(0,0,0,.6);
+}
+h1 em{font-style:normal;color:var(--ink-b)}
+.tagline{color:var(--dim);font-size:12px;letter-spacing:.08em;margin-bottom:4px}
+
+/* ---- layout ---- */
+.stage{display:block}
+
+/* ---- lineup（出撃メンバー・横一列） ---- */
+.lineup{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:start;margin-bottom:10px}
+.side{min-width:0}
+.side .tag{font-family:var(--dot);font-size:12px;letter-spacing:.12em;padding:2px 9px;color:#0d0f16;display:inline-block;margin-bottom:6px}
+.side.a .tag{background:var(--ink-a)}
+.side.b .tag{background:var(--ink-b)}
+.side.b{text-align:right}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.vs{font-family:var(--dot);font-size:13px;color:var(--dim);letter-spacing:.14em;padding-top:26px;white-space:nowrap}
+.card{display:flex;align-items:center;gap:7px;min-width:0;text-align:left;
+  border:1px solid var(--line);background:var(--panel);padding:5px 7px;
+  transition:opacity .15s,border-color .15s,background .15s}
+.card.dead{opacity:.3}
+.card.combat{border-color:#ff8a5c;background:#211b1e}
+.card .badge{width:21px;height:21px;flex:0 0 21px;font-size:11px}
+.card .info{flex:1;min-width:0}
+.card .nm{display:block;font-size:11px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .row{display:flex;align-items:center;gap:6px;margin-top:3px}
+.card .hpbar{flex:1;margin-top:0;height:3px}
+.card .stt{font-family:var(--mono);font-size:9px;color:var(--dim);flex:0 0 auto;letter-spacing:.02em}
+@media (max-width:1100px){ .card .nm{font-size:10px} }
+@media (max-width:760px){
+  .lineup{grid-template-columns:1fr;gap:10px}
+  .vs{display:none}
+  .side.b{text-align:left}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .card .nm{font-size:11px}
+}
+
+/* ---- toolbar ---- */
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;
+  border:2px solid var(--line);background:var(--panel);padding:11px 14px;margin-top:12px}
+.tb-speed{flex:1 1 240px;min-width:180px}
+.tb-speed label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:5px;letter-spacing:.05em}
+.tb-btns{display:flex;gap:8px;flex:0 0 auto}
+.tb-btns button{min-width:112px}
+.tb-checks{display:flex;gap:16px;flex:0 0 auto;flex-wrap:wrap}
+
+/* ---- score gauge ---- */
+.gauge{
+  position:relative;height:34px;border:2px solid var(--line);background:var(--panel);
+  display:flex;overflow:hidden;margin-bottom:10px;
+}
+.gauge .fill{height:100%;transition:width .12s linear}
+.gauge .a{background:linear-gradient(180deg,var(--ink-a-hi),var(--ink-a))}
+.gauge .b{background:linear-gradient(180deg,var(--ink-b-hi),var(--ink-b));margin-left:auto}
+.gauge .neutral{flex:1;background:repeating-linear-gradient(45deg,#20263a,#20263a 4px,#1a1f30 4px,#1a1f30 8px)}
+.gauge .lbl{
+  position:absolute;top:0;height:100%;display:flex;align-items:center;gap:6px;
+  font-family:var(--dot);font-size:19px;letter-spacing:.06em;
+  text-shadow:1px 1px 0 rgba(0,0,0,.75);padding:0 10px;
+}
+.gauge .lbl.l{left:0}
+.gauge .lbl.r{right:0}
+
+/* ---- canvas ---- */
+.board{position:relative;border:2px solid var(--line);background:#000;line-height:0}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.board::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;
+}
+.overlay{
+  position:absolute;inset:0;display:none;place-items:center;
+  background:rgba(8,10,16,.82);z-index:2;text-align:center;line-height:1.6;
+}
+.overlay.show{display:grid}
+.overlay .verdict{font-family:var(--dot);font-size:clamp(28px,5vw,52px);letter-spacing:.1em;margin-bottom:6px}
+.overlay .detail{font-family:var(--mono);font-size:15px;color:var(--text)}
+.overlay .count{color:var(--dim);font-size:12px;margin-top:14px;letter-spacing:.1em}
+
+.ticker{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:12px;color:var(--dim);
+  padding:8px 2px 0;letter-spacing:.06em;
+}
+
+/* ---- controls ---- */
+input[type=range]{width:100%;accent-color:var(--ink-a)}
+button{
+  flex:1;font-family:var(--dot);font-size:14px;letter-spacing:.08em;
+  background:var(--panel-2);color:var(--text);border:2px solid var(--line);
+  padding:8px 4px;cursor:pointer;transition:.12s;
+}
+button:hover{border-color:var(--ink-a);color:#fff}
+button:focus-visible{outline:2px solid var(--ink-b);outline-offset:2px}
+.chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);cursor:pointer}
+.chk input{accent-color:var(--ink-b)}
+
+/* ---- badge / hp ---- */
+.badge{
+  width:24px;height:24px;flex:0 0 24px;display:grid;place-items:center;
+  font-size:12px;color:#0d0f16;font-weight:700;border-radius:2px;
+}
+.hpbar{height:4px;background:#0d0f16;border:1px solid var(--line);margin-top:2px}
+.hpbar i{display:block;height:100%;background:#4ce07a;transition:width .1s}
+
+/* ---- footer ---- */
+footer{margin-top:34px;border-top:2px solid var(--line);padding-top:22px}
+footer h2{font-family:var(--dot);font-size:18px;letter-spacing:.12em;margin:0 0 12px}
+.fgrid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,2fr);gap:26px}
+.fgrid>div{min-width:0}
+@media (max-width:820px){.fgrid{grid-template-columns:1fr}}
+.rules{color:var(--dim);font-size:13px}
+.rules li{margin-bottom:6px}
+.rules strong{color:var(--text);font-weight:500}
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;max-width:100%}
+table{width:100%;min-width:620px;border-collapse:collapse;font-size:12.5px}
+th,td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.08em;font-weight:400;white-space:nowrap}
+td.num{font-family:var(--mono);white-space:nowrap;color:var(--text)}
+.wname{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.wname b{font-weight:500}
+.wdesc{color:var(--dim);font-size:12px;line-height:1.6}
+.note{color:var(--dim);font-size:11.5px;margin-top:16px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>INK <em>TERRITORY</em></h1>
+  <div class="tagline">陣取りバトル・シミュレーター / 360 TICKS</div>
+</header>
+
+<div class="stage">
+  <div class="lineup">
+    <div class="side a">
+      <span class="tag">アルファ</span>
+      <div class="cards" id="rosterA"></div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="side b">
+      <span class="tag">ブラボー</span>
+      <div class="cards" id="rosterB"></div>
+    </div>
+  </div>
+
+  <div class="gauge">
+    <div class="fill a" id="gA" style="width:2%"></div>
+    <div class="neutral"></div>
+    <div class="fill b" id="gB" style="width:2%"></div>
+    <div class="lbl l"><span id="pA">0.0%</span></div>
+    <div class="lbl r"><span id="pB">0.0%</span></div>
+  </div>
+
+  <div class="board">
+    <canvas id="cv"></canvas>
+    <div class="overlay" id="ov">
+      <div>
+        <div class="verdict" id="ovVerdict">—</div>
+        <div class="detail" id="ovDetail"></div>
+        <div class="count" id="ovCount"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker">
+    <span id="tickTxt">TICK 000 / 360</span>
+    <span id="battleTxt">BATTLE #1</span>
+    <span id="speedTxt">10 tick/s</span>
+  </div>
+
+  <div class="toolbar">
+    <div class="tb-speed">
+      <label><span>シミュレーション速度</span><span id="spdVal">10 tick/s</span></label>
+      <input type="range" id="spd" min="1" max="90" value="10">
+    </div>
+    <div class="tb-btns">
+      <button id="btnPause">一時停止</button>
+      <button id="btnSkip">次の試合へ</button>
+    </div>
+    <div class="tb-checks">
+      <label class="chk"><input type="checkbox" id="chkRadius"> 索敵範囲を表示</label>
+      <label class="chk"><input type="checkbox" id="chkPath"> 移動ルートを表示</label>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="fgrid">
+    <div>
+      <h2>ルール</h2>
+      <ul class="rules">
+        <li><strong>4 vs 4</strong> のチーム戦。フィールドは <strong>64×32マス</strong>（1:2）で、障害物は毎試合ランダム生成（点対称配置）。</li>
+        <li>制限時間は <strong>360ティック</strong>。終了時点で<strong>床を多く塗っていたチームの勝ち</strong>。塗れないのは壁だけ。</li>
+        <li>塗りは<strong>ブキを撃った先の床</strong>に乗る。壁があるとインクはそこで止まる。</li>
+        <li><strong>高所</strong>（一段明るく、平地との境に段差がある地形）は壁の一部が低くなったもので、キャラは登って通り抜けられる。<strong>平地から高所は塗れず、高所にいる相手も倒せない</strong>。逆に<strong>高所からは平地も高所も塗れて、どちらにいる相手も倒せる</strong>。高所を取ると一方的に撃てる。</li>
+        <li><strong>水</strong>（波打つ濃紺の地形）にはキャラもインクも乗れない。ただし壁と違って<strong>射線は遮らない</strong>ので、インクは水の上を飛び越えて対岸に届く。撃ち合えるが渡れない、という分断ができる。壁も高所もない広い空間があるマップにだけ現れ、そのときは外周も水になる。</li>
+        <li><strong>網目の床</strong>（格子模様の地形）ではインクが下へ抜ける。<strong>塗れないので得点にならない</strong>が、キャラは普通に歩け、インクも上を飛び越えて対岸に届く。どちらのチームのものにもならない通り道になる。<strong>水の上に架かることもあり、その場合は水を渡る橋になる</strong>。</li>
+        <li>体力は100。0になると<strong>15ティック</strong>後に自陣スポーンへ復帰する。自分のインクの上では体力が回復し、<strong>敵のインクの上に立っている間は少しずつ削られる</strong>（削られるだけでは倒れないが、体力が減った状態で戦うことになる）。</li>
+        <li>移動速度は足元で変わる。<strong>自チームのインク＝等速／未塗装＝やや遅い／敵インク＝半減</strong>。</li>
+        <li>試合終了から<strong>3秒後</strong>に、新しいマップとブキ構成で次の試合が自動で始まる。</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2>ブキ</h2>
+      <div class="tscroll">
+      <table>
+        <thead>
+          <tr><th>ブキ</th><th>塗り範囲</th><th>発射間隔</th><th>ダメージ</th><th>移動速度</th><th>索敵</th><th>行動</th></tr>
+        </thead>
+        <tbody id="wtable"></tbody>
+      </table>
+      </div>
+      <p class="note">
+        ブキは試合ごとに8人へランダムに配られる（同じブキが重なることもある）。フィールド上ではキャラの<strong>外周リングの色</strong>と<strong>持っているブキの形</strong>で見分けられる。<br>
+        「マス」はフィールドのマス目単位。塗り範囲の「前方n×m」は、向いている方向へn、横幅mの意味。
+      </p>
+    </div>
+  </div>
+</footer>
+
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════
+   設定 — ここの数値をいじれば挙動が変わる
+   ══════════════════════════════════════════ */
+const CONFIG = {
+  GRID_W: 64,            // フィールド横マス数
+  GRID_H: 32,            // フィールド縦マス数（1:2）
+  CELL: 20,              // 1マスの描画ピクセル数（表示幅に合わせた解像度）
+  MATCH_TICKS: 360,      // 1試合の長さ
+  TEAM_SIZE: 4,          // 1チームの人数
+  RESPAWN_TICKS: 15,     // やられてから復帰までのティック数
+  INTERMISSION_MS: 3000, // 試合終了から次の試合までの実時間
+  MAX_HP: 100,
+  REGEN_DELAY: 12,       // 被弾後、回復が始まるまでのティック
+  REGEN_RATE: 5,         // 自インク上での毎ティック回復量
+  ENEMY_INK_DPT: 1.0,    // 敵インクの上に立っている間の毎ティックダメージ
+  ENEMY_INK_FLOOR: 70,    // 敵インクで削られる下限HP（これ以下にはならない）
+  SPD_OWN: 1.00,         // 自インク上の速度倍率
+  SPD_NEUTRAL: 0.82,     // 未塗装の床
+  SPD_ENEMY: 0.50,       // 敵インク上
+  REPATH: 6,             // 戦闘中の経路再計算の間隔（ティック）
+  PAINT_REPATH: 25,      // 塗り移動中に目標を選び直す間隔
+  MIN_TARGET: 4,         // 塗り目標に選ぶ最低距離（近すぎる塗り残しは無視）
+  CLAIM_R: 6,            // 味方同士で塗り目標を取り合わない距離
+  SPLAT_R: 2.4,          // 撃破時に飛び散るインクの半径
+};
+
+/* ══════════════════════════════════════════
+   地形生成 — マップの雰囲気はここで決まる
+   [a,b] は「a以上b以下からランダム」の意味
+   ══════════════════════════════════════════ */
+const MAPGEN = {
+  wallArea:       228,        // 壁ブロック1個あたりの面積。小さいほど壁が多い
+  wallJitter:     6,          // ブロック数のばらつき
+  wallW:          [2,7],      // 壁ブロックの横幅
+  wallH:          [2,6],      // 壁ブロックの縦幅
+  highRatio:      [0.26,0.34],// 内側の壁のうち高所に変える割合
+  highClump:      [6,21],     // 一度に高所化する塊の大きさ
+  waterClearance: [4,26],     // 壁・高所からこれ以上離れた空間があれば水を作る（毎回この範囲から抽選）
+                              // 上を大きくするほど水は稀になる。[4,26] で出現率およそ33%
+  waterSize:      0.80,       // 水塊の半径（開けた空間の広さに対する比率）
+  waterNoise:     [0.72,1.06],// 水際のゆらぎ。1.0で真円
+  meshArea:       950,        // 網目ブロック1個あたりの面積
+  meshJitter:     2,
+  meshW:          [3,8],
+  meshH:          [2,6],
+  spawnClear:     [3,5],      // スポーン地帯を平地に均す範囲（横, 縦）
+  spawnClearWide: [4,5],      // 水・網を置いたあとに均し直す範囲
+  spawnInk:       [2,3],      // 開始時に自インクを敷く範囲（横, 縦）
+};
+
+/* ══════════════════════════════════════════
+   ブキ定義 — ここに1つ足すだけでブキが増える
+   pattern() は [前方, 横] のオフセット配列を返す
+   ══════════════════════════════════════════ */
+const WEAPONS = [
+  {
+    key:'shooter', name:'シューター', short:'シューター', glyph:'●', color:'#ffe14d', shape:'shooter',
+    rangeText:'前方2マス',
+    fireInterval:1, damage:50, reach:2,
+    moveSpeed:0.60, turnRate:0.75, turnRatePaint:1.30,
+    paintSweep:{amp:0.70, period:5},
+    engageRadius:30, keepDistance:null,
+    pattern(){ return [[1,0],[2,0]]; },
+    desc:'塗りと戦闘を両立する基本ブキ。前方2マスを毎ティック塗り、2発で倒せる。塗っている間は狙いを左右に振って扇状に塗り広げる。敵が半径30マス以内にいれば接近して倒しにいき、いなければ塗り残しを探しに行く。'
+  },
+  {
+    key:'roller', name:'ローラー', short:'ローラー', glyph:'▬', color:'#ff5ec7', shape:'roller',
+    rangeText:'前方1×3マス',
+    fireInterval:1, damage:40, reach:1,
+    moveSpeed:0.50, turnRate:0.60,
+    engageRadius:10, keepDistance:null,
+    pattern(){ return [[1,-1],[1,0],[1,1]]; },
+    desc:'目の前を横一列に塗りつぶす、塗り幅が最も広いブキ。射程が1マスしかなく、倒すには3発必要。敵が半径10マス以内にいれば接近、いなければ塗り残しを探しに行く。'
+  },
+  {
+    key:'brush', name:'ブラシ', short:'ブラシ', glyph:'▲', color:'#7cff5e', shape:'brush',
+    rangeText:'前方2×3のうち4マス',
+    fireInterval:1, damage:40, reach:2,
+    moveSpeed:0.50, turnRate:0.95, turnRatePaint:1.50,
+    paintSweep:{amp:0.80, period:5},
+    engageRadius:20, keepDistance:null,
+    pattern(){ return pickN([[1,-1],[1,0],[1,1],[2,-1],[2,0],[2,1]], 4); },
+    desc:'毎ティック撃てる塗り特化ブキ。前方2×3マスのうちランダムな4マスを塗る。倒すには3発必要。塗っている間は狙いを大きく左右に振って広く塗り広げる。敵が半径20マス以内にいれば接近、いなければ塗り残しを探しに行く。'
+  },
+  {
+    key:'longshooter', name:'ロングシューター', short:'ロングS', glyph:'➤', color:'#5edcff', shape:'long',
+    rangeText:'前方20マスのうち15マス',
+    fireInterval:20, damage:50, reach:20,
+    moveSpeed:0.50, turnRate:0.40,
+    engageRadius:50, keepDistance:10,
+    pattern(){ const o=[]; for(let f=1;f<=20;f++) o.push([f,0]); return pickN(o,15); },
+    desc:'前方20マスのうちランダムな15マスを塗る長射程ブキ。飛沫に抜けがあるので当たらないこともある。2発当てれば倒せるが、発射間隔は全ブキ中で最も長く足も遅い。敵が半径50マス以内にいれば敵との距離が10マスになる位置まで接近／後退して撃ち、いなければ塗り残しを探しに行く。'
+  },
+];
+
+/* ══════════════════════════════════════════
+   チーム配色 — 試合ごとに切り替わる
+   ペアを1行足すだけで組み合わせが増える
+   ══════════════════════════════════════════ */
+const TEAM_PALETTES = [
+  {label:'オレンジ vs シアン',      a:'#ff6a1f', b:'#17c8ff'},
+  {label:'ライム vs ピンク',        a:'#6ee01a', b:'#ff2f96'},
+  {label:'ブルー vs イエロー',      a:'#3f66ff', b:'#ffc61a'},
+  {label:'マゼンタ vs リーフ',      a:'#ba30b0', b:'#a0e937'},
+  {label:'ローズ vs バイオレット', a:'#DA18AD', b:'#5D25CB'},
+];
+
+/* ══════════════════════════════════════════
+   ユーティリティ
+   ══════════════════════════════════════════ */
+const W = CONFIG.GRID_W, H = CONFIG.GRID_H, CELL = CONFIG.CELL;
+const EMPTY=0, INK_A=1, INK_B=2, WALL=3, MESH=4, WATER=5;
+const blocksInk  = t => t===WALL||t===MESH||t===WATER;  // インクが乗らない地形
+const blocksMove = t => t===WALL||t===WATER;            // 移動を遮る地形
+// 射線を止めるのは壁だけ（あとは平地から見上げる高所）。網と水の上はインクが飛び越える
+const rndInt = n => (Math.random()*n)|0;
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rndInt(i+1);const t=a[i];a[i]=a[j];a[j]=t;}return a;}
+const pickN = (list,n) => shuffle(list).slice(0,n);   // ブキの塗りパターン用
+const rndRange   = ([lo,hi]) => lo + rndInt(hi-lo+1);            // 整数を [lo,hi] から
+const rndBetween = ([lo,hi]) => lo + Math.random()*(hi-lo);      // 実数を [lo,hi) から
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+
+const grid   = new Uint8Array(W*H);   // インク／障害物の層
+const height = new Uint8Array(W*H);   // 高さの層  0=平地 1=高所
+const shade  = new Float32Array(W*H);
+for(let i=0;i<shade.length;i++) shade[i]=Math.random();
+
+function isOpen(fx,fy){
+  const x=Math.floor(fx), y=Math.floor(fy);
+  if(x<0||y<0||x>=W||y>=H) return false;
+  return !blocksMove(grid[y*W+x]);
+}
+
+/* ══════════════════════════════════════════
+   マップ生成（点対称）
+   ══════════════════════════════════════════ */
+const SPAWN_A = {x:3.5, y:H/2};
+const SPAWN_B = {x:W-3.5, y:H/2};
+const spawnIdx  = s => Math.floor(s.y)*W + Math.floor(s.x);
+const mirrorIdx = i => (H-1-((i/W)|0))*W + (W-1-(i%W));   // 点対称の相手マス
+const DX4=[1,-1,0,0], DY4=[0,0,1,-1];
+
+// idx から歩いて行けるマスを塗りつぶす。地形生成の連結性チェックに使う
+function floodFrom(idx){
+  const seen=new Uint8Array(W*H), q=[idx];
+  seen[idx]=1; let count=0;
+  for(let h=0;h<q.length;h++){
+    const c=q[h]; count++;
+    const cx=c%W, cy=(c/W)|0;
+    for(let d=0;d<4;d++){
+      const nx=cx+DX4[d], ny=cy+DY4[d];
+      if(nx<0||ny<0||nx>=W||ny>=H) continue;
+      const ni=ny*W+nx;
+      if(seen[ni]||blocksMove(grid[ni])) continue;
+      seen[ni]=1; q.push(ni);
+    }
+  }
+  return {seen,count};
+}
+
+function carveBox(cx,cy,rw,rh){
+  for(let y=Math.max(0,cy-rh);y<=Math.min(H-1,cy+rh);y++)
+    for(let x=Math.max(0,cx-rw);x<=Math.min(W-1,cx+rw);x++){
+      grid[y*W+x]=EMPTY; height[y*W+x]=0;
+    }
+}
+
+// 両チームのスポーン地帯を平地に均す
+function carveSpawns([rw,rh]){
+  for(const sp of [SPAWN_A,SPAWN_B]) carveBox(Math.floor(sp.x),Math.floor(sp.y),rw,rh);
+}
+
+function generateMap(){
+  for(let attempt=0;attempt<40;attempt++){
+    grid.fill(EMPTY); height.fill(0);
+    // 外周は壁
+    for(let x=0;x<W;x++){ grid[x]=WALL; grid[(H-1)*W+x]=WALL; }
+    for(let y=0;y<H;y++){ grid[y*W]=WALL; grid[y*W+W-1]=WALL; }
+
+    const blobs = Math.round((W*H)/MAPGEN.wallArea) + rndInt(MAPGEN.wallJitter);
+    for(let k=0;k<blobs;k++){
+      const bw = rndRange(MAPGEN.wallW), bh = rndRange(MAPGEN.wallH);
+      const bx = 2 + rndInt(Math.max(1, (W>>1) - 2));   // 端まで置ける
+      const by = 1 + rndInt(Math.max(1, H - bh - 1));
+      for(let y=by;y<by+bh;y++){
+        for(let x=bx;x<bx+bw;x++){
+          if(x<1||y<1||x>=W-1||y>=H-1) continue;
+          grid[y*W+x]=WALL;
+          grid[(H-1-y)*W+(W-1-x)]=WALL;   // 点対称にミラー
+        }
+      }
+    }
+    // スポーン地帯を確保
+    carveSpawns(MAPGEN.spawnClear);
+
+    // 相手スポーンへ行ければ合格。孤立した場所はそのまま残す
+    const {seen,count:reach} = floodFrom(spawnIdx(SPAWN_A));
+    if(!seen[spawnIdx(SPAWN_B)]) continue;
+
+    const openRatio = reach/(W*H);
+    if(openRatio>0.60 && openRatio<0.90){ convertWallsToHigh(); placeWater(); placeMeshFloor(); return; }
+  }
+}
+
+// 壁の一部を高所に変える。高所は通行できるので連結性は悪化しない
+// 変換は点対称ペアで行い、目標マス数を超えないよう都度チェックする
+function convertWallsToHigh(){
+  const walls=[];
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++) if(grid[y*W+x]===WALL) walls.push(y*W+x);
+  if(!walls.length) return;
+  const target=Math.round(walls.length*rndBetween(MAPGEN.highRatio));
+  const raise=i=>{ if(grid[i]!==WALL) return 0; grid[i]=EMPTY; height[i]=1; return 1; };
+  let done=0, guard=0;
+  while(done<target && guard++<400){
+    const seed=walls[rndInt(walls.length)];
+    if(grid[seed]!==WALL) continue;
+    const cap=rndRange(MAPGEN.highClump), q=[seed];   // 一続きの壁をまとめて高所化する
+    done+=raise(seed)+raise(mirrorIdx(seed));
+    for(let h=0;h<q.length && q.length<cap && done<target;h++){
+      const c=q[h], cx=c%W, cy=(c/W)|0;
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=cx+dx, ny=cy+dy;
+        if(nx<1||ny<1||nx>=W-1||ny>=H-1) continue;
+        const ni=ny*W+nx;
+        if(grid[ni]!==WALL) continue;
+        done+=raise(ni)+raise(mirrorIdx(ni)); q.push(ni);
+        if(q.length>=cap||done>=target) break;
+      }
+    }
+  }
+}
+
+// 水：移動は遮るが射線は遮らない。壁も高所もない広い空間があればそこに作る
+// 作れた場合は外周の壁もすべて水に置き換える（島になる）
+function placeWater(){
+  // 端は無視して、壁・高所からの距離を測る
+  const dist=new Int16Array(W*H).fill(-1), q=[];
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+    const i=y*W+x;
+    if(grid[i]===WALL||height[i]===1){ dist[i]=0; q.push(i); }
+  }
+  let best=-1, bd=-1;
+  if(!q.length){                       // 障害物が皆無なら中央を候補にする
+    best=Math.floor(H/2)*W+Math.floor(W/2); bd=Math.min(W,H)/2|0;
+  }else{
+    for(let h=0;h<q.length;h++){
+      const c=q[h], cx=c%W, cy=(c/W)|0;
+      for(const [dx,dy] of D8){
+        const nx=cx+dx, ny=cy+dy;
+        if(nx<1||ny<1||nx>=W-1||ny>=H-1) continue;
+        const ni=ny*W+nx;
+        if(dist[ni]>=0) continue;
+        dist[ni]=dist[c]+1; q.push(ni);
+      }
+    }
+    for(let i=0;i<dist.length;i++) if(dist[i]>bd){ bd=dist[i]; best=i; }
+  }
+  if(bd<rndRange(MAPGEN.waterClearance)) return false;   // しきい値は毎回ランダム
+
+  const snapshot=grid.slice();
+  const R=Math.max(3,Math.round(bd*MAPGEN.waterSize)), cx=best%W, cy=(best/W)|0;
+  const put=(x,y)=>{
+    if(x<1||y<1||x>=W-1||y>=H-1) return;
+    const i=y*W+x;
+    if(grid[i]===WALL||height[i]===1) return;
+    grid[i]=WATER;
+  };
+  for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){
+    if(Math.hypot(dx,dy) > R*rndBetween(MAPGEN.waterNoise)) continue;  // ふちを不定形にする
+    put(cx+dx,cy+dy);
+    put(W-1-(cx+dx), H-1-(cy+dy));                                  // 点対称
+  }
+  carveSpawns(MAPGEN.spawnClearWide);
+
+  // 相手スポーンへ行けなくなったら水は無かったことにする
+  if(!floodFrom(spawnIdx(SPAWN_A)).seen[spawnIdx(SPAWN_B)]){ grid.set(snapshot); return false; }
+
+  for(let x=0;x<W;x++){ grid[x]=WATER; grid[(H-1)*W+x]=WATER; }   // 外周の壁を水に
+  for(let y=0;y<H;y++){ grid[y*W]=WATER; grid[y*W+W-1]=WATER; }
+  return true;
+}
+
+// 網目の床：インクは下へ抜けるが通行はできる地形。壁・高所・水の上には作らない
+function placeMeshFloor(){
+  // 平地の上と、水の上に張る。水に架かった網は渡れる橋になる
+  const canMesh = i => (grid[i]===EMPTY||grid[i]===WATER) && height[i]!==1;
+  const n = Math.round((W*H)/MAPGEN.meshArea) + rndInt(MAPGEN.meshJitter);
+  for(let k=0;k<n;k++){
+    const bw=rndRange(MAPGEN.meshW), bh=rndRange(MAPGEN.meshH);
+    const bx=5+rndInt(Math.max(1,(W>>1)-5));
+    const by=1+rndInt(Math.max(1,H-bh-2));
+    for(let y=by;y<by+bh;y++) for(let x=bx;x<bx+bw;x++){
+      if(x<1||y<1||x>=W-1||y>=H-1) continue;
+      const i=y*W+x;
+      if(!canMesh(i)) continue;
+      grid[i]=MESH;
+      const mi=mirrorIdx(i);                    // 点対称にミラー
+      if(canMesh(mi)) grid[mi]=MESH;
+    }
+  }
+  carveSpawns(MAPGEN.spawnClearWide);   // スポーン地帯は平地にしておく
+}
+
+function countPaintable(){
+  let n=0; for(let i=0;i<grid.length;i++) if(!blocksInk(grid[i])) n++;
+  return n;
+}
+
+/* ══════════════════════════════════════════
+   経路探索（8方向BFS）
+   ══════════════════════════════════════════ */
+const bfsPrev = new Int32Array(W*H);
+const bfsMark = new Int32Array(W*H);
+const bfsQ    = new Int32Array(W*H);
+let bfsStamp  = 0;
+const D8 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+function bfsPath(sx,sy,goalFn){
+  sx=clamp(sx,0,W-1); sy=clamp(sy,0,H-1);
+  let s=sy*W+sx;
+  if(blocksMove(grid[s])){
+    let best=-1,bd=1e9;
+    for(let i=0;i<grid.length;i++){
+      if(blocksMove(grid[i])) continue;
+      const dx=(i%W)-sx, dy=((i/W)|0)-sy, d=dx*dx+dy*dy;
+      if(d<bd){bd=d;best=i;}
+    }
+    if(best<0) return null; s=best;
+  }
+  bfsStamp++;
+  let head=0,tail=0,found=-1;
+  bfsQ[tail++]=s; bfsMark[s]=bfsStamp; bfsPrev[s]=-1;
+  const dirs = shuffle(D8.slice());
+  while(head<tail){
+    const cur=bfsQ[head++];
+    const cx=cur%W, cy=(cur/W)|0;
+    if(cur!==s && goalFn(cx,cy,cur)){ found=cur; break; }
+    for(let d=0;d<8;d++){
+      const nx=cx+dirs[d][0], ny=cy+dirs[d][1];
+      if(nx<1||ny<1||nx>=W-1||ny>=H-1) continue;
+      const ni=ny*W+nx;
+      if(bfsMark[ni]===bfsStamp || blocksMove(grid[ni])) continue;
+      if(dirs[d][0]&&dirs[d][1]){ // 角抜け防止
+        if(blocksMove(grid[cy*W+nx])||blocksMove(grid[ny*W+cx])) continue;
+      }
+      bfsMark[ni]=bfsStamp; bfsPrev[ni]=cur; bfsQ[tail++]=ni;
+    }
+  }
+  if(found<0) return null;
+  const path=[];
+  for(let c=found;c!==-1&&c!==s;c=bfsPrev[c]) path.push({x:(c%W)+0.5,y:((c/W)|0)+0.5});
+  path.reverse();
+  return path;
+}
+
+/* ══════════════════════════════════════════
+   エージェント
+   ══════════════════════════════════════════ */
+let agents=[];
+const dirtyTiles=new Set();
+let inkA=0, inkB=0;          // 塗ったマス数。paintTile で差分更新する
+
+function paintTile(tx,ty,team,fromHigh){
+  if(tx<0||ty<0||tx>=W||ty>=H) return false;
+  const i=ty*W+tx;
+  if(blocksInk(grid[i])) return false;      // 壁と網目の床は塗れない
+  if(height[i]===1 && !fromHigh) return false;  // 平地から高所は塗れない
+  const v = team===0?INK_A:INK_B, prev=grid[i];
+  if(prev!==v){
+    if(prev===INK_A) inkA--; else if(prev===INK_B) inkB--;
+    if(v===INK_A) inkA++; else inkB++;
+    grid[i]=v; dirtyTiles.add(i);
+  }
+  return true;
+}
+
+class Agent{
+  constructor(team,weapon,index){
+    this.team=team; this.weapon=weapon; this.index=index;
+    this.alive=true; this.hp=CONFIG.MAX_HP;
+    this.cooldown=rndInt(weapon.fireInterval);
+    this.respawnIn=0; this.lastHit=-99;
+    this.path=null; this.claim=null; this.repath=0;
+    this.mode='paint'; this.aimError=0;
+    this.stuck=0; this.lastX=0; this.lastY=0;
+    this.phase=rndInt(1000);          // 首振りの位相
+    this.kills=0; this.deaths=0;
+    this.spawnNow();
+  }
+  spawnNow(){
+    const s = this.team===0?SPAWN_A:SPAWN_B;
+    let ok=false;
+    for(let t=0;t<40&&!ok;t++){
+      const x=s.x+(Math.random()*5-2.5), y=s.y+(Math.random()*7-3.5);
+      if(isOpen(x,y)){ this.x=x; this.y=y; ok=true; }
+    }
+    if(!ok){ this.x=s.x; this.y=s.y; }
+    this.dir = this.team===0?0:Math.PI;
+    this.alive=true; this.hp=CONFIG.MAX_HP;
+    this.path=null; this.claim=null; this.repath=0;
+  }
+  get tileIdx(){ return Math.floor(this.y)*W+Math.floor(this.x); }
+  get myInk(){ return this.team===0?INK_A:INK_B; }
+
+  terrainMul(){
+    const t=grid[this.tileIdx];
+    if(t===this.myInk) return CONFIG.SPD_OWN;
+    if(t===INK_A||t===INK_B) return CONFIG.SPD_ENEMY;
+    return CONFIG.SPD_NEUTRAL;
+  }
+  face(dx,dy){
+    if(!dx&&!dy) return;
+    const target=Math.atan2(dy,dx);
+    let d=target-this.dir;
+    while(d>Math.PI)d-=Math.PI*2;
+    while(d<-Math.PI)d+=Math.PI*2;
+    this.aimError=Math.abs(d);
+    // 塗り中は首を大きく振れる（turnRatePaint があればそちらを使う）
+    const m=(this.mode==='paint'&&this.weapon.turnRatePaint)?this.weapon.turnRatePaint:this.weapon.turnRate;
+    this.dir+=clamp(d,-m,m);
+  }
+  move(dx,dy,mul){
+    const len=Math.hypot(dx,dy);
+    if(len<1e-6) return;
+    dx/=len; dy/=len;
+    // 味方同士が重ならないよう軽く反発
+    for(const o of agents){
+      if(o===this||!o.alive||o.team!==this.team) continue;
+      const ox=this.x-o.x, oy=this.y-o.y, d2=ox*ox+oy*oy;
+      if(d2<1.6&&d2>1e-4){ const d=Math.sqrt(d2); dx+=ox/d*0.45; dy+=oy/d*0.45; }
+    }
+    const l2=Math.hypot(dx,dy); dx/=l2; dy/=l2;
+    const spd=this.weapon.moveSpeed*this.terrainMul()*(mul||1);
+    const nx=this.x+dx*spd, ny=this.y+dy*spd;
+    if(isOpen(nx,this.y)) this.x=clamp(nx,1.05,W-1.05);
+    if(isOpen(this.x,ny)) this.y=clamp(ny,1.05,H-1.05);
+  }
+
+  nearestEnemy(){
+    let best=null,bd=Infinity;
+    for(const o of agents){
+      if(o.team===this.team||!o.alive) continue;
+      const d=Math.hypot(o.x-this.x,o.y-this.y);
+      if(d<bd){bd=d;best=o;}
+    }
+    this.enemyDist=bd;
+    return (best && bd<=this.weapon.engageRadius)?best:null;
+  }
+
+  claimedByAlly(x,y){
+    for(const o of agents){
+      if(o===this||o.team!==this.team||!o.claim) continue;
+      const dx=o.claim.x-x, dy=o.claim.y-y;
+      if(dx*dx+dy*dy < CONFIG.CLAIM_R*CONFIG.CLAIM_R) return true;
+    }
+    return false;
+  }
+
+  seekPaint(){
+    const ink=this.myInk;
+    const cx=Math.floor(this.x), cy=Math.floor(this.y);
+    const M=CONFIG.MIN_TARGET*CONFIG.MIN_TARGET;
+    const far=(x,y)=>{const dx=x-cx,dy=y-cy;return dx*dx+dy*dy>=M;};
+    // ①味方が狙っていない、少し離れた塗り残し → ②距離だけ満たす → ③何でもいい
+    const paintable=i=> grid[i]!==ink && !blocksInk(grid[i]);
+    let p=bfsPath(cx,cy,(x,y,i)=> paintable(i) && far(x,y) && !this.claimedByAlly(x,y));
+    if(!p) p=bfsPath(cx,cy,(x,y,i)=> paintable(i) && far(x,y));
+    if(!p) p=bfsPath(cx,cy,(x,y,i)=> paintable(i));
+    this.path=p;
+    this.claim = p&&p.length ? {x:p[p.length-1].x, y:p[p.length-1].y} : null;
+  }
+
+  followPath(){
+    while(this.path&&this.path.length&&Math.hypot(this.path[0].x-this.x,this.path[0].y-this.y)<0.5)
+      this.path.shift();
+    if(!this.path||!this.path.length) return false;
+    const n=this.path[0];
+    const dx=n.x-this.x, dy=n.y-this.y;
+    let ax=dx, ay=dy;
+    const sw=this.weapon.paintSweep;
+    if(sw && this.mode==='paint'){        // 進路は変えずに狙いだけ扇状に振る
+      const a=sw.amp*Math.sin((state.tick+this.phase)*(Math.PI*2/sw.period));
+      const c=Math.cos(a), sn=Math.sin(a);
+      ax=dx*c-dy*sn; ay=dx*sn+dy*c;
+    }
+    this.face(ax,ay); this.move(dx,dy);
+    return true;
+  }
+
+  update(tick){
+    if(!this.alive){
+      if(--this.respawnIn<=0) this.spawnNow();
+      return;
+    }
+    // 足元による体力の増減
+    const foot=grid[this.tileIdx];
+    if((foot===INK_A||foot===INK_B) && foot!==this.myInk){
+      // 下限までしか削られない。すでに下限を割っている場合は増やさない
+      if(this.hp>CONFIG.ENEMY_INK_FLOOR)
+        this.hp=Math.max(CONFIG.ENEMY_INK_FLOOR,this.hp-CONFIG.ENEMY_INK_DPT);
+      this.lastHit=tick;
+    }else if(tick-this.lastHit>CONFIG.REGEN_DELAY && foot===this.myInk){
+      this.hp=Math.min(CONFIG.MAX_HP,this.hp+CONFIG.REGEN_RATE);
+    }
+
+    const enemy=this.nearestEnemy();
+    this.repath--;
+
+    if(enemy){
+      this.mode='combat';
+      const dx=enemy.x-this.x, dy=enemy.y-this.y;
+      const dist=Math.hypot(dx,dy);
+      this.face(dx,dy);
+      const keep=this.weapon.keepDistance;
+      if(keep!==null && keep!==undefined){
+        if(dist<keep-1.2)      this.move(-dx,-dy);       // 近すぎるので下がる
+        else if(dist>keep+1.2){                          // 遠いので詰める
+          if(this.repath<=0||!this.path){ this.path=bfsPath(Math.floor(this.x),Math.floor(this.y),(x,y)=>x===Math.floor(enemy.x)&&y===Math.floor(enemy.y)); this.repath=CONFIG.REPATH; }
+          if(!this.followPath()) this.move(dx,dy);
+          this.face(dx,dy);
+        } else {
+          this.move(-dy,dx,0.4);                         // 適正距離：横に少し動く
+          this.face(dx,dy);
+        }
+      } else {
+        if(dist>1.4){
+          if(this.repath<=0||!this.path){ this.path=bfsPath(Math.floor(this.x),Math.floor(this.y),(x,y)=>x===Math.floor(enemy.x)&&y===Math.floor(enemy.y)); this.repath=CONFIG.REPATH; }
+          if(!this.followPath()) this.move(dx,dy);
+          this.face(dx,dy);
+        }
+      }
+      this.claim=null;
+    } else {
+      this.mode='paint';
+      const done = !this.path || !this.path.length;
+      const claimTaken = this.claim && grid[Math.floor(this.claim.y)*W+Math.floor(this.claim.x)]===this.myInk;
+      if(done||claimTaken||this.repath<=0){ this.seekPaint(); this.repath=CONFIG.PAINT_REPATH; }
+      if(!this.followPath()){ this.seekPaint(); this.followPath(); }
+    }
+
+    // ハマり検知
+    if(Math.hypot(this.x-this.lastX,this.y-this.lastY)<0.04){
+      if(++this.stuck>10){ this.dir+=Math.PI*(Math.random()-0.5); this.path=null; this.repath=0; this.stuck=0; }
+    } else this.stuck=0;
+    this.lastX=this.x; this.lastY=this.y;
+
+    // 射撃
+    if(--this.cooldown<=0){
+      const aimed = this.mode!=='combat' || this.aimError<0.4;
+      if(aimed){ this.fire(); this.cooldown=this.weapon.fireInterval; }
+    }
+  }
+
+  get onHigh(){ return height[this.tileIdx]===1; }
+
+  fire(){
+    const fromHigh=this.onHigh;
+    const fx=Math.cos(this.dir), fy=Math.sin(this.dir);
+    const rx=-fy, ry=fx;
+    const offsets=this.weapon.pattern();
+    const lanes=new Map();
+    for(const [f,s] of offsets){
+      if(!lanes.has(s)) lanes.set(s,new Set());
+      lanes.get(s).add(f);
+    }
+    for(const [s,fs] of lanes){
+      const maxF=Math.max(...fs);
+      for(let f=1;f<=maxF;f++){
+        const tx=Math.floor(this.x+fx*f+rx*s);
+        const ty=Math.floor(this.y+fy*f+ry*s);
+        if(tx<0||ty<0||tx>=W||ty>=H) break;
+        const idx=ty*W+tx, t=grid[idx];
+        if(t===WALL) break;                        // 壁でインクが止まる
+        if(!fromHigh && height[idx]===1) break;    // 平地から高所へは届かない
+        if(fs.has(f)){
+          paintTile(tx,ty,this.team,fromHigh);     // 網目と水には乗らない
+          this.hitCheck(tx,ty,fromHigh);
+        }
+      }
+    }
+  }
+
+  hitCheck(tx,ty,fromHigh){
+    for(const o of agents){
+      if(o.team===this.team||!o.alive) continue;
+      if(!fromHigh && o.onHigh) continue;     // 平地から高所の敵は倒せない
+      if(Math.abs(o.x-(tx+0.5))<0.72 && Math.abs(o.y-(ty+0.5))<0.72){
+        o.hp-=this.weapon.damage;
+        o.lastHit=state.tick;
+        if(o.hp<=0) o.splat(this);
+      }
+    }
+  }
+
+  splat(killer){
+    this.alive=false; this.hp=0; this.deaths++;
+    this.respawnIn=CONFIG.RESPAWN_TICKS;
+    this.path=null; this.claim=null;
+    killer.kills++;
+    const R=CONFIG.SPLAT_R;
+    for(let dy=-Math.ceil(R);dy<=Math.ceil(R);dy++)
+      for(let dx=-Math.ceil(R);dx<=Math.ceil(R);dx++)
+        if(dx*dx+dy*dy<=R*R) paintTile(Math.floor(this.x)+dx,Math.floor(this.y)+dy,killer.team,killer.onHigh);
+  }
+}
+
+/* ══════════════════════════════════════════
+   試合の進行
+   ══════════════════════════════════════════ */
+const state={
+  tick:0, battle:0, paintable:1,
+  scoreA:0, scoreB:0,
+  phase:'playing',       // playing | result
+  paused:false,
+  resultAt:0,
+  tps:10, acc:0, last:0,
+};
+
+function startBattle(){
+  state.battle++;
+  state.tick=0; state.phase='playing';
+  applyPalette();
+  generateMap();
+  inkA=0; inkB=0;                     // 生成直後はインクが無いのでゼロから数え直す
+  state.paintable=countPaintable();
+  agents=[];
+  for(let t=0;t<2;t++)
+    for(let i=0;i<CONFIG.TEAM_SIZE;i++)
+      agents.push(new Agent(t,WEAPONS[rndInt(WEAPONS.length)],i));
+  // スポーン周りに自チームのインクを少し敷く
+  const [ikw,ikh]=MAPGEN.spawnInk;
+  for(const [c,team] of [[SPAWN_A,0],[SPAWN_B,1]])
+    for(let dy=-ikh;dy<=ikh;dy++) for(let dx=-ikw;dx<=ikw;dx++)
+      paintTile(Math.floor(c.x)+dx,Math.floor(c.y)+dy,team,true);
+  redrawAll();
+  buildRoster();
+  ov.classList.remove('show');
+  updateScore();
+}
+
+function endBattle(){
+  state.phase='result';
+  state.resultAt=performance.now();
+  const a=state.scoreA, b=state.scoreB;
+  ovVerdict.textContent = a>b?'アルファ WIN':(b>a?'ブラボー WIN':'DRAW');
+  ovVerdict.style.color = a>b?'var(--ink-a)':(b>a?'var(--ink-b)':'var(--text)');
+  ovDetail.textContent  = `${pct(a)}%  vs  ${pct(b)}%`;
+  ov.classList.add('show');
+}
+
+const pct = v => (v/state.paintable*100).toFixed(1);
+
+function updateScore(){
+  const a=inkA, b=inkB;
+  state.scoreA=a; state.scoreB=b;
+  const pa=a/state.paintable*100, pb=b/state.paintable*100;
+  gA.style.width=Math.max(1.5,pa)+'%';
+  gB.style.width=Math.max(1.5,pb)+'%';
+  pA.textContent=pa.toFixed(1)+'%';
+  pB.textContent=pb.toFixed(1)+'%';
+}
+
+const turnOrder=[];
+function doTick(){
+  state.tick++;
+  turnOrder.length=0;
+  for(const a of agents) turnOrder.push(a);
+  shuffle(turnOrder);                       // 行動順の先攻有利をなくす
+  for(const a of turnOrder) a.update(state.tick);
+  updateScore();
+  tickTxt.textContent=`TICK ${String(state.tick).padStart(3,'0')} / ${CONFIG.MATCH_TICKS}`;
+  battleTxt.textContent=`BATTLE #${state.battle}`;
+  if(state.tick>=CONFIG.MATCH_TICKS) endBattle();
+}
+
+/* ══════════════════════════════════════════
+   描画
+   ══════════════════════════════════════════ */
+const cv=document.getElementById('cv');
+cv.width=W*CELL; cv.height=H*CELL;      // CONFIGを変えれば自動追従
+const ctx=cv.getContext('2d');
+const off=document.createElement('canvas');
+off.width=W*CELL; off.height=H*CELL;
+const octx=off.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+
+const PALETTE={
+  [EMPTY]:[38,43,58],
+  [INK_A]:[255,106,31],
+  [INK_B]:[23,200,255],
+};
+
+/* ---- チーム配色の切り替え ---- */
+const hex2rgb = h => [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const shade2  = (c,f) => c.map(v => f>0 ? Math.round(v+(255-v)*f) : Math.round(v*(1+f)));
+const rgb2hex = c => '#'+c.map(v=>clamp(v,0,255).toString(16).padStart(2,'0')).join('');
+const rgba    = (c,al) => `rgba(${c[0]},${c[1]},${c[2]},${al})`;
+
+let TEAM_HEX=['#ff6a1f','#17c8ff'], TEAM_PATH=[], TEAM_RING=[], paletteIdx=-1;
+
+function applyPalette(){
+  let i; do { i=rndInt(TEAM_PALETTES.length); } while(TEAM_PALETTES.length>1 && i===paletteIdx);
+  paletteIdx=i;
+  const pal=TEAM_PALETTES[i], A=hex2rgb(pal.a), B=hex2rgb(pal.b);
+  PALETTE[INK_A]=A; PALETTE[INK_B]=B;
+  TEAM_HEX=[pal.a,pal.b];
+  TEAM_PATH=[rgba(A,.4),rgba(B,.4)];
+  TEAM_RING=[rgba(A,.18),rgba(B,.18)];
+  const r=document.documentElement.style;
+  r.setProperty('--ink-a',pal.a);   r.setProperty('--ink-b',pal.b);
+  r.setProperty('--ink-a-lo',rgb2hex(shade2(A,-0.42)));
+  r.setProperty('--ink-b-lo',rgb2hex(shade2(B,-0.42)));
+  r.setProperty('--ink-a-hi',rgb2hex(shade2(A,0.38)));
+  r.setProperty('--ink-b-hi',rgb2hex(shade2(B,0.38)));
+}
+
+const EDGE=Math.max(2,Math.round(CELL*0.18));
+
+/* 地形の見た目 — 色と縁の太さはここだけ変えればよい */
+const TERRAIN = {
+  wall : { fill:'#39415a', rimTop:'#4c566f', rimBottom:'#242a3c' },
+  water: { fill:'#0b1826', wave:'rgba(96,148,190,.38)', shore:'rgba(126,176,212,.55)',
+           waveGap:0.45, waveAmp:0.10, waveFreq:0.055, shoreEdge:0.6 },
+  mesh : { fill:'#0f121a', wire:'#7d8aa8', gloss:'rgba(190,205,235,.35)',
+           frame:'#3e485f', frameEdge:0.7 },
+  high : { lift:0.34,                                   // 高所をどれだけ明るくするか
+           rimTop:'rgba(255,255,255,.5)',   rimTopEdge:1.0,
+           rimLeft:'rgba(255,255,255,.28)', rimLeftEdge:0.8,
+           shadowBottom:'rgba(0,0,0,.55)',  shadowBottomEdge:1.7,
+           shadowRight:'rgba(0,0,0,.42)',   shadowRightEdge:1.0 },
+  speck: 'rgba(255,255,255,.05)',
+};
+
+// 隣が別の地形になっている辺にだけ帯を描く。bands の並び順どおりに重ねる
+function drawBorders(x,y,i,differs,bands){
+  const gx=i%W, gy=(i/W)|0;
+  for(const [side,col,th] of bands){
+    let ok, rx=x, ry=y, rw=CELL, rh=CELL;
+    if     (side==='t'){ ok = gy>0   && differs(i-W); rh=th; }
+    else if(side==='b'){ ok = gy<H-1 && differs(i+W); ry=y+CELL-th; rh=th; }
+    else if(side==='l'){ ok = gx>0   && differs(i-1); rw=th; }
+    else               { ok = gx<W-1 && differs(i+1); rx=x+CELL-th; rw=th; }
+    if(ok){ octx.fillStyle=col; octx.fillRect(rx,ry,rw,rh); }
+  }
+}
+
+function drawTile(i){
+  const x=(i%W)*CELL, y=((i/W)|0)*CELL, g=grid[i];
+
+  if(g===WALL){
+    const t=TERRAIN.wall;
+    octx.fillStyle=t.fill;      octx.fillRect(x,y,CELL,CELL);
+    octx.fillStyle=t.rimTop;    octx.fillRect(x,y,CELL,EDGE);
+    octx.fillStyle=t.rimBottom; octx.fillRect(x,y+CELL-EDGE,CELL,EDGE);
+    return;
+  }
+
+  if(g===WATER){
+    const t=TERRAIN.water;
+    octx.fillStyle=t.fill; octx.fillRect(x,y,CELL,CELL);
+    octx.save(); octx.beginPath(); octx.rect(x,y,CELL,CELL); octx.clip();
+    // 絶対座標のサイン波なのでタイルをまたいで波がつながる
+    const sp=CELL*t.waveGap, amp=CELL*t.waveAmp, fq=t.waveFreq;
+    octx.strokeStyle=t.wave; octx.lineWidth=Math.max(1,CELL*0.07);
+    octx.beginPath();
+    for(let base=Math.floor(y/sp)*sp-sp; base<=y+CELL+sp; base+=sp){
+      octx.moveTo(x, base+amp*Math.sin(x*fq));
+      for(let px=x+2; px<=x+CELL; px+=2) octx.lineTo(px, base+amp*Math.sin(px*fq));
+    }
+    octx.stroke(); octx.restore();
+    const e=EDGE*t.shoreEdge;                                   // 岸辺
+    drawBorders(x,y,i,n=>grid[n]!==WATER,
+      [['t',t.shore,e],['b',t.shore,e],['l',t.shore,e],['r',t.shore,e]]);
+    return;
+  }
+
+  if(g===MESH){
+    const t=TERRAIN.mesh, sp=CELL/2;
+    octx.fillStyle=t.fill; octx.fillRect(x,y,CELL,CELL);        // 網の下の空間
+    octx.save(); octx.beginPath(); octx.rect(x,y,CELL,CELL); octx.clip();
+    // 絶対座標で引くのでタイルをまたいで格子がつながる
+    octx.strokeStyle=t.wire; octx.lineWidth=Math.max(1,CELL*0.085);
+    octx.beginPath();
+    for(let c=Math.floor((x+y)/sp)*sp; c<=x+y+CELL*2; c+=sp){        // 「/」方向
+      octx.moveTo(c-y,y); octx.lineTo(c-y-CELL,y+CELL);
+    }
+    for(let c=Math.floor((x-y-CELL)/sp)*sp; c<=x+CELL-y; c+=sp){     // 「\\」方向
+      octx.moveTo(c+y,y); octx.lineTo(c+y+CELL,y+CELL);
+    }
+    octx.stroke();
+    octx.strokeStyle=t.gloss; octx.lineWidth=Math.max(1,CELL*0.03);
+    octx.stroke();                                                   // 細い金属ハイライト
+    octx.restore();
+    const e=EDGE*t.frameEdge;                                        // 床との境目の枠
+    drawBorders(x,y,i,n=>grid[n]!==MESH,
+      [['t',t.frame,e],['b',t.frame,e],['l',t.frame,e],['r',t.frame,e]]);
+    return;
+  }
+
+  // 床とインク
+  const p=PALETTE[g], sh=(shade[i]-0.5)*(g===EMPTY?14:34), hi=height[i]===1;
+  let r=p[0]+sh, gg=p[1]+sh, bb=p[2]+sh;
+  if(hi){ const L=TERRAIN.high.lift; r+=(255-r)*L; gg+=(255-gg)*L; bb+=(255-bb)*L; }
+  octx.fillStyle=`rgb(${clamp(r,0,255)|0},${clamp(gg,0,255)|0},${clamp(bb,0,255)|0})`;
+  octx.fillRect(x,y,CELL,CELL);
+  if(g===EMPTY && shade[i]>0.93 && !hi){
+    octx.fillStyle=TERRAIN.speck; octx.fillRect(x+CELL*0.25,y+CELL*0.25,CELL*0.5,CELL*0.5);
+  }
+  if(hi){
+    const t=TERRAIN.high;
+    // 平地と接する辺だけに段差を描く（壁と接していても描かない）
+    drawBorders(x,y,i,n=>height[n]!==1&&grid[n]!==WALL,
+      [['t',t.rimTop,          EDGE*t.rimTopEdge],
+       ['l',t.rimLeft,         EDGE*t.rimLeftEdge],
+       ['b',t.shadowBottom,    EDGE*t.shadowBottomEdge],
+       ['r',t.shadowRight,     EDGE*t.shadowRightEdge]]);
+  }
+}
+
+function redrawAll(){
+  for(let i=0;i<grid.length;i++) drawTile(i);
+  dirtyTiles.clear();
+}
+
+const AS=CELL/16;                       // キャラ描画のスケール係数（16px タイル基準）
+
+/* キャラの見た目 — 数値は 16px タイル基準。CELL を変えても比率を保つ */
+const SPRITE = {
+  core:6.0, coreEdge:2.2,               // チーム色の芯とその黒縁
+  ring:8.3, ringWidth:2.4,              // ブキ色のリング
+  outline:9.8, outlineWidth:1.2,        // いちばん外の黒縁
+  hpBar:{ w:18, h:4, y:-16.5, innerW:16, innerH:2 },
+  shadow:{ dx:3, dy:5, rx:9, ry:6, color:'rgba(0,0,0,.45)' },   // 高所にいるときの影
+  dead:{ size:7, gap:11, offset:4, alpha:0.35 },                // 復帰待ちのマーカー
+  pathWidth:2, radiusWidth:1,
+  hpColors:[[50,'#4ce07a'],[25,'#ffd23f'],[0,'#ff4d4d']],       // [これより上なら, 色]
+};
+
+/* ブキの形 — 新しい形はここに足して weapon.shape で指名する
+   P(前方, 横) がキャラの向きに合わせた座標を返す。s は拡大率 */
+const WEAPON_SHAPES = {
+  shooter({g,P,s}){ g.lineWidth=4*s; g.beginPath();
+    g.moveTo(...P(4,0)); g.lineTo(...P(13,0)); g.stroke(); },
+  roller ({g,P,s}){ g.lineWidth=5*s; g.beginPath();
+    g.moveTo(...P(12,-10)); g.lineTo(...P(12,10)); g.stroke(); },
+  brush  ({g,P,s}){ g.beginPath();
+    g.moveTo(...P(15,0)); g.lineTo(...P(5,-7)); g.lineTo(...P(5,7)); g.closePath(); g.fill(); },
+  long   ({g,P,s}){ g.lineWidth=3*s; g.beginPath();
+    g.moveTo(...P(3,0)); g.lineTo(...P(22,0)); g.stroke();
+    const [mx,my]=P(20,0); g.fillRect(mx-3*s,my-3*s,6*s,6*s); },
+};
+
+const hpColor = hp => (SPRITE.hpColors.find(([t])=>hp>t) || SPRITE.hpColors[SPRITE.hpColors.length-1])[1];
+
+function drawAgents(){
+  const showR=chkRadius.checked, showP=chkPath.checked;
+
+  if(showP||showR) for(const a of agents){          // 下敷きになる補助表示
+    if(!a.alive) continue;
+    const px=a.x*CELL, py=a.y*CELL;
+    if(showP&&a.path&&a.path.length){
+      ctx.strokeStyle=TEAM_PATH[a.team];
+      ctx.lineWidth=SPRITE.pathWidth*AS; ctx.beginPath(); ctx.moveTo(px,py);
+      for(const n of a.path) ctx.lineTo(n.x*CELL,n.y*CELL);
+      ctx.stroke();
+    }
+    if(showR){
+      ctx.strokeStyle=TEAM_RING[a.team];
+      ctx.lineWidth=SPRITE.radiusWidth*AS; ctx.beginPath();
+      ctx.arc(px,py,a.weapon.engageRadius*CELL,0,Math.PI*2); ctx.stroke();
+    }
+  }
+
+  for(const a of agents){
+    if(!a.alive) continue;
+    const px=a.x*CELL, py=a.y*CELL;
+    const fx=Math.cos(a.dir), fy=Math.sin(a.dir), rx=-fy, ry=fx;
+    const P=(f,sd)=>[px+(fx*f+rx*sd)*AS, py+(fy*f+ry*sd)*AS];   // 前方f・横sd の点
+
+    if(a.onHigh){                                    // 高所にいる間は影を落とす
+      const sh=SPRITE.shadow;
+      ctx.fillStyle=sh.color; ctx.beginPath();
+      ctx.ellipse(px+sh.dx*AS,py+sh.dy*AS,sh.rx*AS,sh.ry*AS,0,0,Math.PI*2); ctx.fill();
+    }
+
+    ctx.strokeStyle=a.weapon.color; ctx.fillStyle=a.weapon.color; ctx.lineCap='butt';
+    (WEAPON_SHAPES[a.weapon.shape]||WEAPON_SHAPES.shooter)({g:ctx,P,s:AS});
+
+    // 本体：チーム色の芯／黒縁／ブキ色リング／黒縁 の4層で、
+    // どの配色でもチーム色とブキ色が混ざらないようにする
+    ctx.beginPath(); ctx.arc(px,py,SPRITE.core*AS,0,Math.PI*2);
+    ctx.fillStyle=TEAM_HEX[a.team]; ctx.fill();
+    ctx.lineWidth=SPRITE.coreEdge*AS; ctx.strokeStyle='#000'; ctx.stroke();
+    ctx.lineWidth=SPRITE.ringWidth*AS; ctx.strokeStyle=a.weapon.color;
+    ctx.beginPath(); ctx.arc(px,py,SPRITE.ring*AS,0,Math.PI*2); ctx.stroke();
+    ctx.lineWidth=SPRITE.outlineWidth*AS; ctx.strokeStyle='rgba(0,0,0,.8)';
+    ctx.beginPath(); ctx.arc(px,py,SPRITE.outline*AS,0,Math.PI*2); ctx.stroke();
+
+    if(a.hp<CONFIG.MAX_HP){                          // 体力バー
+      const b=SPRITE.hpBar;
+      ctx.fillStyle='rgba(0,0,0,.7)';
+      ctx.fillRect(px-b.w/2*AS, py+b.y*AS, b.w*AS, b.h*AS);
+      ctx.fillStyle=hpColor(a.hp);
+      ctx.fillRect(px-b.innerW/2*AS, py+(b.y+1)*AS, b.innerW*AS*(a.hp/CONFIG.MAX_HP), b.innerH*AS);
+    }
+  }
+
+  for(const a of agents){                            // 復帰待ちのマーカー
+    if(a.alive) continue;
+    const s=a.team===0?SPAWN_A:SPAWN_B, d=SPRITE.dead;
+    ctx.globalAlpha=d.alpha;
+    ctx.fillStyle=TEAM_HEX[a.team];
+    ctx.fillRect(s.x*CELL-d.offset*AS+(a.index-1.5)*d.gap*AS, s.y*CELL-d.offset*AS, d.size*AS, d.size*AS);
+    ctx.globalAlpha=1;
+  }
+}
+
+function render(){
+  for(const i of dirtyTiles) drawTile(i);
+  dirtyTiles.clear();
+  ctx.drawImage(off,0,0);
+  drawAgents();
+}
+
+/* ══════════════════════════════════════════
+   UI
+   ══════════════════════════════════════════ */
+const gA=document.getElementById('gA'), gB=document.getElementById('gB');
+const pA=document.getElementById('pA'), pB=document.getElementById('pB');
+const tickTxt=document.getElementById('tickTxt'), battleTxt=document.getElementById('battleTxt');
+const speedTxt=document.getElementById('speedTxt'), spdVal=document.getElementById('spdVal');
+const ov=document.getElementById('ov'), ovVerdict=document.getElementById('ovVerdict');
+const ovDetail=document.getElementById('ovDetail'), ovCount=document.getElementById('ovCount');
+const chkRadius=document.getElementById('chkRadius'), chkPath=document.getElementById('chkPath');
+const btnPause=document.getElementById('btnPause'), btnSkip=document.getElementById('btnSkip');
+const spd=document.getElementById('spd');
+
+const rosterEls=[];
+function buildRoster(){
+  rosterEls.length=0;
+  for(const t of [0,1]){
+    const box=document.getElementById(t===0?'rosterA':'rosterB');
+    box.innerHTML='';
+    for(const a of agents.filter(x=>x.team===t)){
+      const card=document.createElement('div'); card.className='card';
+      card.innerHTML=`
+        <span class="badge" style="background:${a.weapon.color}">${a.weapon.glyph}</span>
+        <span class="info">
+          <span class="nm" title="${a.weapon.name}">${a.weapon.short||a.weapon.name}</span>
+          <span class="row">
+            <span class="hpbar"><i style="width:100%"></i></span>
+            <span class="stt">塗り</span>
+          </span>
+        </span>`;
+      box.appendChild(card);
+      rosterEls.push({a,el:card,hp:card.querySelector('.hpbar i'),st:card.querySelector('.stt')});
+    }
+  }
+}
+let rosterAt=0;
+function updateRoster(now){
+  if(now-rosterAt<90) return;
+  rosterAt=now;
+  for(const r of rosterEls){
+    const a=r.a;
+    r.hp.style.width=(a.alive?a.hp/CONFIG.MAX_HP*100:0)+'%';
+    r.hp.style.background=!a.alive?'#3a4157':(a.hp>50?'#4ce07a':(a.hp>25?'#ffd23f':'#ff4d4d'));
+    r.st.textContent=!a.alive?'復帰'+a.respawnIn:(a.mode==='combat'?'戦闘':'塗り');
+    r.st.style.color=!a.alive?'#5a6480':(a.mode==='combat'?'#ff8a5c':'');
+    r.el.classList.toggle('dead',!a.alive);
+    r.el.classList.toggle('combat',a.alive&&a.mode==='combat');
+  }
+}
+
+spd.addEventListener('input',()=>{
+  state.tps=+spd.value;
+  spdVal.textContent=state.tps+' tick/s';
+  speedTxt.textContent=state.tps+' tick/s';
+});
+btnPause.addEventListener('click',()=>{
+  state.paused=!state.paused;
+  btnPause.textContent=state.paused?'再開':'一時停止';
+});
+btnSkip.addEventListener('click',()=>startBattle());
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){ e.preventDefault(); btnPause.click(); }
+});
+
+// フッターのブキ表を定義から自動生成
+(function buildWeaponTable(){
+  const tb=document.getElementById('wtable');
+  tb.innerHTML=WEAPONS.map(w=>`
+    <tr>
+      <td><span class="wname"><span class="badge" style="background:${w.color}">${w.glyph}</span><b>${w.name}</b></span></td>
+      <td class="num">${w.rangeText}</td>
+      <td class="num">${w.fireInterval}ティック毎</td>
+      <td class="num">${w.damage}</td>
+      <td class="num">${w.moveSpeed.toFixed(2)} マス/T</td>
+      <td class="num">半径${w.engageRadius}マス</td>
+      <td class="wdesc">${w.desc}</td>
+    </tr>`).join('');
+})();
+
+/* ══════════════════════════════════════════
+   メインループ
+   ══════════════════════════════════════════ */
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!state.last) state.last=now;
+  const dt=Math.min(250,now-state.last); state.last=now;
+
+  if(state.phase==='playing'&&!state.paused){
+    state.acc+=dt;
+    const step=1000/state.tps;
+    let guard=0;
+    while(state.acc>=step&&state.phase==='playing'&&guard++<8){
+      state.acc-=step; doTick();
+    }
+  }else if(state.phase==='result'){
+    const left=CONFIG.INTERMISSION_MS-(now-state.resultAt);
+    ovCount.textContent=`次の試合まで ${Math.max(0,Math.ceil(left/1000))}`;
+    if(left<=0) startBattle();
+  }
+  updateRoster(now);
+  render();
+}
+
+startBattle();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

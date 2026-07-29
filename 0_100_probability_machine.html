@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>確率抽選機 CHAOS-02 ｜ 0〜100%の確率で当たるマシーン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#37342c;
+    --body-hi:#f0eadb;
+    --body-mid:#e3dcc8;
+    --body-lo:#d2c8b0;
+    --body-edge:#b3a98f;
+    --recess:#cbc2ab;
+    --ink:#4b463a;
+    --ink-soft:#7d7663;
+    --bezel:#33312b;
+    --bezel-hi:#4a473e;
+    --lcd:#a9b98f;
+    --lcd-hi:#b8c6a0;
+    --lcd-ink:#26321e;
+    --lcd-dim:rgba(38,50,30,.14);
+    --red:#c53a2b;
+    --red-deep:#8c2318;
+    --red-shadow:#5e150d;
+    --led-green:#43bd58;
+    --led-red:#e2472e;
+    --paper:#f7f4eb;
+    --paper-ink:#2e2b24;
+    --paper-red:#b1301f;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:32px 14px 72px;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #45423a 0%, var(--bg) 55%, #2c2a24 100%);
+    color:var(--ink);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .rig{
+    position:relative;
+    width:100%;
+    max-width:400px;
+  }
+
+  .machine{
+    position:relative;
+    z-index:2;
+    width:100%;
+    border-radius:20px;
+    padding:22px 20px 26px;
+    background:linear-gradient(160deg, var(--body-hi) 0%, var(--body-mid) 55%, var(--body-lo) 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.65),
+      inset 0 -3px 0 rgba(90,80,60,.25),
+      0 2px 0 var(--body-edge),
+      0 24px 48px rgba(0,0,0,.5),
+      0 8px 16px rgba(0,0,0,.35);
+  }
+
+  /* ---- screws ---- */
+  .screw{
+    position:absolute;
+    width:13px;height:13px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ddd6c4, #9a917a 70%, #6f684f);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.5);
+  }
+  .screw::after{
+    content:"";position:absolute;left:2px;right:2px;top:50%;height:1.5px;
+    background:rgba(60,54,40,.7);transform:translateY(-50%) rotate(28deg);border-radius:1px;
+  }
+  .screw.tl{top:10px;left:10px}
+  .screw.tr{top:10px;right:10px;}
+  .screw.tr::after{transform:translateY(-50%) rotate(-40deg)}
+  .screw.bl{bottom:10px;left:10px}
+  .screw.bl::after{transform:translateY(-50%) rotate(75deg)}
+  .screw.br{bottom:10px;right:10px}
+  .screw.br::after{transform:translateY(-50%) rotate(5deg)}
+
+  /* ---- name plate ---- */
+  .plate{text-align:center;margin:2px 0 16px}
+  .plate .vents{
+    width:92px;height:7px;margin:0 auto 10px;border-radius:3px;
+    background:repeating-linear-gradient(90deg, rgba(75,70,58,.35) 0 3px, transparent 3px 7px);
+  }
+  .plate h1{
+    margin:0;
+    font-size:15px;
+    letter-spacing:.42em;
+    text-indent:.42em;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .plate .sub{
+    margin:4px 0 0;
+    font-size:10.5px;
+    letter-spacing:.24em;
+    text-indent:.24em;
+    color:var(--ink-soft);
+    font-weight:500;
+  }
+
+  /* ---- LCD ---- */
+  .bezel{
+    background:linear-gradient(180deg, var(--bezel-hi), var(--bezel) 30%);
+    border-radius:12px;
+    padding:10px;
+    box-shadow:
+      inset 0 2px 4px rgba(0,0,0,.6),
+      0 1px 0 rgba(255,255,255,.55);
+  }
+  .lcd{
+    position:relative;
+    border-radius:6px;
+    padding:12px 14px 14px;
+    background:
+      linear-gradient(165deg, var(--lcd-hi) 0%, var(--lcd) 45%, #9cad83 100%);
+    box-shadow:
+      inset 0 2px 6px rgba(25,35,18,.45),
+      inset 0 -1px 2px rgba(255,255,255,.25);
+    color:var(--lcd-ink);
+    font-family:'DotGothic16', monospace;
+    overflow:hidden;
+    transition:filter .15s;
+  }
+  .lcd::after{ /* glass sheen */
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(115deg, rgba(255,255,255,.14) 0%, transparent 28%);
+  }
+  .lcd.hit{filter:brightness(1.18) saturate(1.15)}
+  .lcd.miss{filter:brightness(.82)}
+
+  .lcd-row{
+    display:flex;justify-content:space-between;
+    font-size:11px;opacity:.85;letter-spacing:.06em;
+  }
+
+  .lcd-num{
+    display:flex;align-items:baseline;justify-content:center;
+    gap:6px;padding:10px 0 4px;
+    text-shadow:0 0 6px rgba(38,50,30,.25);
+  }
+  .lcd-num .val{
+    font-size:58px;line-height:1;
+    letter-spacing:.02em;
+    font-variant-numeric:tabular-nums;
+  }
+  .lcd-num .pct{font-size:24px}
+
+  /* ghost segments behind the number */
+  .lcd-num .val{position:relative}
+
+  .bar{
+    display:grid;
+    grid-template-columns:repeat(20,1fr);
+    gap:3px;
+    height:14px;
+    margin:6px 0 10px;
+  }
+  .bar i{
+    background:var(--lcd-dim);
+    border-radius:1.5px;
+    transition:background .12s;
+  }
+  .bar i.on{background:var(--lcd-ink)}
+
+  .bar-range{position:relative;height:7px;margin:-6px 1px 5px}
+  .bar-range .m{
+    position:absolute;top:0;width:0;height:0;
+    border-left:4px solid transparent;border-right:4px solid transparent;
+    border-bottom:6px solid var(--lcd-ink);
+    transform:translateX(-50%);opacity:.6;
+    transition:left .1s;
+  }
+
+  .lcd-status{
+    text-align:center;
+    font-size:13px;
+    letter-spacing:.12em;
+    min-height:1.4em;
+    opacity:.95;
+  }
+
+  /* ---- LEDs + sound switch ---- */
+  .console{
+    display:flex;align-items:center;justify-content:space-between;
+    margin:16px 4px 14px;
+  }
+  .leds{display:flex;gap:18px}
+  .led{
+    display:flex;align-items:center;gap:7px;
+    font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--ink-soft);
+  }
+  .led i{
+    width:12px;height:12px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #b9b2a0, #837b66);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.5);
+    transition:background .1s, box-shadow .1s;
+  }
+  .led.hit.on i{
+    background:radial-gradient(circle at 35% 30%, #b6ffbf, var(--led-green) 65%);
+    box-shadow:0 0 10px rgba(67,189,88,.8), inset 0 0 2px rgba(0,80,20,.6);
+  }
+  .led.miss.on i{
+    background:radial-gradient(circle at 35% 30%, #ffc0ae, var(--led-red) 65%);
+    box-shadow:0 0 10px rgba(226,71,46,.8), inset 0 0 2px rgba(90,10,0,.6);
+  }
+
+  .sound{
+    display:flex;align-items:center;gap:8px;
+    font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--ink-soft);
+    cursor:pointer;user-select:none;
+  }
+  .sound input{position:absolute;opacity:0;width:0;height:0}
+  .sound .track{
+    width:34px;height:16px;border-radius:8px;
+    background:linear-gradient(180deg,#b9b09a,#cfc6ae);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.35);
+    position:relative;transition:background .15s;
+  }
+  .sound .track::after{
+    content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;
+    background:linear-gradient(160deg,#f4efe2,#cfc6ae);
+    box-shadow:0 1px 2px rgba(0,0,0,.4);
+    transition:left .15s;
+  }
+  .sound input:checked + .track{background:linear-gradient(180deg,#8fae7d,#a9c295)}
+  .sound input:checked + .track::after{left:20px}
+  .sound input:focus-visible + .track{outline:2px solid var(--red);outline-offset:2px}
+
+  /* ---- range fader ---- */
+  .range-panel{
+    background:var(--recess);
+    border-radius:12px;
+    padding:12px 16px 9px;
+    margin:0 0 14px;
+    box-shadow:inset 0 2px 5px rgba(90,80,60,.4), inset 0 -1px 0 rgba(255,255,255,.5);
+  }
+  .range-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:10px;font-weight:700;letter-spacing:.16em;color:var(--ink-soft);
+  }
+  .range-head .val{
+    font-family:'DotGothic16', monospace;
+    font-size:14px;color:var(--ink);letter-spacing:.03em;
+    font-variant-numeric:tabular-nums;
+  }
+  .fader{
+    position:relative;height:32px;margin:18px 8px 2px;
+    touch-action:none;cursor:pointer;
+  }
+  .rail{
+    position:absolute;left:-4px;right:-4px;top:50%;height:8px;
+    transform:translateY(-50%);border-radius:4px;
+    background:linear-gradient(180deg,#8f8670,#a89e85);
+    box-shadow:inset 0 2px 3px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.5);
+  }
+  .fill{
+    position:absolute;top:50%;height:8px;transform:translateY(-50%);
+    border-radius:4px;
+    background:linear-gradient(180deg,#dd6350,var(--red));
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.35);
+    pointer-events:none;
+  }
+  .handle{
+    position:absolute;top:50%;width:20px;height:30px;
+    transform:translate(-50%,-50%);border-radius:5px;
+    cursor:grab;
+    background:linear-gradient(180deg,#f4eede 0%,#dad1ba 55%,#bfb49a 100%);
+    box-shadow:0 3px 5px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.85), inset 0 -2px 3px rgba(90,80,60,.35);
+  }
+  .handle::after{
+    content:"";position:absolute;left:4px;right:4px;top:50%;height:2px;
+    transform:translateY(-50%);background:var(--red);border-radius:1px;
+  }
+  .handle:active{cursor:grabbing}
+  .handle:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+  .handle .tag{
+    position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+    font-size:8px;font-weight:700;letter-spacing:.12em;color:var(--ink-soft);
+    font-family:'Zen Kaku Gothic New', sans-serif;white-space:nowrap;
+  }
+  .ticks{
+    display:flex;justify-content:space-between;
+    margin:4px 4px 0;
+    font-size:8.5px;color:var(--ink-soft);
+    font-family:'DotGothic16', monospace;
+  }
+
+  /* ---- button ---- */
+  .btn-well{
+    background:var(--recess);
+    border-radius:16px;
+    padding:10px;
+    box-shadow:inset 0 2px 5px rgba(90,80,60,.45), inset 0 -1px 0 rgba(255,255,255,.5);
+  }
+  #btn{
+    width:100%;
+    border:none;
+    border-radius:12px;
+    padding:18px 0 16px;
+    cursor:pointer;
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    color:#fff;
+    background:linear-gradient(180deg, #de5240 0%, var(--red) 40%, var(--red-deep) 100%);
+    box-shadow:
+      0 6px 0 var(--red-shadow),
+      0 10px 14px rgba(0,0,0,.35),
+      inset 0 2px 0 rgba(255,255,255,.35);
+    transition:transform .06s, box-shadow .06s;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+  }
+  #btn .jp{display:block;font-size:22px;font-weight:700;letter-spacing:.5em;text-indent:.5em;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  #btn .en{display:block;font-size:10px;letter-spacing:.34em;text-indent:.34em;opacity:.85;margin-top:2px}
+  #btn:active, #btn.pressed{
+    transform:translateY(5px);
+    box-shadow:
+      0 1px 0 var(--red-shadow),
+      0 3px 6px rgba(0,0,0,.3),
+      inset 0 2px 4px rgba(0,0,0,.35);
+  }
+  #btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  #btn:disabled{cursor:default;filter:saturate(.75) brightness(.92)}
+
+  .note{
+    margin:12px 6px 0;
+    font-size:10.5px;
+    line-height:1.7;
+    color:var(--ink-soft);
+    text-align:center;
+    font-weight:500;
+  }
+  .note kbd{
+    font-family:inherit;font-size:9.5px;font-weight:700;
+    border:1px solid var(--body-edge);border-bottom-width:2px;border-radius:4px;
+    padding:0 5px;background:var(--body-hi);color:var(--ink);
+  }
+
+  /* ---- counters ---- */
+  .counters{
+    display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:10px;
+    margin:18px 0 18px;
+  }
+  .counter{text-align:center}
+  .counter .win{
+    font-family:'DotGothic16', monospace;
+    background:#22211c;
+    color:#f2eee0;
+    border-radius:6px;
+    padding:7px 0 5px;
+    font-size:19px;
+    letter-spacing:.08em;
+    box-shadow:inset 0 2px 5px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.5);
+    font-variant-numeric:tabular-nums;
+  }
+  .counter .lbl{
+    margin-top:5px;font-size:9.5px;font-weight:700;
+    letter-spacing:.16em;color:var(--ink-soft);
+  }
+
+  /* ---- printer + paper tape ---- */
+  .printer{position:relative;margin-top:20px;z-index:3}
+  .slot{
+    height:12px;border-radius:6px;
+    background:linear-gradient(180deg,#2b2a25,#403d35);
+    box-shadow:inset 0 3px 5px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.5);
+    position:relative;z-index:2;
+  }
+  .slot::after{
+    content:"記録 RECORD";
+    position:absolute;right:10px;top:-15px;
+    font-size:8.5px;letter-spacing:.2em;color:var(--ink-soft);font-weight:700;
+  }
+
+  /* the tape hangs down the machine face from the slot, hiding the serial plate
+     as it grows — it overlays the body, so the machine itself never stretches */
+  .paper{
+    position:absolute;
+    top:6px;left:7%;right:7%;
+    z-index:1;
+    padding:16px 10px 12px 16px;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.16), transparent 18px),
+      var(--paper);
+    box-shadow:0 10px 18px rgba(0,0,0,.35);
+    font-family:'DotGothic16', monospace;
+    color:var(--paper-ink);
+    display:none;
+  }
+  .paper.visible{display:block}
+  /* grows up to ~6 rows, then scrolls inside the paper */
+  .paper-roll{
+    max-height:150px;
+    overflow-y:auto;
+    padding-right:6px;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(46,43,36,.3) transparent;
+  }
+  .paper-roll::-webkit-scrollbar{width:5px}
+  .paper-roll::-webkit-scrollbar-thumb{background:rgba(46,43,36,.28);border-radius:3px}
+  .paper::after{ /* torn edge */
+    content:"";
+    position:absolute;left:0;right:0;top:100%;height:8px;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8'%3E%3Cpath d='M0 0 L7 8 L14 0 Z' fill='%23f7f4eb'/%3E%3C/svg%3E") repeat-x;
+    background-size:14px 8px;
+    filter:drop-shadow(0 3px 3px rgba(0,0,0,.18));
+  }
+  .row{
+    display:flex;justify-content:space-between;
+    font-size:12.5px;line-height:1.9;
+    border-bottom:1px dashed rgba(46,43,36,.18);
+  }
+  .row:last-child{border-bottom:none}
+  .row .res{letter-spacing:.1em}
+  .row.miss .res{color:var(--paper-red)}
+  .row.new{animation:print .28s ease-out}
+  @keyframes print{
+    from{transform:translateY(-8px);opacity:0}
+    to{transform:translateY(0);opacity:1}
+  }
+
+  .footplate{
+    margin-top:18px;text-align:center;
+    font-size:8.5px;letter-spacing:.22em;color:var(--ink-soft);font-weight:500;
+  }
+
+  @media (max-width:380px){
+    .lcd-num .val{font-size:46px}
+    .plate h1{font-size:13px;letter-spacing:.3em;text-indent:.3em}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .row.new{animation:none}
+    #btn, .lcd, .bar i{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="rig">
+<main class="machine">
+  <span class="screw tl"></span><span class="screw tr"></span>
+  <span class="screw bl"></span><span class="screw br"></span>
+
+  <header class="plate">
+    <div class="vents"></div>
+    <h1>PROBABILITY MACHINE</h1>
+    <p class="sub">確率抽選機 ・ MODEL CHAOS-02</p>
+  </header>
+
+  <section class="bezel" aria-label="表示画面">
+    <div class="lcd" id="lcd">
+      <div class="lcd-row">
+        <span>確率 PROBABILITY</span>
+        <span id="lot">LOT ----</span>
+      </div>
+      <div class="lcd-num">
+        <span class="val" id="prob">--.--</span><span class="pct">%</span>
+      </div>
+      <div class="bar" id="bar" aria-hidden="true"></div>
+      <div class="bar-range" aria-hidden="true">
+        <i class="m" id="mMin"></i><i class="m" id="mMax"></i>
+      </div>
+      <div class="lcd-status" id="status" role="status">待機中 ── READY</div>
+    </div>
+  </section>
+
+  <div class="console">
+    <div class="leds">
+      <div class="led hit" id="ledHit"><i></i>HIT 成功</div>
+      <div class="led miss" id="ledMiss"><i></i>MISS 失敗</div>
+    </div>
+    <label class="sound">
+      <span>SOUND 音</span>
+      <input type="checkbox" id="soundToggle" checked>
+      <span class="track"></span>
+    </label>
+  </div>
+
+  <section class="range-panel" aria-label="抽選範囲の設定">
+    <div class="range-head">
+      <span>抽選範囲 RANGE</span>
+      <span class="val" id="rangeVal">0% - 100%</span>
+    </div>
+    <div class="fader" id="fader">
+      <div class="rail"></div>
+      <div class="fill" id="fill"></div>
+      <div class="handle" id="hMin" role="slider" tabindex="0"
+           aria-label="下限 MIN" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="tag">MIN 下限</span>
+      </div>
+      <div class="handle" id="hMax" role="slider" tabindex="0"
+           aria-label="上限 MAX" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <span class="tag">MAX 上限</span>
+      </div>
+    </div>
+    <div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+  </section>
+
+  <div class="btn-well">
+    <button id="btn" type="button">
+      <span class="jp">実行</span>
+      <span class="en">EXECUTE</span>
+    </button>
+  </div>
+
+  <p class="note">レバーで抽選範囲（下限〜上限）を設定できます。確率は毎回この範囲内でランダムに再設定されます。<br>レバーを重ねると確率を固定できます。<kbd>Space</kbd> / <kbd>Enter</kbd> で実行、レバーは<kbd>←</kbd><kbd>→</kbd>でも操作可（<kbd>Shift</kbd>で±10）。</p>
+
+  <section class="counters" aria-label="統計">
+    <div class="counter">
+      <div class="win" id="cTrials">0000</div>
+      <div class="lbl">試行 TRIALS</div>
+    </div>
+    <div class="counter">
+      <div class="win" id="cWins">0000</div>
+      <div class="lbl">成功 WINS</div>
+    </div>
+    <div class="counter">
+      <div class="win" id="cRate">--.-%</div>
+      <div class="lbl">実測率 RATE</div>
+    </div>
+  </section>
+
+  <div class="printer" aria-label="抽選記録の排出口">
+    <div class="slot"></div>
+    <div class="paper" id="paperWrap" aria-label="抽選記録">
+      <div class="paper-roll" id="paper"></div>
+    </div>
+  </div>
+
+  <footer class="footplate">SERIAL NO. 0100-JP ・ MADE OF PURE CHANCE</footer>
+</main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- state ----------
+  let xPct = 0;    // lower bound (%)
+  let yPct = 100;  // upper bound (%)
+  let n = Math.random();
+  let trials = 0;
+  let wins = 0;
+  let busy = false;
+
+  const rollN = () => (xPct + Math.random() * (yPct - xPct)) / 100;
+
+  const MAX_LOG = 100;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- elements ----------
+  const $ = (id) => document.getElementById(id);
+  const lcd = $("lcd"), prob = $("prob"), bar = $("bar"), status = $("status"), lot = $("lot");
+  const btn = $("btn"), paper = $("paper"), paperWrap = $("paperWrap");
+  const cTrials = $("cTrials"), cWins = $("cWins"), cRate = $("cRate");
+  const ledHit = $("ledHit"), ledMiss = $("ledMiss");
+  const soundToggle = $("soundToggle");
+  const fader = $("fader"), fill = $("fill"), hMin = $("hMin"), hMax = $("hMax");
+  const rangeVal = $("rangeVal"), mMin = $("mMin"), mMax = $("mMax");
+
+  // build 20 gauge segments
+  const segs = [];
+  for (let i = 0; i < 20; i++) {
+    const s = document.createElement("i");
+    bar.appendChild(s);
+    segs.push(s);
+  }
+
+  // ---------- sound (WebAudio, created on first gesture) ----------
+  let ctx = null;
+  function beep(freq, dur, type = "square", vol = 0.05, delay = 0) {
+    if (!soundToggle.checked) return;
+    try {
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === "suspended") ctx.resume();
+      const t = ctx.currentTime + delay;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    } catch (e) { /* audio unavailable — stay silent */ }
+  }
+  const sndPress = () => beep(1400, 0.04, "square", 0.04);
+  const sndWin   = () => { beep(880, 0.09, "square", 0.05); beep(1320, 0.16, "square", 0.05, 0.09); };
+  const sndMiss  = () => beep(150, 0.18, "square", 0.06);
+  const sndTick  = () => beep(2100, 0.015, "square", 0.015);
+  const sndSlide = () => beep(1750, 0.012, "square", 0.012);
+
+  // ---------- rendering ----------
+  function renderProb(v) {
+    prob.textContent = (v * 100).toFixed(2).padStart(5, "0");
+    const on = Math.round(v * 20);
+    segs.forEach((s, i) => s.classList.toggle("on", i < on));
+  }
+
+  function renderStats() {
+    cTrials.textContent = String(trials).padStart(4, "0");
+    cWins.textContent = String(wins).padStart(4, "0");
+    cRate.textContent = trials ? (wins / trials * 100).toFixed(1) + "%" : "--.-%";
+  }
+
+  function printRow(round, p, isWin) {
+    const row = document.createElement("div");
+    row.className = "row new" + (isWin ? "" : " miss");
+    const left = document.createElement("span");
+    left.textContent = `#${String(round).padStart(3, "0")}  ${(p * 100).toFixed(1)}%`;
+    const res = document.createElement("span");
+    res.className = "res";
+    res.textContent = isWin ? "○ HIT" : "× MISS";
+    row.append(left, res);
+    paper.prepend(row);
+    while (paper.children.length > MAX_LOG) paper.lastElementChild.remove();
+    paperWrap.classList.add("visible");
+    paper.scrollTop = 0;
+  }
+
+  function flashLed(el) {
+    el.classList.add("on");
+    setTimeout(() => el.classList.remove("on"), 650);
+  }
+
+  function newLot() {
+    lot.textContent = "LOT " + Math.floor(Math.random() * 0xffff)
+      .toString(16).toUpperCase().padStart(4, "0");
+  }
+
+  // scramble digits, then settle on the current value of n
+  function scrambleTo(done) {
+    if (reduceMotion) { renderProb(n); done(); return; }
+    let ticks = 0;
+    const timer = setInterval(() => {
+      renderProb(rollN());
+      if (++ticks % 3 === 0) sndTick();
+      if (ticks >= 8) {
+        clearInterval(timer);
+        renderProb(n);
+        done();
+      }
+    }, 48);
+  }
+
+  // ---------- range fader ----------
+  function renderRange() {
+    fill.style.left = xPct + "%";
+    fill.style.width = (yPct - xPct) + "%";
+    hMin.style.left = xPct + "%";
+    hMax.style.left = yPct + "%";
+    hMin.setAttribute("aria-valuenow", xPct);
+    hMax.setAttribute("aria-valuenow", yPct);
+    mMin.style.left = xPct + "%";
+    mMax.style.left = yPct + "%";
+    rangeVal.textContent = (xPct === yPct)
+      ? `固定 ${xPct}%`
+      : `${xPct}% - ${yPct}%`;
+  }
+
+  // if the current n fell outside the new range, re-roll it inside
+  function settleAfterRange() {
+    const lo = xPct / 100, hi = yPct / 100;
+    if (n < lo || n > hi) {
+      n = rollN();
+      if (!busy) renderProb(n);
+    }
+  }
+
+  function posToPct(clientX) {
+    const r = fader.getBoundingClientRect();
+    return Math.round(Math.min(100, Math.max(0, (clientX - r.left) / r.width * 100)));
+  }
+
+  let dragging = null;
+
+  function moveTo(pct) {
+    // when both levers are stacked, hand over to whichever one can move
+    if (xPct === yPct) {
+      if (dragging === hMax && pct < xPct) dragging = hMin;
+      else if (dragging === hMin && pct > yPct) dragging = hMax;
+    }
+    if (dragging === hMin) {
+      const v = Math.min(pct, yPct);
+      if (v !== xPct) { xPct = v; sndSlide(); renderRange(); }
+    } else {
+      const v = Math.max(pct, xPct);
+      if (v !== yPct) { yPct = v; sndSlide(); renderRange(); }
+    }
+  }
+
+  fader.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const pct = posToPct(e.clientX);
+    const dMin = Math.abs(pct - xPct), dMax = Math.abs(pct - yPct);
+    dragging = dMin < dMax ? hMin : dMax < dMin ? hMax : (pct <= xPct ? hMin : hMax);
+    fader.setPointerCapture(e.pointerId);
+    moveTo(pct);
+  });
+  fader.addEventListener("pointermove", (e) => {
+    if (dragging) moveTo(posToPct(e.clientX));
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = null;
+    settleAfterRange();
+  };
+  fader.addEventListener("pointerup", endDrag);
+  fader.addEventListener("pointercancel", endDrag);
+
+  function bindHandleKeys(handle, isMin) {
+    handle.addEventListener("keydown", (e) => {
+      let d = 0;
+      if (e.key === "ArrowLeft" || e.key === "ArrowDown") d = -1;
+      else if (e.key === "ArrowRight" || e.key === "ArrowUp") d = 1;
+      else return;
+      if (e.shiftKey) d *= 10;
+      e.preventDefault();
+      if (isMin) xPct = Math.min(Math.max(0, xPct + d), yPct);
+      else yPct = Math.max(Math.min(100, yPct + d), xPct);
+      sndSlide();
+      renderRange();
+      settleAfterRange();
+    });
+  }
+  bindHandleKeys(hMin, true);
+  bindHandleKeys(hMax, false);
+
+  // ---------- main action ----------
+  function execute() {
+    if (busy) return;
+    busy = true;
+    btn.disabled = true;
+    sndPress();
+
+    trials++;
+    const rolled = n;
+    const isWin = Math.random() < rolled;
+    if (isWin) wins++;
+
+    // result feedback
+    lcd.classList.add(isWin ? "hit" : "miss");
+    flashLed(isWin ? ledHit : ledMiss);
+    status.textContent = isWin ? "≫ 成功 ── HIT ≪" : "≫ 失敗 ── MISS ≪";
+    isWin ? sndWin() : sndMiss();
+    renderStats();
+    printRow(trials, rolled, isWin);
+
+    // roll the next probability within the selected range
+    n = rollN();
+    newLot();
+    scrambleTo(() => {
+      lcd.classList.remove("hit", "miss");
+      status.textContent = "待機中 ── READY";
+      btn.disabled = false;
+      busy = false;
+      btn.focus({ preventScroll: true });
+    });
+  }
+
+  // ---------- input ----------
+  btn.addEventListener("click", execute);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    if (e.code === "Space" || e.code === "Enter") {
+      if (e.target === soundToggle) return; // let the toggle work normally
+      e.preventDefault();
+      btn.classList.add("pressed");
+      execute();
+    }
+  });
+  document.addEventListener("keyup", (e) => {
+    if (e.code === "Space" || e.code === "Enter") btn.classList.remove("pressed");
+  });
+
+  // ---------- init ----------
+  renderProb(n);
+  renderStats();
+  renderRange();
+  newLot();
+})();
+</script>
+</body>
+</html>

@@ -2,19 +2,21 @@
 バカが作ったゲームやシミュレーション
 
 ## 存在するコンテンツ一覧
-ホームページ (./index.html)
+[ホームページ](./index.html)
 ### シミュレーション
-- じゃんけん粒子バトル　(./RockPaperScissors_battle.html)
-- snake.ioを神の視点から眺める (./snake_io_auto.html)
-- クッソ簡略化された三国志シミュレーション (./castle_capture_battle.html)
-- 存在意義が全くないライフゲームの亜種 (./gendered-lifegame.html)
+- [じゃんけん粒子バトル](./RockPaperScissors_battle.html)
+- [snake.ioを神の視点から眺める](./snake_io_auto.html)
+- [クッソ簡略化された三国志シミュレーション](./castle_capture_battle.html)
+- [存在意義が全くないライフゲームの亜種](./gendered-lifegame.html)
+- [スプラトゥーンでも見るか～](./territory_battle)
 ### ゲーム
-- ありえなマインスイーパー (./reckless_minesweeper.html)
-- 広告でよく見るゲーム (./gate-runner.html)
-- 難易度曲線が終わってるシューティング (./geometric-shooter.html)
+- [ありえなマインスイーパー](./reckless_minesweeper.html)
+- [広告でよく見るゲーム](./gate-runner.html)
+- [難易度曲線が終わってるシューティング](./geometric-shooter.html)
 ### 本当に謎
-- だれでも激つよプログラマーになれるターミナル (./hacker_typer_terminal.html)
-- ブラウザのタブで返信するカスチャットボット (./kotori-title-chatbot.html)
+- [だれでも激つよプログラマーになれるターミナル](./hacker_typer_terminal.html)
+- [ブラウザのタブで返信するカスチャットボット](./kotori-title-chatbot.html)
+- [当たる確率が確率で決まる抽選機](./0_100_probability_machine.html)
 
 ## QUICK START（意味不明）
 https://kill-times.vercel.app/  
@@ -22,6 +24,6 @@ https://kill-times.vercel.app/
 え、わかんない適当にクローンしてください  
 
 ## その他
-./fonts 美咲フォントがあります  
-./jsx htmlを作る前のやつが入ってます  
-./sounds シューティングの効果音が入ってます  
+- [./fonts](./fonts) 美咲フォントがあります
+- [./jsx](./jsx) htmlを作る前のやつが入ってます
+- [./sounds](./sounds) シューティングの効果音が入ってます

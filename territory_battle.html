@@ -55,6 +55,15 @@ h1{
   text-shadow:2px 2px 0 var(--ink-a-lo),4px 4px 0 rgba(0,0,0,.6);
 }
 h1 em{font-style:normal;color:var(--ink-b)}
+h1{cursor:pointer;user-select:none}
+body.cheat h1{animation:cheatGlow .9s ease-in-out infinite alternate}
+@keyframes cheatGlow{
+  from{text-shadow:2px 2px 0 var(--ink-a-lo),4px 4px 0 rgba(0,0,0,.6)}
+  to  {text-shadow:2px 2px 0 var(--ink-b),4px 4px 0 var(--ink-a),0 0 20px var(--ink-b)}
+}
+.cheatTag{display:none;margin-left:10px;padding:1px 7px;font-family:var(--dot);font-size:11px;
+  letter-spacing:.14em;color:#0d0f16;background:var(--ink-b)}
+body.cheat .cheatTag{display:inline-block}
 .tagline{color:var(--dim);font-size:12px;letter-spacing:.08em;margin-bottom:4px}
 
 /* ---- layout ---- */
@@ -80,7 +89,11 @@ h1 em{font-style:normal;color:var(--ink-b)}
 .card .row{display:flex;align-items:center;gap:6px;margin-top:3px}
 .card .hpbar{flex:1;margin-top:0;height:3px}
 .card .stt{font-family:var(--mono);font-size:9px;color:var(--dim);flex:0 0 auto;letter-spacing:.02em}
-@media (max-width:1100px){ .card .nm{font-size:10px} }
+@media (max-width:1100px){
+  .card{gap:6px;padding:5px 6px}
+  .card .badge{width:18px;height:18px;flex:0 0 18px;font-size:10px}
+  .card .nm{font-size:9px}
+}
 @media (max-width:760px){
   .lineup{grid-template-columns:1fr;gap:10px}
   .vs{display:none}
@@ -169,12 +182,18 @@ footer h2{font-family:var(--dot);font-size:18px;letter-spacing:.12em;margin:0 0 
 .rules strong{color:var(--text);font-weight:500}
 .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;max-width:100%}
 table{width:100%;min-width:620px;border-collapse:collapse;font-size:12.5px}
-th,td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th,td{padding:0 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;height:44px}
+th{height:32px}
+th.c,td.c{text-align:center;width:1%;white-space:nowrap}
 th{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.08em;font-weight:400;white-space:nowrap}
 td.num{font-family:var(--mono);white-space:nowrap;color:var(--text)}
+.sub{color:var(--dim);font-size:10.5px}
+label.use{display:flex;align-items:center;justify-content:center;cursor:pointer}
+label.use input{width:17px;height:17px;accent-color:var(--ink-a);cursor:pointer}
+.pending{display:none;color:var(--ink-a)}
+#weaponNote.on .pending{display:block;margin-bottom:6px}
 .wname{display:flex;align-items:center;gap:8px;white-space:nowrap}
 .wname b{font-weight:500}
-.wdesc{color:var(--dim);font-size:12px;line-height:1.6}
 .note{color:var(--dim);font-size:11.5px;margin-top:16px;line-height:1.8}
 </style>
 </head>
@@ -183,7 +202,7 @@ td.num{font-family:var(--mono);white-space:nowrap;color:var(--text)}
 
 <header>
   <h1>INK <em>TERRITORY</em></h1>
-  <div class="tagline">陣取りバトル・シミュレーター / 360 TICKS</div>
+  <div class="tagline">陣取りバトル・シミュレーター / 360 TICKS<span class="cheatTag">CHEAT</span></div>
 </header>
 
 <div class="stage">
@@ -262,12 +281,12 @@ td.num{font-family:var(--mono);white-space:nowrap;color:var(--text)}
       <div class="tscroll">
       <table>
         <thead>
-          <tr><th>ブキ</th><th>塗り範囲</th><th>発射間隔</th><th>ダメージ</th><th>移動速度</th><th>索敵</th><th>行動</th></tr>
+          <tr><th>ブキ</th><th class="c">使う</th><th>塗り範囲</th><th>発射間隔</th><th>ダメージ</th><th>移動速度</th><th>索敵</th></tr>
         </thead>
         <tbody id="wtable"></tbody>
       </table>
       </div>
-      <p class="note">
+      <p class="note" id="weaponNote"><span class="pending">ブキの構成を変更しました。次の試合から反映されます。</span>
         ブキは試合ごとに8人へランダムに配られる（同じブキが重なることもある）。フィールド上ではキャラの<strong>外周リングの色</strong>と<strong>持っているブキの形</strong>で見分けられる。<br>
         「マス」はフィールドのマス目単位。塗り範囲の「前方n×m」は、向いている方向へn、横幅mの意味。
       </p>
@@ -317,8 +336,8 @@ const MAPGEN = {
   wallH:          [2,6],      // 壁ブロックの縦幅
   highRatio:      [0.26,0.34],// 内側の壁のうち高所に変える割合
   highClump:      [6,21],     // 一度に高所化する塊の大きさ
-  waterClearance: [4,26],     // 壁・高所からこれ以上離れた空間があれば水を作る（毎回この範囲から抽選）
-                              // 上を大きくするほど水は稀になる。[4,26] で出現率およそ33%
+  waterClearance: [6,21],     // 壁・高所からこれ以上離れた空間があれば水を作る（毎回この範囲から抽選）
+                              // 上を大きくするほど水は稀になる。[6,21] で出現率およそ33%
   waterSize:      0.80,       // 水塊の半径（開けた空間の広さに対する比率）
   waterNoise:     [0.72,1.06],// 水際のゆらぎ。1.0で真円
   meshArea:       950,        // 網目ブロック1個あたりの面積
@@ -338,52 +357,87 @@ const WEAPONS = [
   {
     key:'shooter', name:'シューター', short:'シューター', glyph:'●', color:'#ffe14d', shape:'shooter',
     rangeText:'前方2マス',
-    fireInterval:1, damage:50, reach:2,
+    enabled:true,
+    fireInterval:1, damage:60,
     moveSpeed:0.60, turnRate:0.75, turnRatePaint:1.30,
     paintSweep:{amp:0.70, period:5},
     engageRadius:30, keepDistance:null,
-    pattern(){ return [[1,0],[2,0]]; },
+    pattern(){ return area(1,2,0,0); },
     desc:'塗りと戦闘を両立する基本ブキ。前方2マスを毎ティック塗り、2発で倒せる。塗っている間は狙いを左右に振って扇状に塗り広げる。敵が半径30マス以内にいれば接近して倒しにいき、いなければ塗り残しを探しに行く。'
   },
   {
     key:'roller', name:'ローラー', short:'ローラー', glyph:'▬', color:'#ff5ec7', shape:'roller',
     rangeText:'前方1×3マス',
-    fireInterval:1, damage:40, reach:1,
+    enabled:true,
+    fireInterval:1, damage:30,
     moveSpeed:0.50, turnRate:0.60,
     engageRadius:10, keepDistance:null,
-    pattern(){ return [[1,-1],[1,0],[1,1]]; },
-    desc:'目の前を横一列に塗りつぶす、塗り幅が最も広いブキ。射程が1マスしかなく、倒すには3発必要。敵が半径10マス以内にいれば接近、いなければ塗り残しを探しに行く。'
+    pattern(){ return area(1,1,-1,1); },
+    desc:'目の前を横一列に塗りつぶす、塗り幅が最も広いブキ。射程が1マスしかなく、倒すには4発必要。敵が半径10マス以内にいれば接近、いなければ塗り残しを探しに行く。'
   },
   {
-    key:'brush', name:'ブラシ', short:'ブラシ', glyph:'▲', color:'#7cff5e', shape:'brush',
+    key:'brush', name:'フデ', short:'フデ', glyph:'▲', color:'#7cff5e', shape:'brush',
     rangeText:'前方2×3のうち4マス',
-    fireInterval:1, damage:40, reach:2,
+    enabled:true,
+    fireInterval:1, damage:40,
     moveSpeed:0.50, turnRate:0.95, turnRatePaint:1.50,
     paintSweep:{amp:0.80, period:5},
     engageRadius:20, keepDistance:null,
-    pattern(){ return pickN([[1,-1],[1,0],[1,1],[2,-1],[2,0],[2,1]], 4); },
+    pattern(){ return pickN(area(1,2,-1,1), 4); },
     desc:'毎ティック撃てる塗り特化ブキ。前方2×3マスのうちランダムな4マスを塗る。倒すには3発必要。塗っている間は狙いを大きく左右に振って広く塗り広げる。敵が半径20マス以内にいれば接近、いなければ塗り残しを探しに行く。'
   },
   {
-    key:'longshooter', name:'ロングシューター', short:'ロングS', glyph:'➤', color:'#5edcff', shape:'long',
+    key:'longshooter', name:'チャージャー', short:'チャージャー', glyph:'➤', color:'#5edcff', shape:'long',
     rangeText:'前方20マスのうち15マス',
-    fireInterval:20, damage:50, reach:20,
-    moveSpeed:0.50, turnRate:0.40,
+    enabled:true,
+    fireInterval:20, damage:80,
+    moveSpeed:0.30, turnRate:0.40,
     engageRadius:50, keepDistance:10,
-    pattern(){ const o=[]; for(let f=1;f<=20;f++) o.push([f,0]); return pickN(o,15); },
+    pattern(){ return pickN(area(1,20,0,0), 15); },
     desc:'前方20マスのうちランダムな15マスを塗る長射程ブキ。飛沫に抜けがあるので当たらないこともある。2発当てれば倒せるが、発射間隔は全ブキ中で最も長く足も遅い。敵が半径50マス以内にいれば敵との距離が10マスになる位置まで接近／後退して撃ち、いなければ塗り残しを探しに行く。'
   },
+  {
+    key:'blaster', name:'ブラスター', short:'ブラスター', glyph:'◆', color:'#ff7a3d', shape:'blaster',
+    rangeText:'前方2〜4×3のうち6マス',
+    enabled:false,
+    fireInterval:2, damage:30,
+    moveSpeed:0.50, turnRate:0.70,
+    engageRadius:30, keepDistance:3,
+    pattern(){ return pickN(area(2,4,-1,1), 6); },
+    desc:'少し離れた位置を面で塗る爆発型。倒すには4発必要。敵が半径30マス以内にいれば、距離3マスを保つ位置まで接近／後退して撃つ。いなければ塗り残しを探しに行く。'
+  },
+  {
+    key:'spinner', name:'スピナー', short:'スピナー', glyph:'⊛', color:'#b388ff', shape:'spinner',
+    rangeText:'前方5×3のうち12マス',
+    enabled:false,
+    fireInterval:7, damage:100,
+    moveSpeed:0.40, turnRate:0.60,
+    engageRadius:40, keepDistance:null,
+    pattern(){ return pickN(area(1,5,-1,1), 12); },
+    desc:'溜めてから広い範囲をまとめて塗る。当たれば一撃だが発射間隔が長い。敵が半径40マス以内にいれば接近して倒しにいき、いなければ塗り残しを探しに行く。'
+  },
+  {
+    key:'stringer', name:'ストリンガー', short:'ストリンガー', glyph:'⇈', color:'#1cffb3', shape:'stringer',
+    rangeText:'前方4〜5×5のうち8マス',
+    enabled:false,
+    fireInterval:3, damage:30,
+    moveSpeed:0.40, turnRate:0.55,
+    engageRadius:40, keepDistance:5,
+    pattern(){ return pickN(area(4,5,-2,2), 8); },
+    desc:'横に広く飛ばす弓型。倒すには4発必要で、発射間隔も長い。敵が半径40マス以内にいれば、距離5マスを保つ位置まで接近／後退して撃つ。いなければ塗り残しを探しに行く。'
+  },
 ];
+
 
 /* ══════════════════════════════════════════
    チーム配色 — 試合ごとに切り替わる
    ペアを1行足すだけで組み合わせが増える
    ══════════════════════════════════════════ */
 const TEAM_PALETTES = [
-  {label:'オレンジ vs シアン',      a:'#ff6a1f', b:'#17c8ff'},
-  {label:'ライム vs ピンク',        a:'#6ee01a', b:'#ff2f96'},
-  {label:'ブルー vs イエロー',      a:'#3f66ff', b:'#ffc61a'},
-  {label:'マゼンタ vs リーフ',      a:'#ba30b0', b:'#a0e937'},
+  {label:'オレンジ vs シアン',    a:'#ff6a1f', b:'#17c8ff'},
+  {label:'ライム vs ピンク',      a:'#6ee01a', b:'#ff2f96'},
+  {label:'ブルー vs イエロー',    a:'#3f66ff', b:'#ffc61a'},
+  {label:'マゼンタ vs リーフ',    a:'#ba30b0', b:'#a0e937'},
   {label:'ローズ vs バイオレット', a:'#DA18AD', b:'#5D25CB'},
 ];
 
@@ -398,6 +452,27 @@ const blocksMove = t => t===WALL||t===WATER;            // 移動を遮る地形
 const rndInt = n => (Math.random()*n)|0;
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rndInt(i+1);const t=a[i];a[i]=a[j];a[j]=t;}return a;}
 const pickN = (list,n) => shuffle(list).slice(0,n);   // ブキの塗りパターン用
+// 前方 f1〜f2、横 s1〜s2 の長方形。塗りパターンはこれで書く
+function area(f1,f2,s1,s2){ const o=[]; for(let f=f1;f<=f2;f++) for(let s=s1;s<=s2;s++) o.push([f,s]); return o; }
+
+/* おまけ：ブキを全部外すと、これだけが出てくる。
+   索敵は無限なので必ず相手を見つけるが、ブキを持っていないのでただ歩くだけ */
+const IDLER = {
+  key:'idler', name:'さんぽ', short:'さんぽ', glyph:'✿', color:'#d7dced', shape:'idler',
+  rangeText:'塗らない', enabled:false,
+  fireInterval:1, damage:0,
+  moveSpeed:0.45, turnRate:0.50,
+  engageRadius:Infinity, keepDistance:1,   // 近づいたら止まらず周りをうろつく
+  pattern(){ return []; },
+  desc:'ブキを持っていない。どこにいる相手でも見つけて、ひたすら歩いて近づく。'
+};
+
+// 射程は塗りパターンから自動で決まる（発射間隔×移動速度 ≦ 射程 なら塗り跡が途切れない）
+for(const w of [...WEAPONS, IDLER]){
+  let mx=0;
+  for(let i=0;i<60;i++) for(const [f] of w.pattern()) if(f>mx) mx=f;
+  w.reach=mx;
+}
 const rndRange   = ([lo,hi]) => lo + rndInt(hi-lo+1);            // 整数を [lo,hi] から
 const rndBetween = ([lo,hi]) => lo + Math.random()*(hi-lo);      // 実数を [lo,hi) から
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -879,10 +954,13 @@ class Agent{
     this.respawnIn=CONFIG.RESPAWN_TICKS;
     this.path=null; this.claim=null;
     killer.kills++;
-    const R=CONFIG.SPLAT_R;
-    for(let dy=-Math.ceil(R);dy<=Math.ceil(R);dy++)
-      for(let dx=-Math.ceil(R);dx<=Math.ceil(R);dx++)
-        if(dx*dx+dy*dy<=R*R) paintTile(Math.floor(this.x)+dx,Math.floor(this.y)+dy,killer.team,killer.onHigh);
+    const R=CONFIG.SPLAT_R, cx=Math.floor(this.x), cy=Math.floor(this.y), r=Math.ceil(R);
+    const x0=Math.max(0,cx-r), x1=Math.min(W-1,cx+r);      // 盤外まで回さない
+    const y0=Math.max(0,cy-r), y1=Math.min(H-1,cy+r);
+    for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+      const dx=x-cx, dy=y-cy;
+      if(dx*dx+dy*dy<=R*R) paintTile(x,y,killer.team,killer.onHigh);
+    }
   }
 }
 
@@ -906,9 +984,11 @@ function startBattle(){
   inkA=0; inkB=0;                     // 生成直後はインクが無いのでゼロから数え直す
   state.paintable=countPaintable();
   agents=[];
+  const pool = WEAPONS.filter(w=>w.enabled);
+  const usable = pool.length ? pool : [IDLER];      // 全部外れていたら…？
   for(let t=0;t<2;t++)
     for(let i=0;i<CONFIG.TEAM_SIZE;i++)
-      agents.push(new Agent(t,WEAPONS[rndInt(WEAPONS.length)],i));
+      agents.push(new Agent(t,usable[rndInt(usable.length)],i));
   // スポーン周りに自チームのインクを少し敷く
   const [ikw,ikh]=MAPGEN.spawnInk;
   for(const [c,team] of [[SPAWN_A,0],[SPAWN_B,1]])
@@ -916,6 +996,7 @@ function startBattle(){
       paintTile(Math.floor(c.x)+dx,Math.floor(c.y)+dy,team,true);
   redrawAll();
   buildRoster();
+  document.dispatchEvent(new Event('newBattle'));
   ov.classList.remove('show');
   updateScore();
 }
@@ -1130,6 +1211,19 @@ const WEAPON_SHAPES = {
   long   ({g,P,s}){ g.lineWidth=3*s; g.beginPath();
     g.moveTo(...P(3,0)); g.lineTo(...P(22,0)); g.stroke();
     const [mx,my]=P(20,0); g.fillRect(mx-3*s,my-3*s,6*s,6*s); },
+  blaster({g,P,s}){ g.lineWidth=6*s; g.beginPath();       // 太い砲身の先に爆発の玉
+    g.moveTo(...P(3,0)); g.lineTo(...P(11,0)); g.stroke();
+    const [mx,my]=P(14,0); g.beginPath(); g.arc(mx,my,4.5*s,0,Math.PI*2); g.fill(); },
+  idler(){},                                              // 手ぶら
+  spinner({g,P,s}){ g.lineWidth=4*s; g.beginPath();       // 銃身の先に回るローター
+    g.moveTo(...P(3,0)); g.lineTo(...P(10,0)); g.stroke();
+    const [mx,my]=P(13.5,0);
+    g.lineWidth=2.4*s; g.beginPath(); g.arc(mx,my,5*s,0,Math.PI*2); g.stroke();
+    g.beginPath(); g.arc(mx,my,1.7*s,0,Math.PI*2); g.fill(); },
+  stringer({g,P,s}){ g.lineWidth=3*s; g.beginPath();      // 弓なりの弦
+    g.moveTo(...P(5,-10)); g.quadraticCurveTo(...P(15,0), ...P(5,10)); g.stroke();
+    g.lineWidth=1.6*s; g.beginPath();
+    g.moveTo(...P(5,-10)); g.lineTo(...P(5,10)); g.stroke(); },
 };
 
 const hpColor = hp => (SPRITE.hpColors.find(([t])=>hp>t) || SPRITE.hpColors[SPRITE.hpColors.length-1])[1];
@@ -1254,6 +1348,18 @@ function updateRoster(now){
   }
 }
 
+/* おまけ：タイトルを押すと、撃破時の飛び散りが盤面全体に広がる */
+(function cheatToggle(){
+  const NORMAL=CONFIG.SPLAT_R, HUGE=Math.hypot(W,H);
+  const h1=document.querySelector('h1');
+  h1.title='押すと何かが起きる';
+  h1.addEventListener('click',()=>{
+    const on=!document.body.classList.contains('cheat');
+    document.body.classList.toggle('cheat',on);
+    CONFIG.SPLAT_R = on ? HUGE : NORMAL;
+  });
+})();
+
 spd.addEventListener('input',()=>{
   state.tps=+spd.value;
   spdVal.textContent=state.tps+' tick/s';
@@ -1273,14 +1379,23 @@ window.addEventListener('keydown',e=>{
   const tb=document.getElementById('wtable');
   tb.innerHTML=WEAPONS.map(w=>`
     <tr>
-      <td><span class="wname"><span class="badge" style="background:${w.color}">${w.glyph}</span><b>${w.name}</b></span></td>
+      <td><span class="wname" title="${w.desc}"><span class="badge" style="background:${w.color}">${w.glyph}</span><b>${w.name}</b></span></td>
+      <td class="c"><label class="use"><input type="checkbox" data-key="${w.key}" ${w.enabled?'checked':''}></label></td>
       <td class="num">${w.rangeText}</td>
       <td class="num">${w.fireInterval}ティック毎</td>
-      <td class="num">${w.damage}</td>
+      <td class="num">${w.damage}<span class="sub"> (${Math.ceil(100/w.damage)}発)</span></td>
       <td class="num">${w.moveSpeed.toFixed(2)} マス/T</td>
-      <td class="num">半径${w.engageRadius}マス</td>
-      <td class="wdesc">${w.desc}</td>
+      <td class="num">半径${w.engageRadius}マス${w.keepDistance?`<span class="sub">（${w.keepDistance}マス保つ）</span>`:''}</td>
     </tr>`).join('');
+
+  const note=document.getElementById('weaponNote');
+  tb.addEventListener('change',e=>{
+    const cb=e.target;
+    if(cb.type!=='checkbox') return;
+    WEAPONS.find(w=>w.key===cb.dataset.key).enabled=cb.checked;
+    note.classList.add('on');
+  });
+  document.addEventListener('newBattle',()=>note.classList.remove('on'));
 })();
 
 /* ══════════════════════════════════════════
@@ -1298,6 +1413,7 @@ function loop(now){
     while(state.acc>=step&&state.phase==='playing'&&guard++<8){
       state.acc-=step; doTick();
     }
+    if(state.acc>step*8) state.acc=step*8;   // 溜まりすぎた分は捨てる（復帰時の早送り防止）
   }else if(state.phase==='result'){
     const left=CONFIG.INTERMISSION_MS-(now-state.resultAt);
     ovCount.textContent=`次の試合まで ${Math.max(0,Math.ceil(left/1000))}`;

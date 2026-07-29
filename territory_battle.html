@@ -176,7 +176,11 @@ footer{margin-top:34px;border-top:2px solid var(--line);padding-top:22px}
 footer h2{font-family:var(--dot);font-size:18px;letter-spacing:.12em;margin:0 0 12px}
 .fgrid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,2fr);gap:26px}
 .fgrid>div{min-width:0}
-@media (max-width:820px){.fgrid{grid-template-columns:1fr}}
+@media (max-width:820px){
+  .fgrid{grid-template-columns:1fr}
+  .fgrid>div:first-child{order:2}   /* 縦並びのときはブキを先に見せる */
+  .fgrid>div:last-child{order:1}
+}
 .rules{color:var(--dim);font-size:13px}
 .rules li{margin-bottom:6px}
 .rules strong{color:var(--text);font-weight:500}

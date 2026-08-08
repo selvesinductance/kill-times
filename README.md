@@ -2,7 +2,8 @@
 バカが作ったゲームやシミュレーション
 
 ## 存在するコンテンツ一覧
-[ホームページ](./index.html)
+[ホームページ](./index.html)  
+秘密のページ
 ### シミュレーション
 - [じゃんけん粒子バトル](./RockPaperScissors_battle.html)
 - [snake.ioを神の視点から眺める](./snake_io_auto.html)
@@ -13,6 +14,7 @@
 - [ありえなマインスイーパー](./reckless_minesweeper.html)
 - [広告でよく見るゲーム](./gate-runner.html)
 - [難易度曲線が終わってるシューティング](./geometric-shooter.html)
+- [無限に続くイライラ棒](./infinite-irairabou.html)
 ### 本当に謎
 - [だれでも激つよプログラマーになれるターミナル](./hacker_typer_terminal.html)
 - [ブラウザのタブで返信するカスチャットボット](./kotori-title-chatbot.html)

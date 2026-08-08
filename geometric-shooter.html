@@ -113,21 +113,51 @@ const soundBtn  = document.getElementById('soundBtn');
 // ============================================================
 // ===== 効果音の設定 =====
 // ↓↓↓ ここに音声ファイルのパス(またはURL)を書いてください ↓↓↓
-const BOSS_KILL_SE_PATH = './sounds/din_voice.mp3';
-// 例: 'sounds/boss_kill.mp3'（このHTMLと同じ場所にsoundsフォルダを置く場合）
-// 例: 'https://example.com/se/boss_kill.mp3'（Web上のファイルを使う場合）
-// ↑↑↑ ここに音声ファイルのパスを書く ↑↑↑
+// 各配列に複数書くと、再生のたびにその中からランダムで1つ選ばれます。1つだけでもOK。
+// 例: 'sounds/boss_kill.mp3'（このHTMLと同じ場所のsoundsフォルダ）
+// 例: 'https://example.com/se/boss_kill.mp3'（Web上のファイル）
+
+// --- ボス撃破音 ---
+const BOSS_KILL_SE_PATHS = [
+  'sounds/din_voice.mp3',
+  // 'boss_kill2.mp3',  ← 追加するときはこの形でカンマ区切りで並べる
+];
+const BOSS_KILL_SE_VOLUME = 0.5; // ボス撃破音の音量 (0.0〜1.0)
+
+// --- 通常敵撃破音 ---
+const ENEMY_KILL_SE_PATHS = [
+  
+  // 'enemy_kill2.mp3',
+];
+const ENEMY_KILL_SE_VOLUME = 0.5; // 通常敵撃破音の音量 (0.0〜1.0)
+// ↑↑↑ ここまでが編集エリア ↑↑↑
 // ============================================================
 let soundOn=false; // デフォルトはOFF
-const bossKillSE=new Audio(BOSS_KILL_SE_PATH);
-bossKillSE.volume=0.8; // 音量 (0.0〜1.0)
-function playBossKillSE(){
-  if(!soundOn) return;
-  try{
-    bossKillSE.currentTime=0;
-    bossKillSE.play().catch(()=>{}); // ファイルが無い/再生不可でもゲームは止めない
-  }catch(_){}
+function makeSE(paths, volume){
+  const clips=paths.map(p=>new Audio(p));
+  return {
+    volume,
+    play(){
+      if(!soundOn||!clips.length) return;
+      try{
+        const base=clips[Math.random()*clips.length|0];
+        // 連続で鳴らしても前の音が途切れないよう、再生中なら複製して重ねる
+        const a=(base.paused||base.ended)?base:base.cloneNode();
+        a.volume=this.volume;
+        a.currentTime=0;
+        a.play().catch(()=>{}); // ファイルが無い/再生不可でもゲームは止めない
+      }catch(_){}
+    },
+    unlock(){ // モバイルの自動再生制限を解除するための無音再生
+      for(const a of clips){
+        a.muted=true;
+        a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false;}).catch(()=>{a.muted=false;});
+      }
+    }
+  };
 }
+const bossKillSE = makeSE(BOSS_KILL_SE_PATHS, BOSS_KILL_SE_VOLUME);
+const enemyKillSE = makeSE(ENEMY_KILL_SE_PATHS, ENEMY_KILL_SE_VOLUME);
 
 // ===== 固定論理解像度（全デバイス共通の広さ） =====
 const W = 700, H = 700;
@@ -532,7 +562,7 @@ function update(){
         flashMode='boss'; flashTimer=wave*60;
         addFloat(player.x,player.y-24,'❤️ +1','#00ff99');
         addFloat(player.x,player.y-48,'💣 +1','#ffaa00');
-        playBossKillSE();
+        bossKillSE.play();
         boss=null; bossBarEl.style.display='none';
         lives=Math.min(lives+1,99); livesEl.textContent=lives;
         bombs++; updateBombUI();
@@ -545,6 +575,7 @@ function update(){
           e.hp--; e.hit=6; hit=true;
           if(e.hp<=0){
             addParticles(e.x,e.y,e.color,14);
+            enemyKillSE.play();
             if(flashMode!=='boss'){
               flashHue=parseInt(e.color.match(/\d+/)[0])||0;
               flashTimer=Math.max(flashTimer,40); flashMode='normal';
@@ -676,10 +707,8 @@ soundBtn.addEventListener('click',()=>{
   soundBtn.textContent=soundOn?'🔊':'🔇';
   if(soundOn){
     // モバイルの自動再生制限を解除するため、ユーザー操作の中で一度無音再生しておく
-    bossKillSE.muted=true;
-    bossKillSE.play().then(()=>{
-      bossKillSE.pause(); bossKillSE.currentTime=0; bossKillSE.muted=false;
-    }).catch(()=>{ bossKillSE.muted=false; });
+    bossKillSE.unlock();
+    enemyKillSE.unlock();
   }
 });
 bombBtn.addEventListener('pointerdown',e=>{

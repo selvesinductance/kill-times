@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>無限イライラ棒</title>
+<style>
+:root{
+  color-scheme:light;
+  --paper:#fcfdff;
+  --paper2:#ffffff;
+  --ink:#26313f;
+  --ink2:#54627a;
+  --dim:#8996a8;
+  --rule:#ccd5e2;
+  --rule2:#7a889c;
+  --blue:#3d6fa8;
+  --blue-d:#2f5987;
+  --red:#c85a3c;
+  --orange:#d0761f;
+  --orange-d:#a95c15;
+  --amber:#b07c26;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* WebKit はフォームコントロールの文字色に -webkit-text-fill-color を使うため、
+   color だけ指定しても灰色のままになることがある。常に color に追従させる */
+button,button *,label,input{-webkit-text-fill-color:currentColor}
+html,body{margin:0;height:100%;background:var(--paper);overflow:hidden}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",system-ui,-apple-system,Meiryo,sans-serif;
+  color:var(--ink);user-select:none;-webkit-user-select:none;
+  touch-action:none;overscroll-behavior:none;
+}
+#stage{position:fixed;inset:0;overflow:hidden}
+#wrap{position:absolute;left:0;top:0;width:1000px;height:1000px;transform-origin:0 0}
+#cv{display:block;width:1000px;height:1000px}
+#ui{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+
+#hudBtns{position:absolute;top:19px;right:20px;display:flex;gap:8px}
+.ib{
+  pointer-events:auto;appearance:none;-webkit-appearance:none;width:50px;height:50px;border-radius:3px;cursor:pointer;
+  background:var(--paper2);border:1.5px solid var(--rule);color:var(--ink2);
+  font:700 18px/1 inherit;display:grid;place-items:center;
+}
+.ib:hover{border-color:var(--rule2);color:var(--ink)}
+.ib.off{color:#b3b8ae}
+.ib:focus-visible{outline:2.5px solid var(--red);outline-offset:2px}
+
+.screen{
+  position:absolute;inset:0;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  padding:38px 46px;text-align:center;
+  background:var(--paper);
+}
+.screen.hide{display:none}
+
+.wordmark{display:flex;flex-direction:column;align-items:center;gap:2px}
+.mugen{font-size:22px;font-weight:700;letter-spacing:1.2em;text-indent:1.2em;color:var(--ink2)}
+.ttl{font-size:82px;font-weight:800;line-height:1.02;letter-spacing:.05em;color:var(--ink)}
+.tag{font-size:15px;color:var(--dim);letter-spacing:.1em;margin-top:8px}
+
+.grp{width:100%;max-width:640px}
+.lbl{font-size:13px;font-weight:700;letter-spacing:.24em;text-indent:.24em;color:var(--dim);margin-bottom:8px}
+.seg{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.seg button{
+  pointer-events:auto;appearance:none;-webkit-appearance:none;font:700 18px/1 inherit;color:var(--ink2);cursor:pointer;
+  background:var(--paper2);border:1.5px solid var(--rule);border-radius:3px;
+  padding:12px 20px;
+}
+.seg button:hover{border-color:var(--rule2);color:var(--ink)}
+.seg button.on{color:var(--paper2);border-color:var(--blue-d);background:var(--blue)}
+.seg button:focus-visible{outline:2.5px solid var(--red);outline-offset:2px}
+
+/* ライフ・スライダー */
+.slider{position:relative;width:100%;max-width:520px;margin:0 auto;padding-bottom:30px}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:24px;
+  background:transparent;cursor:pointer;touch-action:auto;display:block;
+}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:#d7dfe9;border:1.5px solid var(--rule);border-radius:0}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:26px;margin-top:-11px;
+  background:var(--blue);border:1.5px solid var(--blue-d);border-radius:2px;
+}
+input[type=range]::-moz-range-track{height:8px;background:#d7dfe9;border:1.5px solid var(--rule);border-radius:0}
+input[type=range]::-moz-range-thumb{width:14px;height:24px;background:var(--blue);border:1.5px solid var(--blue-d);border-radius:2px}
+input[type=range]:focus-visible{outline:2.5px solid var(--red);outline-offset:4px}
+.ticks{position:absolute;left:0;right:0;top:27px;height:24px;pointer-events:none}
+.tick{position:absolute;top:0;width:1.5px;height:5px;background:var(--rule);transform:translateX(-50%)}
+.tick.major{height:9px;background:var(--rule2)}
+.tick span{position:absolute;top:11px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:700;color:var(--dim)}
+.lifeval{margin-top:6px;font-size:14px;color:var(--ink2)}
+.lifeval b{font-size:24px;font-weight:800;color:var(--ink);margin:0 3px}
+.lifeval em{font-style:normal;color:var(--red);font-weight:700}
+
+.big{
+  pointer-events:auto;appearance:none;-webkit-appearance:none;font:800 27px/1 inherit;letter-spacing:.2em;text-indent:.2em;
+  padding:16px 48px;border-radius:3px;cursor:pointer;color:var(--paper2);
+  background:var(--blue);border:1.5px solid var(--blue-d);
+}
+.big:hover{background:var(--blue-d)}
+.big{white-space:nowrap}
+/* 幅は長い方のラベルで決め、短い方は絶対配置で中央に重ねる。
+   button に display:grid を使うと環境によって外観が既定に戻るため使わない */
+#startBtn .stack{position:relative;display:inline-block}
+#startBtn .stack,#startBtn .lbl{color:inherit}
+#startBtn .lbl{position:absolute;left:0;right:0;text-align:center}
+#startBtn .lbl.a{position:static;visibility:hidden}
+#startBtn.auto .lbl{visibility:hidden}
+#startBtn.auto .lbl.a{visibility:visible}
+.big.auto{background:var(--orange);border-color:var(--orange-d)}
+.big.auto:hover{background:var(--orange-d)}
+.big:active{transform:translateY(1px)}
+.big:focus-visible{outline:2.5px solid var(--red);outline-offset:3px}
+.ghost{
+  pointer-events:auto;appearance:none;-webkit-appearance:none;font:700 19px/1 inherit;letter-spacing:.08em;
+  padding:14px 28px;border-radius:3px;cursor:pointer;
+  color:var(--ink2);background:var(--paper2);border:1.5px solid var(--rule);
+}
+.ghost:hover{border-color:var(--rule2);color:var(--ink)}
+.ghost:focus-visible{outline:2.5px solid var(--red);outline-offset:2px}
+.btnrow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+.multbox{display:flex;align-items:center;gap:13px;background:var(--paper2);
+  border:1.5px solid var(--rule);border-radius:3px;padding:9px 20px;box-shadow:2px 2px 0 rgba(60,70,55,.09)}
+.multbox .mk{font-size:12px;font-weight:700;letter-spacing:.2em;color:var(--dim)}
+.multbox b{font-size:26px;font-weight:800;color:var(--red);line-height:1}
+.multbox .mm{font-size:13px;color:var(--dim);border-left:1px solid var(--rule);padding-left:13px}
+
+.rules{font-size:14.5px;line-height:1.8;color:var(--ink2);max-width:790px;
+  border-top:1px solid var(--rule);padding-top:14px}
+.rules b{color:var(--blue);font-weight:700}
+.rules i{color:var(--red);font-style:normal;font-weight:700}
+.hsrow{display:flex;align-items:center;gap:13px;justify-content:center;flex-wrap:wrap}
+.chk{pointer-events:auto;display:flex;align-items:center;gap:7px;cursor:pointer;
+  font:700 14px/1 inherit;color:var(--ink2);background:var(--paper2);
+  border:1.5px solid var(--rule);border-radius:3px;padding:8px 13px}
+.chk:hover{border-color:var(--rule2);color:var(--ink)}
+.chk input{accent-color:var(--blue);width:15px;height:15px;margin:0;cursor:pointer}
+.chk:focus-within{outline:2.5px solid var(--red);outline-offset:2px}
+.hs{font-size:14px;letter-spacing:.1em;color:var(--dim)}
+.hs em{font-style:normal;color:var(--red);font-weight:800;font-size:18px}
+
+.verdict{font-size:22px;font-weight:800;letter-spacing:.45em;text-indent:.45em;color:var(--red)}
+.verdict.up{color:var(--amber)}
+.score{font-size:128px;font-weight:800;line-height:.88;color:var(--blue)}
+.scorelbl{font-size:13px;font-weight:700;letter-spacing:.4em;text-indent:.4em;color:var(--dim);margin-top:6px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.stat{background:var(--paper2);border:1.5px solid var(--rule);border-radius:3px;padding:10px 18px;min-width:138px;
+  box-shadow:2px 2px 0 rgba(60,70,55,.09)}
+.stat .k{font-size:11px;font-weight:700;letter-spacing:.2em;color:var(--dim)}
+.stat .v{font-size:24px;font-weight:800;margin-top:2px}
+.newrec{font-size:17px;font-weight:800;letter-spacing:.22em;color:var(--red)}
+
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="wrap">
+    <canvas id="cv"></canvas>
+    <div id="ui">
+
+      <div id="hudBtns">
+        <button class="ib" id="soundBtn" title="音">♪</button>
+        <button class="ib" id="pauseBtn" title="一時停止">❚❚</button>
+      </div>
+
+      <!-- TITLE -->
+      <div class="screen" id="scTitle">
+        <div class="wordmark">
+          <div class="mugen">無限</div>
+          <div class="ttl">イライラ棒</div>
+        </div>
+        <div class="tag">壁に触れず、ひたすら反時計回りに周回せよ</div>
+
+        <div class="grp">
+          <div class="lbl">モード</div>
+          <div class="seg" id="segMode">
+            <button data-v="time">3分アタック</button>
+            <button data-v="endless">エンドレス</button>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">マップの複雑さ</div>
+          <div class="seg" id="segDiff">
+            <button data-v="0">ゆるい</button>
+            <button data-v="1">ふつう</button>
+            <button data-v="2">きつい</button>
+            <button data-v="3">鬼</button>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">ライフ（ミスできる回数）</div>
+          <div class="slider">
+            <input type="range" id="lifeRange" min="0" max="10" step="1" value="3" aria-label="ライフ">
+            <div class="ticks" id="lifeTicks"></div>
+          </div>
+          <div class="lifeval" id="lifeVal"></div>
+        </div>
+
+        <div class="multbox" id="multBox">
+          <span class="mk">スコア倍率</span><b>×3.3</b>
+          <span class="mm" id="multDetail">難易度 ×2 × ライフ ×1.7</span>
+        </div>
+
+        <button class="big" id="startBtn"><span class="stack"><span class="lbl">スタート</span><span class="lbl a">AUTO スタート</span></span></button>
+        <div class="hsrow">
+          <label class="chk"><input type="checkbox" id="autoChk"><span>オートプレイ</span></label>
+          <div class="hs" id="hsLine"><span id="hsLabel">ハイスコア</span> <em id="hsVal">--</em></div>
+        </div>
+
+        <div class="rules">
+          画面は<b>X字</b>で4エリアに分割。境目が<i>チェックポイント</i>で、通過するたびに<b>対角のエリアが再生成</b>される ── だから道は永遠に尽きない。<br>
+          スコアは<b>チェックポイント数 × 倍率</b>。設定を変えても同じ土俵で比べられる。<br>
+          マウス＝カーソルを追う／キーボード＝矢印・WASD／指＝画面のどこでもドラッグ（自機を隠さない相対操作）
+        </div>
+      </div>
+
+      <!-- PAUSE -->
+      <div class="screen hide" id="scPause">
+        <div class="verdict up">一時停止</div>
+        <div class="stats" id="pauseStats"></div>
+        <div class="btnrow">
+          <button class="big" id="resumeBtn">再開</button>
+          <button class="ghost" id="quitBtn">タイトルへ</button>
+        </div>
+      </div>
+
+      <!-- RESULT -->
+      <div class="screen hide" id="scOver">
+        <div class="verdict" id="verdict">ライフ切れ</div>
+        <div>
+          <div class="score" id="finalScore">0</div>
+          <div class="scorelbl">SCORE</div>
+        </div>
+        <div class="newrec" id="newRec" style="visibility:hidden">ハイスコア更新</div>
+        <div class="stats" id="overStats"></div>
+        <div class="btnrow">
+          <button class="big" id="retryBtn">もう一度</button>
+          <button class="ghost" id="titleBtn">タイトルへ</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   無限イライラ棒 — 論理解像度 1000 x 1000 固定（正方形）
+   HUD: y 0..90 / フィールド: 910x910 (x45..955, y90..1000)
+   周回方向：反時計回り（画面角度が減る向き）
+   ========================================================= */
+const LW=1000, LH=1000;
+const HUDH=90, FS=910, FX=45, FY=90, HALF=455;
+const CX=FX+HALF, CY=FY+HALF;
+const GATE_R=346, RCAP=564, MINR=107;
+const PR=6, SPEED=480;   // PR は半径。自機は直径12px
+const TRAIL_N=18;        // 軌跡はリングバッファで持つ（毎フレームの確保をなくす）
+const KEY_SPEED=180;     // キーボードは8方向しか出せないので速度を落とす（px/秒）
+const REGEN_T=1.1;       // マップ再生成の遷移時間（秒）
+const SENS=1.35, LEAD=80;
+const GA=[-3*Math.PI/4, -Math.PI/4, Math.PI/4, 3*Math.PI/4];  // ゲート0=左上 1=右上 2=右下 3=左下
+
+// 壁は青みの灰色、道は白。今いないエリアの道は灰色寄りにして現在地を示す
+const C_WALL="#b4c1d3", C_ROAD="#ffffff", C_ROAD_OFF="#dfe6f0";
+const C_INK="#26313f", C_MARK="#c85a3c", C_BLUE="#3d6fa8";
+const C_EDGE_ON="rgb(103,126,158)", C_EDGE_OFF="rgb(152,168,191)";
+const C_QUIET="rgba(56,76,104,.6)", C_TRAIL="rgb(38,49,63)";
+
+const DIFFS=[
+  {name:"ゆるい",  hw:34,   mul:1, amp:0.55, slots:[2,2], nodes:[2,3],
+   deck:[["wave",38],["arc",14],["pocket",48]]},
+  {name:"ふつう",  hw:26,   mul:2, amp:0.60, slots:[2,3], nodes:[2,4],
+   deck:[["wave",28],["chicane",18],["arc",8],["pocket",34],["switch3",12]]},
+  {name:"きつい",  hw:19,   mul:3, amp:0.62, slots:[2,3], nodes:[2,4],
+   deck:[["wave",30],["chicane",25],["pocket",25],["switch3",20]]},
+  {name:"鬼",      hw:13.5, mul:5, amp:0.65, slots:[3,3], nodes:[2,4],
+   deck:[["wave",20],["chicane",20],["pocket",25],["switch3",25],["switch5",10]]},
+];
+
+const cv=document.getElementById("cv");
+const ctx=cv.getContext("2d");
+const wrapEl=document.getElementById("wrap");
+
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const mod4=n=>((n%4)+4)%4;
+function segDist(px,py,x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1, l2=dx*dx+dy*dy;
+  let t=l2>0?((px-x1)*dx+(py-y1)*dy)/l2:0;
+  t=t<0?0:t>1?1:t;
+  const ax=px-(x1+t*dx), ay=py-(y1+t*dy);
+  return Math.sqrt(ax*ax+ay*ay);
+}
+const lapFmt=s=>s<60?s.toFixed(1)
+  :`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}.${Math.floor((s*10)%10)}`;
+const FF=(w,px)=>`${w} ${px}px "Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif`;
+const FT={lab:FF(700,12), val:FF(800,30), score:FF(800,36), sub:FF(800,26),
+          life:FF(800,20), cbig:FF(800,36), csm:FF(700,13), pop:FF(800,25),
+          rdA:FF(800,20), rdB:FF(700,20)};
+
+/* ---------- 音 ---------- */
+let AC=null, muted=false;
+function ac(){
+  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+  if(AC.state==="suspended") AC.resume();
+  return AC;
+}
+function beep(f1,f2,dur,type,vol){
+  if(muted) return; const a=ac(); if(!a) return;
+  const t=a.currentTime, o=a.createOscillator(), g=a.createGain();
+  o.type=type||"square";
+  o.frequency.setValueAtTime(f1,t);
+  if(f2) o.frequency.exponentialRampToValueAtTime(Math.max(30,f2),t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||0.07,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+dur+0.03);
+}
+let noiseBuf=null;
+function zap(){
+  if(muted) return; const a=ac(); if(!a) return;
+  const t=a.currentTime, len=0.3;
+  if(!noiseBuf||noiseBuf.sampleRate!==a.sampleRate){   // 毎回作らず使い回す
+    noiseBuf=a.createBuffer(1,Math.floor(a.sampleRate*len),a.sampleRate);
+    const d=noiseBuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.2);
+  }
+  const s=a.createBufferSource(); s.buffer=noiseBuf;
+  const f=a.createBiquadFilter(); f.type="bandpass";
+  f.frequency.setValueAtTime(1400,t); f.frequency.exponentialRampToValueAtTime(180,t+len);
+  const g=a.createGain(); g.gain.value=0.2;
+  s.connect(f).connect(g).connect(a.destination); s.start(t);
+  beep(300,60,0.28,"sawtooth",0.08);
+}
+
+/* ---------- マップ生成 v2：パターン合成 ----------
+   ・楔（90°）の角度帯を N 個のスロットに分割し、各スロットに1つのパターンを充てる。
+   ・パターンは自分のスロットの角度帯から出てはならない（band ownership）。
+     → スロット同士・エリア同士は原理的に衝突しない。検査はスロット内だけで済む。
+   ・両端は必ず r=GATE_R の接線帯（landing strip）なので、
+     再生成しても隣のエリアとの継ぎ目がズレない。
+   ・進行方向ローカル座標 u（0→π/2）で組み立て、最後に極→デカルト変換。
+     エリア i の入口ゲート角 aIn = GA[i]+π/2 で、a(u) = aIn - u（反時計回り）。  */
+const GLEAD=0.11;         // ゲート前後の接線帯
+const MINSEG=2.2, MINSEG2=MINSEG*MINSEG;   // 中心線サンプルの最小間隔
+const RREF=GATE_R;        // (u,r) を擬似デカルト化するときの u 軸スケール
+
+const wedgeRHi=(u,hw)=>Math.min(RCAP, HALF/Math.cos(Math.PI/4-u)-hw-11);
+const wedgeRLo=hw=>MINR+hw;
+// レーン間に残す壁は「自機直径＋余裕」を必ず上回らせる（squeeze も見た目の破綻も防ぐ）
+const sepOf  =hw=>2*hw+Math.max(2*PR+8, hw*0.8);   // 構築時に確保する中心線間距離
+const mergeOf=hw=>2*hw+2*PR+3;                     // これを下回ると壁として機能しない
+function slotBounds(u0,u1,hw){
+  let hi=1e9;
+  for(let k=0;k<=8;k++) hi=Math.min(hi,wedgeRHi(u0+(u1-u0)*k/8,hw));
+  return {lo:wedgeRLo(hw), hi};
+}
+function hermiteR(K,u){
+  let s=0; while(s<K.length-2 && u>K[s+1].u) s++;
+  const p0=K[s],p1=K[s+1],h=p1.u-p0.u,t=(u-p0.u)/h;
+  const pp=K[s-1]||p0, nn=K[s+2]||p1;
+  const m0=(p1.r-pp.r)/((p1.u-pp.u)||1e-6);
+  const m1=(nn.r-p0.r)/((nn.u-p0.u)||1e-6);
+  const t2=t*t,t3=t2*t;
+  return (2*t3-3*t2+1)*p0.r+(t3-2*t2+t)*h*m0+(-2*t3+3*t2)*p1.r+(t3-t2)*h*m1;
+}
+
+/* --- P1 WAVE：角度は単調、半径だけ振動（v1 の形をそのまま温存） --- */
+function pWave(S){
+  const {W,rIn,lo,hi,rng}=S;
+  const eps=Math.min(0.035,W*0.15), span=W-2*eps, n=S.nodes, du=span/(n+1);
+  const K=[{u:0,r:rIn},{u:eps,r:rIn}];
+  let dir=rng()<0.5?1:-1, prev=rIn;
+  const c=(lo+hi)/2, half=(hi-lo)/2;
+  for(let k=1;k<=n;k++){
+    let r=c+dir*S.amp*half*(0.62+0.38*rng());
+    const maxD=S.maxSlope*Math.max(prev,140)*du;
+    r=clamp(clamp(r,prev-maxD,prev+maxD),lo,hi);
+    K.push({u:eps+du*k,r}); prev=r; dir=-dir;
+  }
+  const hiOut=S.hiOut!=null?S.hiOut:hi;
+  let rOut = S.rOutTarget!=null ? S.rOutTarget
+           : clamp(clamp(lo+rng()*(hiOut-lo), prev-S.maxSlope*Math.max(prev,140)*du,
+                                              prev+S.maxSlope*Math.max(prev,140)*du), lo,hiOut);
+  const lk=K[K.length-1], gap=(W-eps)-lk.u;
+  const maxD2=S.maxSlope*Math.max(lk.r,140)*gap;
+  if(Math.abs(lk.r-rOut)>maxD2) lk.r=clamp(rOut+Math.sign(lk.r-rOut)*maxD2,lo,hi);
+  K.push({u:W-eps,r:rOut},{u:W,r:rOut});
+  const M=Math.max(14,Math.ceil(W*RREF/(S.step*0.85))), wp=[];
+  for(let s=0;s<=M;s++){
+    const u=W*s/M;
+    wp.push({u, r:clamp(hermiteR(K,u),lo,hi)});
+  }
+  wp[0].r=rIn; wp[M].r=rOut;
+  return {wp,rOut};
+}
+
+/* --- P2 ARC：等半径 or 単調ランプ。休憩と、ゲートへ半径を戻す役 --- */
+function pArc(S){
+  const {W,rIn,lo,hi,rng}=S;
+  const eps=Math.min(0.03,W*0.15);
+  const hiOut=S.hiOut!=null?S.hiOut:hi;
+  let rOut;
+  if(S.rOutTarget!=null) rOut=S.rOutTarget;
+  else{
+    rOut=clamp(rIn+(rng()*2-1)*Math.min(70,(hi-lo)*0.28),lo,hiOut);
+    const maxD=S.maxSlope*Math.max(Math.min(rIn,rOut),140)*(W-2*eps);
+    rOut=clamp(rOut,rIn-maxD,rIn+maxD);
+  }
+  const M=Math.max(8,Math.ceil(W*RREF/(S.step*0.85))), wp=[];
+  for(let s=0;s<=M;s++){
+    const u=W*s/M;
+    let t=clamp((u-eps)/(W-2*eps),0,1); t=t*t*(3-2*t);
+    wp.push({u,r:rIn+(rOut-rIn)*t});
+  }
+  return {wp,rOut};
+}
+
+/* --- P3 CHICANE：WAVE と同じ骨格を折れ線で。角は後段で丸める --- */
+function pChicane(S){
+  const {W,rIn,lo,hi,rng}=S;
+  const eps=Math.min(0.04,W*0.15), span=W-2*eps, n=S.nodes, du=span/(n+1);
+  const wp=[{u:0,r:rIn},{u:eps,r:rIn}];
+  let dir=rng()<0.5?1:-1, prev=rIn;
+  const c=(lo+hi)/2, half=(hi-lo)/2;
+  for(let k=1;k<=n;k++){
+    let r=c+dir*S.amp*half*(0.7+0.3*rng());
+    const maxD=S.maxSlope*Math.max(prev,140)*du;
+    r=clamp(clamp(r,prev-maxD,prev+maxD),lo,hi);
+    wp.push({u:eps+du*k,r}); prev=r; dir=-dir;
+  }
+  const hiOut=S.hiOut!=null?S.hiOut:hi;
+  let rOut=S.rOutTarget!=null?S.rOutTarget:clamp(prev+(rng()*2-1)*45,lo,hiOut);
+  const gap=(W-eps)-wp[wp.length-1].u, maxD2=S.maxSlope*Math.max(prev,140)*gap;
+  if(Math.abs(prev-rOut)>maxD2) wp[wp.length-1].r=clamp(rOut+Math.sign(prev-rOut)*maxD2,lo,hi);
+  wp.push({u:W-eps,r:rOut},{u:W,r:rOut});
+  return {wp,rOut};
+}
+
+/* --- P4/P5 LADDER：一旦遠ざかる本命。L本の等半径レグを minSep 間隔で積み、
+       端でヘアピン。極座標では等半径レグ同士の距離が厳密に半径差なので、
+       レグを minSep 間隔に置くだけでショートカットは原理的に起きない。
+       backFrac<1 で戻りレグを短くすると「寄り道（POCKET）」になる。      --- */
+function pLadder(S){
+  const {W,rIn,lo,hi,minSep,rng}=S;
+  const hiOut=S.hiOut!=null?S.hiOut:hi;
+  const L=S.levels, need=(L-1)*minSep, cand=[];
+  if(rIn+need<=hiOut) cand.push(1);   // 到達レベルは隣スロットの上限も満たすこと
+  if(rIn-need>=lo) cand.push(-1);
+  if(!cand.length) return null;
+  let d;
+  if(cand.length===2){ const pref=(GATE_R>rIn)?1:-1; d=(rng()<0.7)?pref:-pref; }
+  else d=cand[0];
+  const eps=Math.min(0.05,W*0.16), uLo=eps, uHi=W-eps;
+  const uBack=uLo+(uHi-uLo)*(1-S.backFrac);
+  const wp=[{u:0,r:rIn},{u:uLo,r:rIn}];
+  let lvl=rIn;
+  for(let k=0;k<L-1;k++){
+    const t=(k%2===0)?uHi:uBack;
+    wp.push({u:t,r:lvl});
+    lvl+=d*minSep;
+    wp.push({u:t,r:lvl});
+  }
+  wp.push({u:uHi,r:lvl},{u:W,r:lvl});
+  return {wp,rOut:lvl};
+}
+
+const PATTERNS={
+  wave:   {minW:0.25, gen:pWave,    closer:true},
+  arc:    {minW:0.12, gen:pArc,     closer:true},
+  chicane:{minW:0.30, gen:pChicane, closer:true},
+  pocket: {minW:0.42, gen:pLadder,  closer:false, levels:3, backFrac:0.55},
+  switch3:{minW:0.40, gen:pLadder,  closer:false, levels:3, backFrac:1},
+  switch5:{minW:0.52, gen:pLadder,  closer:false, levels:5, backFrac:1},
+};
+function pickPattern(D,rng,last){
+  const deck=D.deck.filter(e=>!last||PATTERNS[e[0]].closer);
+  let total=0; for(const e of deck) total+=e[1];
+  let x=rng()*total;
+  for(const e of deck){ x-=e[1]; if(x<=0) return Object.assign({key:e[0]},PATTERNS[e[0]]); }
+  return Object.assign({key:"wave"},PATTERNS.wave);
+}
+// 残りの角度幅で GATE_R まで半径を戻せるか
+function reachOK(rOut,remainW){
+  const cap=3.2*Math.max(Math.min(rOut,GATE_R),120)*Math.max(remainW-0.07,0.05);
+  return Math.abs(rOut-GATE_R)<=cap*0.9;
+}
+
+/* --- 後段：角の丸め → (u,r) 上で密度確保 → デカルト --- */
+function roundCorners(wp,rr){
+  if(wp.length<3) return wp;
+  const P=wp.map(p=>({x:p.u*RREF,y:p.r}));
+  const out=[wp[0]];
+  for(let i=1;i<wp.length-1;i++){
+    const a=P[i-1],b=P[i],c=P[i+1];
+    const v1x=a.x-b.x,v1y=a.y-b.y,v2x=c.x-b.x,v2y=c.y-b.y;
+    const l1=Math.hypot(v1x,v1y), l2=Math.hypot(v2x,v2y);
+    if(l1<1e-6||l2<1e-6) continue;
+    if((v1x*v2x+v1y*v2y)/(l1*l2)<-0.994){ out.push(wp[i]); continue; }  // ほぼ直線
+    const t=Math.min(rr,l1*0.45,l2*0.45);
+    const p1x=b.x+v1x/l1*t, p1y=b.y+v1y/l1*t;
+    const p2x=b.x+v2x/l2*t, p2y=b.y+v2y/l2*t;
+    for(let s=0;s<=5;s++){
+      const q=s/5,m=1-q;
+      out.push({u:(m*m*p1x+2*m*q*b.x+q*q*p2x)/RREF, r:m*m*p1y+2*m*q*b.y+q*q*p2y});
+    }
+  }
+  out.push(wp[wp.length-1]);
+  return out;
+}
+function emitWaypoints(out,wp,uOff,aIn,maxStep){   // 末尾の点は出さない（連結の重複回避）
+  for(let i=0;i<wp.length-1;i++){
+    const p=wp[i],q=wp[i+1];
+    const rm=(p.r+q.r)*0.5;
+    const len=Math.hypot((q.u-p.u)*rm, q.r-p.r);
+    const n=Math.max(1,Math.ceil(len/maxStep));
+    for(let s=0;s<n;s++){
+      const t=s/n, u=p.u+(q.u-p.u)*t, r=p.r+(q.r-p.r)*t, a=aIn-(uOff+u);
+      const x=CX+r*Math.cos(a), y=CY+r*Math.sin(a);
+      const m=out.length;
+      if(m){
+        // 極小セグメントは太い線を引いたとき継ぎ目（髪の毛状の隙間）を生むので落とす。
+        // 落とす距離は MINSEG 未満なので中心線のズレも MINSEG/2 以下に収まる。
+        const dx=x-out[m-2], dy=y-out[m-1];
+        if(dx*dx+dy*dy<MINSEG2) continue;
+      }
+      out.push(x,y);
+    }
+  }
+}
+
+/* --- 検証：ショートカットになる近接だけを弾く ----------------------------
+   単に「近い」だけでは駄目。滑らかな曲がりでは通路が自分自身と重なるのが普通で、
+   それは角を丸めて通れるだけ（v1もそうだった）。本当に困るのは
+   「近接を突っ切ると経路を大幅に飛ばせる」場合なので、短縮できる距離で判定する。
+   実測：単調WAVEの短縮量は最大でも minSep の約2倍。閾値は3倍に置く。
+   接近とみなす距離は mergeOf（壁が自機を止められなくなる距離）で、構築目標の
+   minSep はそれより広いので、はしごの隣接レーンが誤検出されることはない。
+   スロット境界をまたぐ接近があるので検査は経路全体。格子で近傍だけ見る。      */
+const gainMaxOf=minSep=>Math.max(3.0*minSep,130);
+function validatePath(pts,minSep,mergeAt,hw){
+  const n=pts.length/2;
+  if(n<4) return true;
+  const arc=new Float64Array(n);
+  for(let i=1;i<n;i++)
+    arc[i]=arc[i-1]+Math.hypot(pts[i*2]-pts[i*2-2],pts[i*2+1]-pts[i*2-1]);
+  const gainMax=gainMaxOf(minSep), sep2=mergeAt*mergeAt, full=2*hw;
+  const cs=Math.max(mergeAt,24), gw=Math.ceil(FS/cs)+3, cells=new Array(gw*gw);
+  const cix=x=>clamp(Math.floor((x-FX)/cs),0,gw-1);
+  const ciy=y=>clamp(Math.floor((y-FY)/cs),0,gw-1);
+  for(let i=0;i<n;i++){
+    const id=ciy(pts[i*2+1])*gw+cix(pts[i*2]);
+    (cells[id]||(cells[id]=[])).push(i);
+  }
+  for(let i=0;i<n;i++){
+    const x=pts[i*2], y=pts[i*2+1], ci=cix(x), cj=ciy(y);
+    for(let dj=-1;dj<=1;dj++) for(let di=-1;di<=1;di++){
+      const a=ci+di, b=cj+dj;
+      if(a<0||a>=gw||b<0||b>=gw) continue;
+      const c=cells[b*gw+a]; if(!c) continue;
+      for(let t=0;t<c.length;t++){
+        const j=c[t]; if(j<=i) continue;
+        const dx=pts[j*2]-x, dy=pts[j*2+1]-y, d2=dx*dx+dy*dy;
+        if(d2>=sep2) continue;
+        const d=Math.sqrt(d2), gain=arc[j]-arc[i]-d;
+        if(gain>gainMax) return false;                      // ショートカットになる接近
+        if(d>full && gain>1.4*minSep) return false;         // 自機より薄い壁が残る接近
+      }
+    }
+  }
+  return true;
+}
+function pathLen(pts){
+  let L=0;
+  for(let i=2;i<pts.length;i+=2) L+=Math.hypot(pts[i]-pts[i-2],pts[i+1]-pts[i-1]);
+  return L;
+}
+
+
+/* --- ゲートの継ぎ目対策 ---------------------------------------------------
+   エリアの端は butt（直角切り）なので、切り口は最後の線分に垂直になる。
+   両隣の線分の向きがサンプリング誤差ぶん食い違うと切り口が噛み合わず、
+   通路の外側に細い楔形の隙間が残る（塗り漏れ。判定上は通路内なので当たらない）。
+   端の1線分をゲートの接線に厳密に合わせると、両側の切り口が完全に一致する。   */
+function alignGateEnds(pts,aIn){
+  const n=pts.length/2; if(n<3) return;
+  const t0x=Math.sin(aIn), t0y=-Math.cos(aIn);
+  const d0=Math.hypot(pts[2]-pts[0],pts[3]-pts[1]);
+  pts[2]=pts[0]+t0x*d0; pts[3]=pts[1]+t0y*d0;
+  const ae=aIn-Math.PI/2, t1x=Math.sin(ae), t1y=-Math.cos(ae);
+  const li=(n-1)*2, lp=(n-2)*2;
+  const d1=Math.hypot(pts[li]-pts[lp],pts[li+1]-pts[lp+1]);
+  pts[lp]=pts[li]-t1x*d1; pts[lp+1]=pts[li+1]-t1y*d1;
+}
+
+/* --- 合成本体 --- */
+function legacyWave(areaIdx,D,rng){
+  const hw=D.hw, aIn=GA[areaIdx]+Math.PI/2, maxStep=clamp(hw*0.45,3.5,9);
+  const W=Math.PI/2-2*GLEAD, b=slotBounds(GLEAD,GLEAD+W,hw);
+  const res=pWave({W,rIn:GATE_R,lo:b.lo,hi:b.hi,rng,maxSlope:2.2,amp:D.amp,
+                   step:maxStep,nodes:D.nodes[1]+2,rOutTarget:GATE_R});
+  const pts=[], strip=[{u:0,r:GATE_R},{u:GLEAD,r:GATE_R}];
+  emitWaypoints(pts,strip,0,aIn,maxStep);
+  emitWaypoints(pts,res.wp,GLEAD,aIn,maxStep);
+  emitWaypoints(pts,strip,Math.PI/2-GLEAD,aIn,maxStep);
+  const ae=aIn-Math.PI/2;
+  pts.push(CX+GATE_R*Math.cos(ae), CY+GATE_R*Math.sin(ae));
+  alignGateEnds(pts,aIn);
+  return {pts:Float32Array.from(pts), bounds:[{i:0,u:0}]};
+}
+
+/* 合成は1試行ずつ呼べるようにしてある。実行中は毎フレーム1試行だけ回して、
+   再試行が1フレームに固まらないようにする（最悪フレームの平坦化）。      */
+function composeOnce(areaIdx,D,rng,lastChance){
+  const hw=D.hw, minSep=sepOf(hw), aIn=GA[areaIdx]+Math.PI/2;
+  const span=Math.PI/2-2*GLEAD, maxStep=clamp(hw*0.45,3.5,9);
+  const roundR=clamp(hw*0.8,4,minSep*0.4);   // hw 未満なら曲がり角の内側が塞がる
+  const strip=[{u:0,r:GATE_R},{u:GLEAD,r:GATE_R}];
+  {
+    const N=D.slots[0]+Math.floor(rng()*(D.slots[1]-D.slots[0]+1));
+    const picks=[];
+    for(let k=0;k<N;k++) picks.push(pickPattern(D,rng,k===N-1));
+    let sumMin=0; for(const p of picks) sumMin+=p.minW;
+    if(sumMin>span) return null;
+
+    const widths=picks.map(p=>p.minW);
+    let extra=span-sumMin;
+    widths[N-1]+=extra*0.45; extra*=0.55;
+    const w=[]; let ws=0;
+    for(let k=0;k<N;k++){ const x=0.6+rng()*0.8; w.push(x); ws+=x; }
+    for(let k=0;k<N;k++) widths[k]+=extra*w[k]/ws;
+
+    const B=[]; let uu=GLEAD;
+    for(let k=0;k<N;k++){ B.push(slotBounds(uu,uu+widths[k],hw)); uu+=widths[k]; }
+
+    const pts=[], bounds=[{i:0,u:0}];
+    emitWaypoints(pts,strip,0,aIn,maxStep);
+    let r=GATE_R, u0=GLEAD;
+
+    for(let k=0;k<N;k++){
+      const W=widths[k], last=(k===N-1), b=B[k];
+      const hiOut=last?b.hi:Math.min(b.hi,B[k+1].hi);
+      let remain=0; for(let m=k+1;m<N;m++) remain+=widths[m];
+      const S={W,rIn:r,lo:b.lo,hi:b.hi,hiOut,hw,minSep,rng,amp:D.amp,
+               maxSlope:last?3.2:2.2, step:maxStep,
+               nodes:D.nodes[0]+Math.floor(rng()*(D.nodes[1]-D.nodes[0]+1)),
+               rOutTarget:last?GATE_R:null,
+               levels:picks[k].levels, backFrac:picks[k].backFrac};
+      let res=null;
+      for(let t=0;t<4;t++){
+        const cand=picks[k].gen(S);
+        if(!cand) break;
+        if(!last && !reachOK(cand.rOut,remain)) continue;
+        res=cand; break;
+      }
+      if(!res) res=pWave(Object.assign({},S,{rOutTarget:clamp(GATE_R,b.lo,b.hi)}));
+
+      emitWaypoints(pts,roundCorners(res.wp,roundR),u0,aIn,maxStep);
+      r=res.rOut; u0+=W;
+      bounds.push({i:pts.length/2, u:u0});
+    }
+    if(Math.abs(r-GATE_R)>0.5) return null;
+
+    emitWaypoints(pts,strip,Math.PI/2-GLEAD,aIn,maxStep);
+    const ae=aIn-Math.PI/2;
+    pts.push(CX+GATE_R*Math.cos(ae), CY+GATE_R*Math.sin(ae));
+    alignGateEnds(pts,aIn);
+
+    if(!validatePath(pts,minSep,mergeOf(hw),hw)) return null;
+    const L=pathLen(pts);
+    if((L<520||L>1500)&&!lastChance) return null;
+    return {pts:Float32Array.from(pts), bounds};
+  }
+}
+const COMPOSE_TRIES=14;
+function composeArea(areaIdx,D,rng){   // 同期版（初期生成と検証用）
+  for(let t=0;t<COMPOSE_TRIES;t++){
+    const r=composeOnce(areaIdx,D,rng,t===COMPOSE_TRIES-1);
+    if(r) return r;
+  }
+  return legacyWave(areaIdx,D,rng);    // 単調WAVEは必ず成立する最終保険
+}
+
+/* ---------- 反時計回りの進行 ----------
+   スタート＝ゲート1（右上）。角度が減る向きに進む。
+   q回目のゲート通過後：いるエリア = -q, 直前に抜けたゲート = 1-q （mod 4）  */
+const START_GATE=1;
+const areaAt=q=>mod4(-q);
+const gateAt=q=>mod4(START_GATE-q);
+
+/* ---------- 状態 ---------- */
+let state="title", T=0, inputMode="mouse", BEST={};
+let scareT=0, scareClick=-1, autoWait=0, pendingRegen=-1, pendingTries=0;   // お遊び：ライフ切れ時に1%で出る無害なジャンプスケア
+const G={
+  mode:"time", diff:1, livesSel:3, auto:false,
+  areas:[], px:0,py:0, tx:0,ty:0,
+  life:3, cp:0, q:0, unwrap:0, startAng:0, lastAng:0,
+  timeLeft:180, elapsed:0, missed:false,
+  segStart:0, lastSeg:0, bestSeg:0, segHold:0,
+  trailX:new Float32Array(TRAIL_N), trailY:new Float32Array(TRAIL_N), trailLen:0, trailHead:0,
+  parts:[], rings:[], pops:[], shake:0, missFlash:0, reason:"",
+};
+const gatePos=GA.map(a=>({x:CX+GATE_R*Math.cos(a), y:CY+GATE_R*Math.sin(a)}));
+const HW=()=>DIFFS[G.diff].hw;
+
+/* ---------- スコア（設定に依らず横並びで比べられるよう倍率で補正） ----------
+   ライフ倍率 = 10 ÷ ライフ数 → 10:1倍 / 5:2倍 / 3:10÷3倍 / 1:10倍
+   （ライフ0＝ノーミスは 0.5 相当として ×20）
+   難易度倍率 = ゆるい1 / ふつう2 / きつい3 / 鬼5                         */
+const lifeMul =()=>10/Math.max(G.livesSel,0.5);
+const diffMul =()=>DIFFS[G.diff].mul;
+const totalMul=()=>lifeMul()*diffMul();
+const scoreAt =n=>Math.round(n*totalMul());
+const score   =()=>scoreAt(G.cp);
+function fmtMul(m){
+  const r=Math.round(m*10)/10;
+  return Math.abs(r-Math.round(r))<0.05 ? String(Math.round(r)) : r.toFixed(1);
+}
+
+/* 経路の形が変わるのは再生成のときだけなので、描画用の Path2D は生成時に作る。
+   毎フレーム moveTo/lineTo で組み直すと鬼で 4700 回/フレームになり、実測で
+   描画時間の 8 割がここに消えていた。
+   区間分割の内側余白は太い方（縁 hw*2+3）に合わせて 1 組だけ持つ。細い方に
+   使っても丸端がゲート側にはみ出すことはない。                              */
+const P2D=(typeof Path2D!=="undefined")?Path2D:null;
+function makeDrawable(pts,hw){
+  const d={pts, path:null, chunks:null, ranges:[]};
+  const n=pts.length/2;
+  if(n>=8){
+    const m=hw+3.5;
+    let s=0,acc=0;
+    while(s<n-1&&acc<m){ acc+=Math.hypot(pts[(s+1)*2]-pts[s*2],pts[(s+1)*2+1]-pts[s*2+1]); s++; }
+    let e=n-1; acc=0;
+    while(e>0&&acc<m){ acc+=Math.hypot(pts[e*2]-pts[(e-1)*2],pts[e*2+1]-pts[(e-1)*2+1]); e--; }
+    if(e-s>=3) for(let a=s;a<e;a+=24) d.ranges.push(a,Math.min(e,a+24));
+  }
+  if(P2D){
+    const P=new P2D(); P.moveTo(pts[0],pts[1]);
+    for(let i=2;i<pts.length;i+=2) P.lineTo(pts[i],pts[i+1]);
+    d.path=P; d.chunks=[];
+    for(let r=0;r<d.ranges.length;r+=2){
+      const a=d.ranges[r], b=d.ranges[r+1], Q=new P2D();
+      Q.moveTo(pts[a*2],pts[a*2+1]);
+      for(let k=a+1;k<=b;k++) Q.lineTo(pts[k*2],pts[k*2+1]);
+      d.chunks.push(Q);
+    }
+  }
+  return d;
+}
+function setArea(i,pts){
+  const A=G.areas[i], d=makeDrawable(pts,DIFFS[G.diff].hw);
+  A.pts=d.pts; A.path=d.path; A.chunks=d.chunks; A.ranges=d.ranges;
+}
+function applyRegen(i,pts){
+  const A=G.areas[i];
+  A.old = A.pts ? {pts:A.pts,path:A.path,chunks:A.chunks,ranges:A.ranges} : null;
+  setArea(i,pts);
+  A.flash=1;
+  buildGrid();
+}
+function regen(i){ applyRegen(i,composeArea(i,DIFFS[G.diff],Math.random).pts); }
+// 保留中の生成を1フレームにつき1試行だけ進める
+function stepRegen(){
+  if(pendingRegen<0) return;
+  const D=DIFFS[G.diff];
+  pendingTries++;
+  const res=composeOnce(pendingRegen,D,Math.random,pendingTries>=COMPOSE_TRIES);
+  if(res||pendingTries>=COMPOSE_TRIES){
+    applyRegen(pendingRegen, (res||legacyWave(pendingRegen,D,Math.random)).pts);
+    pendingRegen=-1; pendingTries=0;
+  }
+}
+function buildAll(){
+  // 最初は「今いるエリア」と「次のエリア」だけ敷く。残りは進むにつれて生えてくる
+  G.areas=[];
+  for(let i=0;i<4;i++) G.areas.push({pts:null,path:null,chunks:null,ranges:null,old:null,flash:0});
+  for(const i of [areaAt(0),areaAt(1)]) setArea(i,composeArea(i,DIFFS[G.diff],Math.random).pts);
+  buildGrid();
+}
+const hasArea=i=>!!G.areas[i].pts;
+function newGame(){
+  buildAll();
+  G.life=G.livesSel; G.cp=0; G.q=0; G.missed=false; pendingRegen=-1; pendingTries=0;
+  G.timeLeft=180; G.elapsed=0;
+  G.segStart=0; G.lastSeg=0; G.bestSeg=0; G.segHold=0;
+  G.trailLen=0; G.trailHead=0; G.parts=[]; G.rings=[]; G.pops=[]; G.shake=0; G.missFlash=0;
+  G.startAng=GA[START_GATE];
+  respawn(); setState("ready");
+}
+function respawn(){                        // 直前に通ったチェックポイントへ戻る
+  const gi=gateAt(G.q), g=gatePos[gi];
+  G.px=g.x; G.py=g.y; G.tx=g.x; G.ty=g.y;
+  G.unwrap=G.startAng-G.q*Math.PI/2;       // 反時計回り＝角度が減る
+  G.lastAng=GA[gi];
+  G.trailLen=0; G.trailHead=0; lastTouch=null;   // 計測はミスでリセットしない
+  distToPath(G.px,G.py);              // 追従の起点（最近傍）を確定
+}
+
+/* ---------- 当たり判定：一様グリッドで近傍セグメントだけ見る ----------
+   サンプル間隔は最大 9px、探索半径は最大 hw-PR(28px) なので、
+   セル 48px の 3×3 ブロックを見れば取りこぼしはない。               */
+const GRID=48, GW=Math.ceil(FS/GRID)+2;
+let grid=null, nearA=-1, nearI=-1;
+function buildGrid(){
+  if(!grid){ grid=new Array(GW*GW); for(let i=0;i<grid.length;i++) grid[i]=[]; }
+  else for(let i=0;i<grid.length;i++){ if(grid[i].length) grid[i].length=0; }
+  for(let a=0;a<4;a++){
+    const p=G.areas[a].pts; if(!p) continue;
+    for(let k=0;k+3<p.length;k+=2){
+      const x1=p[k],y1=p[k+1],x2=p[k+2],y2=p[k+3];
+      const i0=clamp(Math.floor((Math.min(x1,x2)-FX)/GRID),0,GW-1);
+      const i1=clamp(Math.floor((Math.max(x1,x2)-FX)/GRID),0,GW-1);
+      const j0=clamp(Math.floor((Math.min(y1,y2)-FY)/GRID),0,GW-1);
+      const j1=clamp(Math.floor((Math.max(y1,y2)-FY)/GRID),0,GW-1);
+      for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++) grid[j*GW+i].push(a,k>>1);
+    }
+  }
+}
+function distToPath(x,y){
+  let best=1e9; nearA=-1; nearI=-1;
+  if(!grid) return best;
+  const ci=Math.floor((x-FX)/GRID), cj=Math.floor((y-FY)/GRID);
+  for(let j=cj-1;j<=cj+1;j++){
+    if(j<0||j>=GW) continue;
+    for(let i=ci-1;i<=ci+1;i++){
+      if(i<0||i>=GW) continue;
+      const cell=grid[j*GW+i]; if(!cell.length) continue;
+      for(let t=0;t<cell.length;t+=2){
+        const a=cell[t], s=cell[t+1]<<1, p=G.areas[a].pts;
+        const d=segDist(x,y,p[s],p[s+1],p[s+2],p[s+3]);
+        if(d<best){ best=d; nearA=a; nearI=cell[t+1]; }
+      }
+    }
+  }
+  return best;
+}
+const isSafe=(x,y)=>distToPath(x,y)<=HW()-PR;
+
+/* ---------- オートプレイ ----------
+   中心線の少し先の点を目標にして追従する。曲がりで弦が壁を切らないよう、
+   途中点が通路内に収まるまで先読み距離を詰める。速度は人間と同じ上限。   */
+const nextAreaOf=i=>mod4(i-1);
+function aheadPoint(a,i,dist){
+  let p=G.areas[a].pts; if(!p) return null;
+  let k=i, acc=0, guard=0;
+  while(acc<dist && guard++<600){
+    if((k+1)*2+1>=p.length){
+      const na=nextAreaOf(a);
+      if(!G.areas[na].pts) break;
+      a=na; p=G.areas[a].pts; k=0; continue;
+    }
+    acc+=Math.hypot(p[(k+1)*2]-p[k*2], p[(k+1)*2+1]-p[k*2+1]);
+    k++;
+  }
+  return {x:p[k*2], y:p[k*2+1]};
+}
+function aiSteer(){
+  let a=nearA, i=nearI;
+  if(a<0||!G.areas[a]||!G.areas[a].pts){ a=areaAt(G.q); i=0; }
+  const lim=(HW()-PR)*0.72, base=HW()*1.1+10;
+  let fallback=null;
+  for(let s=0;s<6;s++){
+    const t=aheadPoint(a,i,base*Math.pow(0.62,s));
+    if(!t) break;
+    fallback=t;
+    let ok=true;                       // 自機が通る弦が通路に収まるか、4点で確かめる
+    for(let u=1;u<=3;u++){
+      const q=u/4;
+      if(distToPath(G.px+(t.x-G.px)*q, G.py+(t.y-G.py)*q)>lim){ ok=false; break; }
+    }
+    if(ok){ G.tx=t.x; G.ty=t.y; return; }
+  }
+  if(fallback){ G.tx=fallback.x; G.ty=fallback.y; }   // 最小の先読みでも駄目なら詰めて進む
+}
+
+function onCheckpoint(k){
+  const gain=scoreAt(k)-scoreAt(k-1);
+  G.cp=k;
+  G.lastSeg=G.elapsed-G.segStart;                // エリア1つぶんのタイムを確定
+  if(!G.bestSeg||G.lastSeg<G.bestSeg) G.bestSeg=G.lastSeg;
+  G.segStart=G.elapsed; G.segHold=1;             // 1秒だけ直前の記録を止めて見せる
+  const entered=areaAt(k), gi=gateAt(k);
+  // 抜けたエリアの対角＝これから入るエリアを作り直す。
+  // 初期生成（今いるエリアと次のエリアだけ敷く）と同じ規則なので、
+  // 開始直後もその後も「常に次のエリアが生まれたてになる」で一貫する。
+  // 生成自体は次フレーム以降に1試行ずつ進める（最悪フレームの平坦化）。
+  pendingRegen=areaAt(k+1); pendingTries=0;
+  const g=gatePos[gi];
+  G.rings.push({x:g.x,y:g.y,r:HW(),a:1,area:entered});
+  G.pops.push({x:g.x,y:g.y,t:1,txt:"+"+gain});
+  beep(760+(entered*90),1500,0.11,"square",0.05);
+}
+function checkProgress(){
+  const ang=Math.atan2(G.py-CY,G.px-CX);
+  let d=ang-G.lastAng;
+  while(d>Math.PI) d-=Math.PI*2;
+  while(d<-Math.PI) d+=Math.PI*2;
+  G.unwrap+=d; G.lastAng=ang;
+  const q=Math.floor((G.startAng-G.unwrap)/(Math.PI/2));
+  if(q>G.q){ for(let k=G.q+1;k<=q;k++) onCheckpoint(k); G.q=q; }
+}
+function die(x,y){
+  G.px=x; G.py=y;
+  G.shake=15; G.missFlash=1; G.missed=true;
+  for(let i=0;i<26;i++){
+    const a=Math.random()*Math.PI*2, s=rnd(55,300);
+    G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,a:1,r:rnd(1.4,3.6)});
+  }
+  zap();
+  if(G.life<=0) gameOver("ライフ切れ");
+  else { G.life--; respawn(); setState("ready"); }
+}
+function movePlayer(dt){
+  if(G.auto) aiSteer();
+  else if(inputMode==="key"){
+    let dx=0,dy=0;
+    if(keys.ArrowLeft||keys.KeyA) dx--;
+    if(keys.ArrowRight||keys.KeyD) dx++;
+    if(keys.ArrowUp||keys.KeyW) dy--;
+    if(keys.ArrowDown||keys.KeyS) dy++;
+    if(dx||dy){ const l=Math.hypot(dx,dy); G.tx=G.px+dx/l*220; G.ty=G.py+dy/l*220; }
+    else { G.tx=G.px; G.ty=G.py; }
+  }
+  const dx=G.tx-G.px, dy=G.ty-G.py, d=Math.hypot(dx,dy);
+  if(d<0.001) return;
+  const sp=(!G.auto&&inputMode==="key")?KEY_SPEED:SPEED;
+  const step=Math.min(d,sp*dt);
+  const nx=G.px+dx/d*step, ny=G.py+dy/d*step;
+  const lim=Math.max(2.2,(HW()-PR)*0.55);
+  const sub=Math.max(1,Math.ceil(step/lim));
+  for(let s=1;s<=sub;s++){
+    const t=s/sub, x=G.px+(nx-G.px)*t, y=G.py+(ny-G.py)*t;
+    if(!isSafe(x,y)){ die(x,y); return; }
+  }
+  G.px=nx; G.py=ny;
+  G.trailX[G.trailHead]=nx; G.trailY[G.trailHead]=ny;
+  G.trailHead=(G.trailHead+1)%TRAIL_N;
+  if(G.trailLen<TRAIL_N) G.trailLen++;
+}
+function update(dt){
+  T+=dt;
+  stepRegen();
+  if(state==="ready"&&G.auto){ autoWait+=dt; if(autoWait>0.5) startPlay(); }
+  if(state==="scare"){
+    scareT+=dt;
+    if(scareClick>=0 && scareT-scareClick>=1) showResult(G.reason,true);
+  }
+  if(state==="play"){
+    if(G.mode==="time"){
+      G.timeLeft-=dt;
+      if(G.timeLeft<=0){ G.timeLeft=0; gameOver("タイムアップ"); }
+    }
+    G.elapsed+=dt;
+    if(state==="play"){ movePlayer(dt); checkProgress(); }
+  }
+  for(const A of G.areas) if(A.flash>0) A.flash=Math.max(0,A.flash-dt/REGEN_T);
+  const drop=(arr,i)=>{ arr[i]=arr[arr.length-1]; arr.pop(); };   // 順序は問わない
+  for(let i=G.parts.length-1;i>=0;i--){
+    const p=G.parts[i];
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.93; p.vy*=0.93; p.a-=dt*1.7;
+    if(p.a<=0) drop(G.parts,i);
+  }
+  for(let i=G.rings.length-1;i>=0;i--){
+    const r=G.rings[i]; r.r+=dt*250; r.a-=dt*2.2;
+    if(r.a<=0) drop(G.rings,i);
+  }
+  for(let i=G.pops.length-1;i>=0;i--){
+    G.pops[i].t-=dt*1.1;
+    if(G.pops[i].t<=0) drop(G.pops,i);
+  }
+  G.segHold=Math.max(0,G.segHold-dt);
+  G.shake=Math.max(0,G.shake-dt*60);
+  G.missFlash=Math.max(0,G.missFlash-dt*2.4);
+}
+
+/* ---------- 描画 ---------- */
+function traceLine(p){
+  ctx.beginPath(); ctx.moveTo(p[0],p[1]);
+  for(let i=2;i<p.length;i+=2) ctx.lineTo(p[i],p[i+1]);
+}
+/* 通路の描画 ------------------------------------------------------------
+   端は butt（直角切り）でエリアの継ぎ目に丸みを出さない。切り口の向きは
+   alignGateEnds で隣と厳密に一致させてある。そのうえで内側だけを短い区間に
+   分けて丸端で二重に描く（描画系による継ぎ目対策）。経路は生成時の Path2D。
+   関数と色文字列は毎フレーム作り直さずここで固定する。                     */
+function paint(d,w,style,capA,capB){
+  const p=d.pts, n=p.length/2;
+  ctx.strokeStyle=style; ctx.lineWidth=w;
+  ctx.lineCap="butt";
+  if(d.path) ctx.stroke(d.path); else { traceLine(p); ctx.stroke(); }
+  if(capA||capB){        // 隣がまだ無い端は行き止まりなので、例外的に丸く閉じる
+    ctx.fillStyle=style;
+    if(capA){ ctx.beginPath(); ctx.arc(p[0],p[1],w/2,0,7); ctx.fill(); }
+    if(capB){ ctx.beginPath(); ctx.arc(p[(n-1)*2],p[(n-1)*2+1],w/2,0,7); ctx.fill(); }
+  }
+  ctx.lineCap="round";
+  if(d.chunks){ for(let k=0;k<d.chunks.length;k++) ctx.stroke(d.chunks[k]); }
+  else for(let r=0;r<d.ranges.length;r+=2){
+    const i0=d.ranges[r], i1=d.ranges[r+1];
+    ctx.beginPath(); ctx.moveTo(p[i0*2],p[i0*2+1]);
+    for(let k=i0+1;k<=i1;k++) ctx.lineTo(p[k*2],p[k*2+1]);
+    ctx.stroke();
+  }
+}
+const fadeOut=f=>0.85*clamp(f/0.72,0,1);
+const fadeIn =f=>(f>0)?clamp((1-f)/0.45,0,1):1;
+// エリア i は「ゲート i+1 → ゲート i」。手前は mod4(i+1)、次は mod4(i-1)
+const capStart=i=>!hasArea(mod4(i+1)), capEnd=i=>!hasArea(mod4(i-1));
+function drawRoads(hw,cur){
+  ctx.lineJoin="round";
+  for(let i=0;i<4;i++){                               // 1) 縁（判定境界の外側）
+    const A=G.areas[i]; if(!A.pts) continue;
+    const on=(i===cur), f=A.flash, ca=capStart(i), cb=capEnd(i);
+    if(f>0){
+      if(A.old) paint(A.old,hw*2+3,`rgba(150,166,189,${fadeOut(f)})`,ca,cb);
+      const a=fadeIn(f);
+      paint(A,hw*2+3,on?`rgba(103,126,158,${a})`:`rgba(152,168,191,${a})`,ca,cb);
+    } else paint(A,hw*2+3,on?C_EDGE_ON:C_EDGE_OFF,ca,cb);
+  }
+  for(let i=0;i<4;i++){                               // 2) 当たり判定の領域を塗る
+    const A=G.areas[i]; if(!A.pts) continue;
+    const on=(i===cur), f=A.flash, ca=capStart(i), cb=capEnd(i);
+    if(f>0){
+      if(A.old) paint(A.old,hw*2,`rgba(223,230,240,${fadeOut(f)})`,ca,cb);
+      const a=fadeIn(f);
+      paint(A,hw*2,on?`rgba(255,255,255,${a})`:`rgba(223,230,240,${a})`,ca,cb);
+      paint(A,hw*2,`rgba(61,111,168,${0.26*f})`,ca,cb);
+    } else paint(A,hw*2,on?C_ROAD:C_ROAD_OFF,ca,cb);
+  }
+  ctx.lineCap="butt";
+}
+
+function drawField(){
+  const hw=HW(), cur=areaAt(G.q);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(FX,FY,FS,FS); ctx.clip();
+  ctx.fillStyle=C_WALL; ctx.fillRect(FX,FY,FS,FS);
+
+  if(G.shake>0) ctx.translate(rnd(-G.shake,G.shake)*0.4, rnd(-G.shake,G.shake)*0.4);
+
+  // X字の分割線
+  ctx.strokeStyle="rgba(52,72,102,.15)"; ctx.lineWidth=1.2; ctx.setLineDash([6,8]);
+  ctx.beginPath();
+  ctx.moveTo(FX,FY); ctx.lineTo(FX+FS,FY+FS);
+  ctx.moveTo(FX+FS,FY); ctx.lineTo(FX,FY+FS);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // 通路。端は butt で切るのでエリアの継ぎ目に丸みが出ない
+  ctx.lineCap="butt"; ctx.lineJoin="round";
+  drawRoads(hw,cur);
+
+  // 進行方向（今いるエリアだけ）
+  if(G.areas[cur].pts){
+    ctx.setLineDash([8,17]); ctx.lineDashOffset=-T*80;
+    ctx.lineWidth=2; ctx.strokeStyle="rgba(124,143,169,.5)";
+    if(G.areas[cur].path) ctx.stroke(G.areas[cur].path);
+    else { traceLine(G.areas[cur].pts); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+
+  // チェックポイント（継ぎ目もこの線で覆われる）
+  const next=areaAt(G.q);
+  for(let i=0;i<4;i++){
+    if(!hasArea(i)||!hasArea(mod4(i-1))) continue;   // 片側が未生成なら描かない
+    const a=GA[i], ux=Math.cos(a), uy=Math.sin(a);
+    const gx=CX+GATE_R*ux, gy=CY+GATE_R*uy;
+    ctx.beginPath(); ctx.moveTo(gx-ux*hw,gy-uy*hw); ctx.lineTo(gx+ux*hw,gy+uy*hw);
+    if(i===next){
+      ctx.lineWidth=5; ctx.strokeStyle="rgb(200,90,60)";
+      ctx.globalAlpha=0.75+0.25*Math.sin(T*7);
+    }else{
+      ctx.lineWidth=2.5; ctx.strokeStyle="rgba(124,143,169,.55)";
+    }
+    ctx.stroke(); ctx.globalAlpha=1;
+  }
+
+  // マップ中央のタイマー（通路は中心から半径107px以上にしか来ないので常に空く）
+  // 普段はラベルと同じ色で溶け込ませ、エリアを跨いだ瞬間だけ直前の記録を
+  // 1秒間だけ黒で止めて見せる。
+  if(state!=="title"&&state!=="scare"){
+    const hold=G.segHold>0;
+    const quiet=C_QUIET;
+    ctx.textAlign="center";
+    ctx.fillStyle=quiet; ctx.font=FT.lab;
+    ctx.fillText((G.auto?"AUTO · LAP ":"LAP ")+G.cp, CX, CY-36);   // 計測の区切り＝チェックポイント通過数
+    ctx.fillStyle=hold?"rgba(18,26,38,.95)":quiet; ctx.font=FT.cbig;
+    ctx.fillText(lapFmt(hold?G.lastSeg:G.elapsed-G.segStart), CX, CY+4);
+    ctx.fillStyle=quiet; ctx.font=FT.csm;
+    ctx.fillText("BEST  "+(G.bestSeg?lapFmt(G.bestSeg):"--"), CX, CY+34);
+    ctx.textAlign="left";
+  }
+
+  ctx.lineCap="round";
+  ctx.lineWidth=3; ctx.strokeStyle="rgb(200,90,60)";
+  for(const r of G.rings){
+    ctx.globalAlpha=r.a;
+    ctx.beginPath(); ctx.arc(r.x,r.y,r.r,0,7); ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  ctx.textAlign="center";
+  if(G.pops.length){
+    ctx.font=FT.pop; ctx.lineWidth=4;
+    ctx.strokeStyle="#ffffff"; ctx.fillStyle="rgb(200,90,60)";
+    for(const p of G.pops){
+      const y=p.y-(1-p.t)*48;
+      ctx.globalAlpha=p.t;
+      ctx.strokeText(p.txt,p.x,y); ctx.fillText(p.txt,p.x,y);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  if(state==="play"&&inputMode==="mouse"&&!G.auto){
+    ctx.beginPath(); ctx.arc(G.tx,G.ty,10,0,7);
+    ctx.lineWidth=1.2; ctx.strokeStyle="rgba(38,49,63,.28)"; ctx.stroke();
+  }
+  if(G.trailLen>1){
+    ctx.strokeStyle=C_TRAIL;
+    const st=(G.trailHead-G.trailLen+TRAIL_N)%TRAIL_N;
+    for(let i=1;i<G.trailLen;i++){
+      const q=(st+i-1)%TRAIL_N, r=(st+i)%TRAIL_N, a=i/G.trailLen;
+      ctx.globalAlpha=0.16*a; ctx.lineWidth=PR*1.4*a;
+      ctx.beginPath();
+      ctx.moveTo(G.trailX[q],G.trailY[q]); ctx.lineTo(G.trailX[r],G.trailY[r]);
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  if(state!=="title"){
+    ctx.save();
+    ctx.globalAlpha=(state==="ready")?(0.55+0.45*Math.sin(T*10)):1;
+    ctx.beginPath(); ctx.arc(G.px,G.py,PR+3.5,0,7); ctx.fillStyle="#ffffff"; ctx.fill();
+    ctx.beginPath(); ctx.arc(G.px,G.py,PR,0,7); ctx.fillStyle=C_INK; ctx.fill();
+    ctx.restore();
+  }
+  if(G.parts.length){
+    ctx.fillStyle="rgb(200,90,60)";
+    for(const p of G.parts){
+      ctx.globalAlpha=p.a;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+
+  ctx.strokeStyle="rgba(52,72,102,.28)"; ctx.lineWidth=1.5;
+  ctx.strokeRect(FX+0.75,FY+0.75,FS-1.5,FS-1.5);
+
+  if(G.missFlash>0){
+    ctx.globalAlpha=0.16*G.missFlash;
+    ctx.fillStyle="rgb(200,90,60)"; ctx.fillRect(FX,FY,FS,FS);
+    ctx.globalAlpha=1;
+  }
+  if(state==="ready") drawReady();
+}
+
+function drawReady(){
+  ctx.save();
+  ctx.fillStyle="rgba(252,253,255,.76)"; ctx.fillRect(FX,FY,FS,FS);
+
+  const t=(T*1.1)%1;
+  if(inputMode==="mouse"&&!G.auto){          // 受付範囲を実寸で見せる
+    const R=startR();
+    ctx.setLineDash([4,4]); ctx.lineWidth=1.5;
+    ctx.strokeStyle="rgba(61,111,168,.5)";
+    ctx.beginPath(); ctx.arc(G.px,G.py,R,0,7); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth=2.4; ctx.strokeStyle=`rgba(61,111,168,${0.7*t})`;
+    ctx.beginPath(); ctx.arc(G.px,G.py,R+30*(1-t),0,7); ctx.stroke();
+  }else{
+    ctx.beginPath(); ctx.arc(G.px,G.py,24+18*t,0,7);
+    ctx.lineWidth=2.4; ctx.strokeStyle=`rgba(61,111,168,${0.8*(1-t)})`; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(G.px,G.py,PR+3.5,0,7); ctx.fillStyle="#ffffff"; ctx.fill();
+  ctx.beginPath(); ctx.arc(G.px,G.py,PR,0,7); ctx.fillStyle=C_INK; ctx.fill();
+
+  const msg = G.auto            ? "オートプレイ"
+            : inputMode==="mouse" ? "カーソルを自機に重ねるとスタート"
+            : inputMode==="key"   ? "矢印キー / WASD でスタート"
+            : "画面をタッチしてスタート（どこでもドラッグOK）";
+  const w=680,h=106,x=CX-w/2,y=CY-h/2;
+  ctx.fillStyle="#ffffff"; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle="rgba(52,72,102,.3)"; ctx.lineWidth=1.5; ctx.strokeRect(x+.75,y+.75,w-1.5,h-1.5);
+
+  ctx.textAlign="center";
+  ctx.fillStyle=G.missed?C_MARK:C_BLUE; ctx.font=FT.rdA;
+  ctx.fillText(G.missed?"ミス！ 直前のチェックポイントから再開":"反時計回りに周回せよ", CX, y+41);
+  ctx.fillStyle=C_INK; ctx.font=FT.rdB;
+  ctx.fillText(msg, CX, y+77);
+  ctx.restore();
+}
+
+function drawHUD(){
+  ctx.save();
+  ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,LW,HUDH);
+  ctx.fillStyle="rgba(52,72,102,.22)"; ctx.fillRect(0,HUDH-1.5,LW,1.5);
+  ctx.textAlign="left";
+
+  const lab=(x,t)=>{ ctx.fillStyle="#8996a8"; ctx.font=FT.lab; ctx.fillText(t,x,31); };
+  const val=(x,t,c,f)=>{ ctx.fillStyle=c; ctx.font=f||FT.val; ctx.fillText(t,x,70); };
+  const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}.${Math.floor((s*10)%10)}`;
+
+  lab(26,"TIME");
+  let tc=C_INK, ts;
+  if(G.mode==="time"){
+    const s=Math.max(0,G.timeLeft); ts=fmt(s);
+    if(s<=10) tc=(Math.floor(T*6)%2)?C_MARK:"#b07c26";
+  } else ts=fmt(G.elapsed);
+  val(26,ts,tc);
+
+  lab(222,"SCORE"); val(222,String(score()),C_BLUE,FT.score);
+  lab(418,"CP");    val(418,String(G.cp),C_INK,FT.sub);
+  lab(500,"倍率");   val(500,"×"+fmtMul(totalMul()),C_MARK,FT.sub);
+
+  lab(618,"LIFE");
+  if(G.livesSel===0){
+    ctx.fillStyle=C_MARK; ctx.font=FT.life; ctx.fillText("ノーミス",618,68);
+  }else{
+    for(let i=0;i<G.livesSel;i++){
+      const x=624+i*19, y=59;
+      ctx.beginPath();
+      ctx.moveTo(x,y-8); ctx.lineTo(x+6.5,y); ctx.lineTo(x,y+8); ctx.lineTo(x-6.5,y); ctx.closePath();
+      if(i<G.life){ ctx.fillStyle=C_MARK; ctx.fill(); }
+      else{ ctx.strokeStyle="rgba(200,90,60,.35)"; ctx.lineWidth=1.4; ctx.stroke(); }
+    }
+  }
+  ctx.restore();
+}
+
+function drawScare(){
+  const g=scareClick<0?0:clamp((scareT-scareClick)/1,0,1);   // 1秒かけて迫る
+  const e=1-Math.pow(1-g,3);
+  ctx.save();
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.font=`${(40+36*e).toFixed(1)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+  ctx.fillText("\u{1F60E}", CX, CY);
+  ctx.textBaseline="alphabetic"; ctx.textAlign="right";
+  ctx.fillStyle="rgba(56,76,104,.62)"; ctx.font=FT.csm;
+  ctx.fillText("\u203B\u30B8\u30E3\u30F3\u30D7\u30B9\u30B1\u30A2", LW-24, LH-20);
+  ctx.restore();
+}
+// タイトル・一時停止・リザルトは不透明なDOMで全面が覆われるので、
+// その裏でフィールドとHUDを描き続ける必要がない。更新もまとめて止める。
+const covered=s=>s==="title"||s==="pause"||s==="over";
+function draw(){
+  ctx.fillStyle="#fcfdff"; ctx.fillRect(0,0,LW,LH);
+  if(state==="scare"){ drawScare(); return; }   // 背景は一色。マップもHUDも出さない
+  drawField();
+  drawHUD();
+}
+
+let prev=performance.now();
+function loop(now){
+  let dt=(now-prev)/1000; prev=now;
+  if(!covered(state)){ update(Math.min(dt,1/30)); draw(); }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 表示領域にフィット（論理解像度は常に1000x1000） ---------- */
+let scale=1;
+function vp(){
+  const de=document.documentElement;
+  let w=Math.min(window.innerWidth||1e9, de.clientWidth||1e9);
+  let h=Math.min(window.innerHeight||1e9, de.clientHeight||1e9);
+  if(window.visualViewport){ w=Math.min(w,visualViewport.width); h=Math.min(h,visualViewport.height); }
+  return {w:w>0&&w<1e9?w:360, h:h>0&&h<1e9?h:640};
+}
+let lastTF="", lastCW=-1, lastCH=-1;
+function resize(){
+  // ResizeObserver はサイズ以外のレイアウト変化でも発火する。cv.width への代入は
+  // バッキングストアの再確保とクリアを伴うので、寸法が変わったときだけ行う。
+  const {w,h}=vp();
+  scale=Math.min(w/LW,h/LH);
+  const left=Math.max(0,(w-LW*scale)/2);
+  const top=clamp((h-LH*scale)/2,0,32);   // 上寄せ（表示枠が狭くても下が切れない）
+  const tf=`translate(${left}px,${top}px) scale(${scale})`;
+  if(tf!==lastTF){ wrapEl.style.transform=tf; lastTF=tf; }
+  const dpr=Math.min(window.devicePixelRatio||1,2.5);
+  const nw=Math.max(1,Math.round(LW*scale*dpr)), nh=Math.max(1,Math.round(LH*scale*dpr));
+  if(nw===lastCW && nh===lastCH) return;
+  lastCW=nw; lastCH=nh;
+  cv.width=nw; cv.height=nh;
+  ctx.setTransform(nw/LW,0,0,nh/LH,0,0);
+  // 覆われている状態は毎フレーム描き直さないので、クリアされた面を塗り直す
+  if(covered(state)){ ctx.fillStyle="#fcfdff"; ctx.fillRect(0,0,LW,LH); }
+}
+addEventListener("resize",resize);
+addEventListener("orientationchange",()=>setTimeout(resize,150));
+if(window.visualViewport) visualViewport.addEventListener("resize",resize);
+if(window.ResizeObserver) new ResizeObserver(resize).observe(document.documentElement);
+
+/* ---------- 入力 ---------- */
+const keys={};
+let touchId=null, lastTouch=null;
+const KEYCODES=["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","KeyA","KeyD","KeyW","KeyS"];
+function toLogical(e){
+  const r=cv.getBoundingClientRect();
+  return { x:(e.clientX-r.left)/(r.width/LW), y:(e.clientY-r.top)/(r.height/LH) };
+}
+const clampX=v=>clamp(v,FX+4,FX+FS-4);
+const clampY=v=>clamp(v,FY+4,FY+FS-4);
+function setInputMode(m){ if(inputMode!==m){ inputMode=m; updateCursor(); } }
+function updateCursor(){ cv.style.cursor=(state==="play"&&inputMode==="mouse")?"none":"default"; }
+
+cv.addEventListener("pointerdown",e=>{
+  if(state==="scare"){ if(scareClick<0) scareClick=scareT; e.preventDefault(); return; }
+  ac(); const p=toLogical(e);
+  if(e.pointerType==="mouse"){
+    setInputMode("mouse");
+    if(state==="ready"&&canStart(p.x,p.y,startR()*1.6)) startPlay();
+  }else{
+    setInputMode("touch");
+    touchId=e.pointerId; lastTouch=p;
+    try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+    if(state==="ready") startPlay();
+  }
+  e.preventDefault();
+},{passive:false});
+
+addEventListener("pointermove",e=>{
+  const p=toLogical(e);
+  if(e.pointerType==="mouse"){
+    setInputMode("mouse");
+    if(state==="play"){ G.tx=clampX(p.x); G.ty=clampY(p.y); }
+    else if(state==="ready"&&canStart(p.x,p.y,startR())) startPlay();
+  }else if(e.pointerId===touchId&&lastTouch){
+    setInputMode("touch");
+    const dx=(p.x-lastTouch.x)*SENS, dy=(p.y-lastTouch.y)*SENS;
+    lastTouch=p;
+    if(state==="play"){
+      G.tx+=dx; G.ty+=dy;
+      const lx=G.tx-G.px, ly=G.ty-G.py, l=Math.hypot(lx,ly);
+      if(l>LEAD){ G.tx=G.px+lx/l*LEAD; G.ty=G.py+ly/l*LEAD; }
+      G.tx=clampX(G.tx); G.ty=clampY(G.ty);
+    }
+  }
+},{passive:false});
+addEventListener("pointerup",e=>{ if(e.pointerId===touchId){ touchId=null; lastTouch=null; } });
+addEventListener("pointercancel",e=>{ if(e.pointerId===touchId){ touchId=null; lastTouch=null; } });
+
+addEventListener("keydown",e=>{
+  if(e.target&&e.target.tagName==="INPUT") return;   // スライダー操作を邪魔しない
+  if(state==="scare"){ e.preventDefault(); if(scareClick<0) scareClick=scareT; return; }
+  if(state==="over"&&e.code==="Space"){ e.preventDefault(); newGame(); return; }
+  if(state==="pause"&&e.code==="Space"){ e.preventDefault(); setState("ready"); return; }
+  if(KEYCODES.includes(e.code)){
+    e.preventDefault(); keys[e.code]=true; setInputMode("key");
+    if(state==="ready") startPlay();
+  }
+  if(e.code==="Space"){ e.preventDefault(); if(state==="ready") startPlay(); }
+  if(e.code==="Escape"||e.code==="KeyP"){ e.preventDefault(); togglePause(); }
+});
+addEventListener("keyup",e=>{ if(KEYCODES.includes(e.code)) keys[e.code]=false; });
+addEventListener("blur",()=>{ if(state==="play") togglePause(); });
+addEventListener("contextmenu",e=>e.preventDefault());
+
+/* ---------- 画面遷移 ---------- */
+const scTitle=document.getElementById("scTitle");
+const scPause=document.getElementById("scPause");
+const scOver=document.getElementById("scOver");
+const hudBtns=document.getElementById("hudBtns");
+// 繰り返し触る要素は起動時に一度だけ引く（updateHS はスライダー操作中に連続で走る）
+const $=id=>document.getElementById(id);
+const UI={
+  pauseStats:$("pauseStats"), verdict:$("verdict"), finalScore:$("finalScore"),
+  newRec:$("newRec"), overStats:$("overStats"), startBtn:$("startBtn"), retryBtn:$("retryBtn"),
+  hsLabel:$("hsLabel"), hsVal:$("hsVal"), multVal:document.querySelector("#multBox b"),
+  multDetail:$("multDetail"), lifeVal:$("lifeVal"), lifeRange:$("lifeRange"), lifeTicks:$("lifeTicks"),
+  autoChk:$("autoChk"), titleBtn:$("titleBtn"), resumeBtn:$("resumeBtn"), quitBtn:$("quitBtn"),
+  pauseBtn:$("pauseBtn"), soundBtn:$("soundBtn"),
+};
+
+function setState(s){
+  state=s;
+  if(s==="ready") autoWait=0;
+  if(covered(s)){ ctx.fillStyle="#fcfdff"; ctx.fillRect(0,0,LW,LH); }   // 覆う前に一度消す
+  scTitle.classList.toggle("hide",s!=="title");
+  scPause.classList.toggle("hide",s!=="pause");
+  scOver.classList.toggle("hide",s!=="over");
+  hudBtns.style.display=(s==="play"||s==="ready")?"flex":"none";   // scare 中は何も出さない
+  updateCursor();
+}
+// カーソルが自機からどれだけ離れていても始まってしまうと、開始直後に
+// 壁へ突っ込んで連続ミスになる。自機のほぼ真上で、かつ通路の中を要求する。
+const startR=()=>Math.max(12,HW()*0.7);
+const canStart=(x,y,r)=>Math.hypot(x-G.px,y-G.py)<=r && isSafe(x,y);
+function startPlay(){ setState("play"); G.missFlash=0; }
+function togglePause(){
+  if(state==="play"||state==="ready"){
+    setState("pause");
+    UI.pauseStats.innerHTML=statHTML();
+  }else if(state==="pause") setState("ready");
+}
+const lifeLabel=()=>G.livesSel===0?"ノーミス":String(G.livesSel);
+function statHTML(){
+  const s=G.mode==="time"?Math.max(0,G.timeLeft):G.elapsed;
+  const tm=`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+  return `
+  <div class="stat"><div class="k">SCORE</div><div class="v">${score()}</div></div>
+  <div class="stat"><div class="k">CHECKPOINT</div><div class="v">${G.cp}</div></div>
+  <div class="stat"><div class="k">倍率</div><div class="v">×${fmtMul(totalMul())}</div></div>
+  <div class="stat"><div class="k">${G.mode==="time"?"のこり":"経過"}</div><div class="v">${tm}</div></div>
+  <div class="stat"><div class="k">MAP</div><div class="v">${DIFFS[G.diff].name}</div></div>`;
+}
+const bestKey=()=>(G.auto?"ai_":"")+G.mode;   // 難易度・ライフをまたいで1本。AIは別枠
+function gameOver(reason){
+  G.reason=reason;
+  if(reason==="ライフ切れ" && Math.random()<0.01){   // 1%。驚かせも怖がらせもしない、完全無音
+    scareT=0; scareClick=-1; setState("scare"); return;
+  }
+  showResult(reason,false);
+}
+function showResult(reason,silent){
+  setState("over");
+  UI.verdict.textContent=reason; UI.verdict.classList.toggle("up",reason==="タイムアップ");
+  const sc=score();
+  UI.finalScore.textContent=sc;
+  const k=bestKey(), rec=sc>(BEST[k]||0);
+  if(rec){ BEST[k]=sc; saveBest(); }
+  UI.newRec.style.visibility=rec?"visible":"hidden";
+  const s=G.elapsed;
+  UI.overStats.innerHTML=`
+  <div class="stat"><div class="k">CHECKPOINT</div><div class="v">${G.cp}</div></div>
+  <div class="stat"><div class="k">倍率</div><div class="v">×${fmtMul(totalMul())}</div></div>
+  <div class="stat"><div class="k">LAP</div><div class="v">${Math.floor(G.cp/4)}</div></div>
+  <div class="stat"><div class="k">最速エリア</div><div class="v">${G.bestSeg?lapFmt(G.bestSeg):"--"}</div></div>
+  <div class="stat"><div class="k">生存時間</div><div class="v">${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}</div></div>
+  <div class="stat"><div class="k">MAP / ライフ</div><div class="v">${DIFFS[G.diff].name} / ${lifeLabel()}</div></div>
+  <div class="stat"><div class="k">ハイスコア</div><div class="v">${BEST[k]||0}</div></div>`;
+  if(!silent) beep(rec?520:300, rec?900:110, 0.55, "sawtooth", 0.08);
+  updateHS();
+}
+
+async function loadBest(){
+  try{
+    if(!window.storage) return;
+    const r=await window.storage.get("mugen-iraira:best2");
+    if(r&&r.value) BEST=JSON.parse(r.value);
+  }catch(e){}
+  updateHS();
+}
+async function saveBest(){
+  try{ if(window.storage) await window.storage.set("mugen-iraira:best2",JSON.stringify(BEST)); }catch(e){}
+}
+function updateHS(){
+  UI.startBtn.classList.toggle("auto",G.auto);
+  UI.retryBtn.classList.toggle("auto",G.auto);
+  const b=BEST[bestKey()];
+  UI.hsLabel.textContent=`${G.auto?"AI ":""}${G.mode==="time"?"3分アタック":"エンドレス"} のハイスコア`;
+  UI.hsVal.textContent=b?b:"--";
+  UI.multVal.textContent="×"+fmtMul(totalMul());
+  UI.multDetail.textContent=`難易度 ×${fmtMul(diffMul())} × ライフ ×${fmtMul(lifeMul())}`;
+  UI.lifeVal.innerHTML= G.livesSel===0
+    ? `<em>ノーミス</em> ── 1回でも壁に触れたら終了`
+    : `ミスできる回数 <b>${G.livesSel}</b> 回`;
+}
+
+function wireSeg(id,fn,init){
+  const el=document.getElementById(id);
+  el.addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    [...el.children].forEach(c=>c.classList.toggle("on",c===b));
+    fn(b.dataset.v); beep(900,1200,0.05,"square",0.03); updateHS();
+  });
+  [...el.children].forEach(c=>c.classList.toggle("on",c.dataset.v===String(init)));
+}
+wireSeg("segMode",v=>G.mode=v,"time");
+wireSeg("segDiff",v=>G.diff=+v,1);
+
+// ライフ・スライダー（目盛り付き / 0〜10）
+const lifeRange=UI.lifeRange, ticksEl=UI.lifeTicks;
+const MAJOR={0:1,1:1,3:1,5:1,10:1};
+for(let i=0;i<=10;i++){
+  const d=document.createElement("div");
+  d.className="tick"+(MAJOR[i]?" major":"");
+  d.style.left=`calc(8px + (100% - 16px) * ${i/10})`;
+  if(MAJOR[i]) d.innerHTML=`<span>${i}</span>`;
+  ticksEl.appendChild(d);
+}
+lifeRange.value=String(G.livesSel);
+lifeRange.addEventListener("input",()=>{
+  const v=+lifeRange.value;
+  if(v===G.livesSel) return;            // 値が動いていなければ何もしない
+  G.livesSel=v;
+  beep(1000,1200,0.03,"square",0.025);
+  updateHS();
+});
+
+const autoChk=UI.autoChk;
+autoChk.checked=false;
+autoChk.addEventListener("change",()=>{ G.auto=autoChk.checked; updateHS(); });
+
+UI.startBtn.onclick=()=>{ ac(); newGame(); };
+UI.retryBtn.onclick=()=>newGame();
+UI.titleBtn.onclick=()=>{ setState("title"); updateHS(); };
+UI.resumeBtn.onclick=()=>setState("ready");
+UI.quitBtn.onclick=()=>{ setState("title"); updateHS(); };
+UI.pauseBtn.onclick=()=>togglePause();
+UI.soundBtn.onclick=e=>{
+  muted=!muted;
+  e.currentTarget.classList.toggle("off",muted);
+  e.currentTarget.textContent=muted?"🔇":"♪";
+  if(!muted) beep(900,1300,0.06,"square",0.05);
+};
+
+resize(); buildAll();
+G.startAng=GA[START_GATE];
+G.px=gatePos[START_GATE].x; G.py=gatePos[START_GATE].y; G.tx=G.px; G.ty=G.py;
+setState("title"); updateHS(); loadBest();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

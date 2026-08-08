@@ -14,7 +14,7 @@ h1 {
     font-family: 'misakigothic';
     font-size: 32px;
     letter-spacing: 4px;
-    text-shadow: 0px 0px 8px rgba(255, 255, 255, 0.6);
+    text-shadow: 0px 0px 6px rgba(255, 255, 255, 0.6);
 }
 h1:hover {
     color: orange;
@@ -59,6 +59,10 @@ a.newcontent:hover {
     color:hotpink;
     font-size: x-large;
 }
+.new {
+    font-size: x-small;
+    color: goldenrod;
+}
 .specialthanks {
     font-size: x-small;
     color: rgba(255, 255, 255, 0.3);
@@ -88,22 +92,28 @@ a.newcontent:hover {
         left: 0;
     }
 }
-.releasenotes {
-    margin-bottom: 64px;
-}
-.releasenotes, .releasenotesli {
+.releasenotes, .releasenotesli, .TermsOfService, .TermsOfServiceli {
     text-align: left;
     color: rgb(10, 22, 22);
     transition: all 1s;
 }
-.releasenotes:hover {
+.releasenotes:hover, .TermsOfService:hover {
     color: rgba(255, 255, 255, 0.5);
     .releasenotesli {
     color: rgba(255, 255, 255, 0.5);
     }
 }
-.understood:active, h2:active, .specialthanks:active, .releasenotesli:active, .releasenotes:active {
+.TermsOfService:hover {
+    color: rgba(255, 255, 255, 0.5);
+    .TermsOfServiceli {
+    color: rgba(255, 255, 255, 0.5);
+    }
+}
+.understood:active, h2:active, .specialthanks:active, .releasenotesli:active, .releasenotes:active, .TermsOfService:active, .TermsOfServiceli:active {
     font-family: misakigothic;
+}
+.rectangleAd {
+    margin-bottom: 64px;
 }
 footer {
     position: fixed;
@@ -173,4 +183,17 @@ a.behind {
     text-align: right;
     margin-right: 16px;
     cursor: not-allowed;
+}
+.ADs {
+    margin: 256px auto;
+}
+@media (min-width: 728px) {
+    .mobileAd {
+    display: none;
+    }
+}
+@media (max-width: 728px) {
+    .PCAd, .ADs {
+    display: none;
+    }
 }

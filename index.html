@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +7,8 @@
     <link href="./index.css" rel="stylesheet" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gen-interface-jp@0.7.0/cdn/400.css">
+    <script src="https://jpad.jp/jpad_conversion1.js"></script>
+    <script src="https://jpad.jp/jpad.js"></script>
 </head>
 <body>
     <header>
@@ -15,26 +17,27 @@
     <main>
         <section>
             <h2>シミュレーション</h2>
-                <a class="content" href="./RockPaperScissors_battle.html">じゃんけん粒子バトル</a>
-                <a class="content" href="./snake_io_auto.html">snake.ioを神の視点から眺める</a>
-                <a class="content" href="./castle_capture_battle.html">クッソ簡略化された三国志シミュレーション</a>
-                <a class="content" href="./gendered-lifegame.html">存在意義が全くないライフゲームの亜種</a>
-                <a class="newcontent" href="./territory_battle.html">スプラトゥーンでも見るか～</a>
+                <a class="content" onclick="JpadConversion('じゃんけん粒子バトルをプレイ')" href="./RockPaperScissors_battle.html">じゃんけん粒子バトル</a>
+                <a class="content" onclick="JpadConversion('snake.ioシミュレーターをプレイ')" href="./snake_io_auto.html">snake.ioを神の視点から眺める</a>
+                <a class="content" onclick="JpadConversion('三国志シミュレーションをプレイ')" href="./castle_capture_battle.html">クッソ簡略化された三国志シミュレーション</a>
+                <a class="content" onclick="JpadConversion('男女ライフゲームをプレイ')" href="./gendered-lifegame.html">存在意義が全くないライフゲームの亜種</a>
+                <a class="newcontent" onclick="JpadConversion('スプラトゥーンシミュレーターをプレイ')" href="./territory_battle.html"><span class="new">NEW</span> スプラトゥーンでも見るか～</a>
             <h2>ゲーム</h2>
-                <a class="content" href="./reckless_minesweeper.html">ありえなマインスイーパー</a>
-                <a class="content" href="./gate-runner.html">広告でよく見る増える方を選ぶゲーム</a>
-                <a class="content" href="./geometric-shooter.html">難易度曲線が終わってるシューティング</a>
+                <a class="content" onclick="JpadConversion('ありえなマインスイーパーをプレイ')" href="./reckless_minesweeper.html">ありえなマインスイーパー</a>
+                <a class="content" onclick="JpadConversion('ゲートランナーをプレイ')" href="./gate-runner.html">広告でよく見る増える方を選ぶゲーム</a>
+                <a class="content" onclick="JpadConversion('幾何学シューティングをプレイ')" href="./geometric-shooter.html">難易度曲線が終わってるシューティング</a>
                     <div class="specialthanks">スペシャルサンクス：ぢん（ITC OB）</div>
+                <a class="newcontent" onclick="JpadConversion('無限イライラ棒をプレイ')" href="./infinite-irairabou.html"><span class="new">NEW</span> 無限に続くイライラ棒</a>
         
             <h2>本当に謎</h2>
-                <a class="content" href="./hacker_typer_terminal.html">だれでも激つよプログラマーになれるターミナル</a>
-                <a class="content" href="./kotori-title-chatbot.html">ブラウザのタブで返信するカスチャットボット</a>
+                <a class="content" onclick="JpadConversion('偽ターミナルをプレイ')" href="./hacker_typer_terminal.html">だれでも激つよプログラマーになれるターミナル</a>
+                <a class="content" onclick="JpadConversion('カスチャットボットをプレイ')" href="./kotori-title-chatbot.html">ブラウザのタブで返信するカスチャットボット</a>
                     <div class="caution">スマホユーザーにとっては面白くないかも</div>
-                <a class="newcontent" href="./0_100_probability_machine.html">当たる確率が確率で決まる抽選機</a>
+                <a class="newcontent" onclick="JpadConversion('確率確率抽選機をプレイ')" href="./0_100_probability_machine.html"><span class="new">NEW</span> 当たる確率が確率で決まる抽選機</a>
             </section>
 
         <div class="understoodbox">
-            <a class="behind" href="./behind.html">
+            <a class="behind" onclick="JpadConversion('隠し要素発見')" href="./behind.html">
                 <div class="understood">
                     CSS<br>完全に理解した
                 </div>
@@ -45,12 +48,31 @@
             更新履歴　最新1件のみ表示(←え)
             <ul class="releasenotesul">
                 <li class="releasenotesli">
-                    v1.05.00 2026/07/29 <br>
-                    スプラトゥーンでも見るか～ を追加 <br>
-                    当たる確率が確率で決まる抽選機 を追加 <br>
+                    v1.06.00 2026/08/08 <br>
+                    無限に続くイライラ棒 を追加 <br>
+                    広告を追加　<br>
+                    利用規約とトラッカーを追加してお前らの行動を監視することを追加　<br>
                 </li>
             </ul>
         </section>
+        <section class="TermsOfService">
+            利用規約
+            <ul class="TermsOfServiceul">
+                <li class="TermsOfServiceli">
+                    当サイトでは、広告の配信、広告の表示回数・クリック数・成果の測定や不正利用の検知、ついでに当サイトの人気コンテンツの把握を目的として、Cookie、ローカルストレージ、ユーザ識別子、IPアドレス、ブラウザ情報、端末情報、アクセス日時、閲覧ページ、リファラーその他広告配信に必要な情報（以下「アクセス情報」といいます。）を取得することがあります。共有される情報には、ユーザを直接特定する氏名、住所、電話番号、電子メールアドレス等の個人情報は含まれません。<br>
+                </li>
+                <li class="TermsOfServiceli">
+                    当サイトは、前項の目的を達成するため、広告配信に関係するスポンサー、パブリッシャーその他の提携事業者との間で、必要な範囲においてアクセス情報を共有する場合があります。広告をクリックした利用者に対して識別情報を付与し、スポンサーが運営するWebサイト等における行動情報と関連付けることにより、広告効果の測定および成果判定を行うことがあります。<br>
+                </li>
+                <li class="TermsOfServiceli">
+                    当サイトは、前項の目的を達成するため、アクセス情報をクリックした上記それぞれのURLと結び付ける可能性があります。こちらの情報は外部と共有されません。
+                </li>
+            </ul>
+        </section>
+        <div> 
+            <a href="https://jpad.jp/sponsor.php?s=9hjtnkk">↓かわいい広告がたまに出る</a>
+        </div>   
+        <iframe class="rectangleAd" src="https://jpad.jp/main.php?s=9hjtnkk&k=2" scrolling="no" frameborder="0" style="width:300px;height:250px;border:0px;"></iframe>
     </main>
     <footer>
         <div class="footercontents">

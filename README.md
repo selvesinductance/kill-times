@@ -19,6 +19,7 @@
 - [だれでも激つよプログラマーになれるターミナル](./hacker_typer_terminal.html)
 - [ブラウザのタブで返信するカスチャットボット](./kotori-title-chatbot.html)
 - [当たる確率が確率で決まる抽選機](./0_100_probability_machine.html)
+- [マルコフ連鎖エディタ](./markov-lab.html)
 
 ## QUICK START（意味不明）
 https://kill-times.vercel.app/  

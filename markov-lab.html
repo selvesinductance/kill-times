@@ -1,0 +1,1596 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>マルコフ連鎖ラボ</title>
+<style>
+:root{
+  --base:ghostwhite;            /* 主役 */
+  --paper:ghostwhite;
+  --grid:#dedeef;
+  --surface:#fdfdff;
+  --line:#e1e1ee;
+  --line-strong:#c4c4da;
+  --ink:#22243a;
+  --muted:#6c6e8d;
+  --indigo:#4a4ea3;
+  --indigo-soft:#e9e9fa;
+  --amber:#ffdf5c;
+  --amber-deep:#c69007;
+  --danger:#bf3b2f;
+  --danger-soft:#fbe9e6;
+  --node:#c9cade;
+  --node-line:#9698b6;
+  --edge:#6c6e8d;
+  --shadow:0 1px 1px rgba(40,40,80,.05), 0 8px 24px rgba(40,40,80,.08);
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Noto Sans Mono",monospace;
+  --jp:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;padding:0}
+body{
+  position:fixed;inset:0;width:100%;height:100%;overflow:hidden;
+  font-family:var(--jp);color:var(--ink);background:var(--paper);
+  -webkit-text-size-adjust:100%;overscroll-behavior:none;touch-action:manipulation;
+}
+button,input,select{font:inherit;color:inherit}
+.app{display:flex;flex-direction:column;height:100%;min-height:0}
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;
+  padding:9px 14px;background:var(--surface);border-bottom:1px solid var(--line);
+  user-select:none;
+}
+.brand{display:flex;align-items:baseline;gap:9px;margin-right:2px}
+.brand b{font-size:15px;font-weight:700;letter-spacing:.06em}
+.brand span{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+.group{display:flex;align-items:center;gap:6px}
+.group.sep{padding-left:14px;border-left:1px solid var(--line)}
+.cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+
+.seg{display:flex;gap:2px;padding:3px;background:#ececf8;border:1px solid var(--line);border-radius:7px}
+.seg button{
+  display:flex;align-items:center;gap:5px;padding:6px 10px;border:0;border-radius:5px;
+  background:transparent;font-size:12.5px;cursor:pointer;color:var(--muted);white-space:nowrap;
+}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(40,40,80,.14);font-weight:600}
+.seg button .ic{font-size:14px;line-height:1}
+
+.btn{
+  padding:8px 13px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface);
+  font-size:13px;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s,transform .06s;
+}
+.btn:hover{background:#f1f1fc}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn[aria-pressed="true"]{background:var(--indigo-soft);border-color:var(--indigo);color:var(--indigo);font-weight:600}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{background:#ececf8;color:var(--ink)}
+
+/* ---------- main ---------- */
+main{flex:1;display:flex;min-height:0}
+.stage{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.board-wrap{
+  position:relative;flex:1;min-height:0;overflow:hidden;
+  background-color:var(--base);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px;
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+svg#board{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;cursor:crosshair}
+svg#board[data-tool="connect"],svg#board[data-tool="rename"]{cursor:pointer}
+svg#board[data-tool="delete"]{cursor:not-allowed}
+svg#board.grabbing{cursor:grabbing}
+
+/* svg pieces */
+.edge{fill:none;stroke:var(--edge);stroke-width:2.1;stroke-linecap:round}
+.edge.hot{stroke:var(--amber-deep);stroke-width:3}
+.edge-hit{fill:none;stroke:#000;stroke-opacity:0;stroke-width:20;pointer-events:stroke;cursor:pointer}
+.temp{fill:none;stroke:var(--indigo);stroke-width:2.4;stroke-dasharray:7 6;opacity:.85}
+.plabel{cursor:pointer}
+.plabel rect{fill:#fbfbff;stroke:var(--line-strong);stroke-width:1;rx:5}
+.plabel text{font-family:var(--mono);font-size:14px;font-weight:600;fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.plabel:hover rect{fill:var(--indigo-soft);stroke:var(--indigo)}
+.plabel.bad rect{fill:var(--danger-soft);stroke:var(--danger);stroke-width:1.6}
+.plabel.bad text{fill:var(--danger)}
+.node circle.body{fill:var(--node);stroke:var(--node-line);stroke-width:1.5;cursor:grab}
+.node text{font-weight:600;fill:#1d1f23;text-anchor:middle;dominant-baseline:central;pointer-events:none;user-select:none}
+.node.cur circle.body{fill:var(--amber);stroke:var(--amber-deep);stroke-width:2}
+.node .halo{fill:none;stroke:var(--amber-deep);stroke-width:2;opacity:.55}
+.node.cur .halo{animation:ping .55s ease-out}
+.node .badring{fill:none;stroke:var(--danger);stroke-width:1.6;stroke-dasharray:4 4;opacity:.8}
+@keyframes ping{from{r:36px;opacity:.9}to{r:52px;opacity:0}}
+@media (prefers-reduced-motion:reduce){.node.cur .halo{animation:none;opacity:0}}
+
+.zoomers{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
+.zoomers button{width:32px;height:32px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font-size:14px;line-height:1;box-shadow:var(--shadow)}
+
+/* ---------- status ---------- */
+.statusbar{
+  display:flex;align-items:center;gap:10px;min-height:38px;padding:7px 14px;
+  background:var(--surface);border-top:1px solid var(--line);font-size:12.5px;line-height:1.4
+}
+.statusbar .tag{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;padding:3px 6px;border-radius:4px;
+  background:#e7e7f5;color:var(--muted);flex:none
+}
+.statusbar.info .tag{background:var(--indigo-soft);color:var(--indigo)}
+.statusbar.warn .tag{background:#fdf1d6;color:#8a6206}
+.statusbar.error{background:var(--danger-soft)}
+.statusbar.error .tag{background:var(--danger);color:#fff}
+.statusbar.error #statusText{color:var(--danger)}
+#statusText{flex:1;min-width:0}
+.statusbar .btn{padding:6px 10px;font-size:12.5px}
+
+/* ---------- transport ---------- */
+.transport{
+  display:flex;align-items:center;gap:10px 6px;flex-wrap:wrap;
+  padding:9px 14px;background:var(--surface);border-top:1px solid var(--line);user-select:none
+}
+.play{
+  display:flex;align-items:center;gap:7px;padding:9px 17px;border-radius:6px;border:1px solid var(--indigo);
+  background:var(--indigo);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(74,78,163,.3)
+}
+.play:hover{filter:brightness(1.06)}
+.play:disabled{opacity:.4;cursor:default}
+.play.on{background:#8a6206;border-color:#8a6206;box-shadow:none}
+.speed{display:flex;align-items:center;gap:8px;margin-left:8px}
+input[type=range]{width:120px;accent-color:var(--indigo)}
+.readout{display:flex;align-items:center;gap:14px;margin-left:auto;font-size:12.5px;color:var(--muted)}
+.readout b{font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:600}
+.now{
+  display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 7px;
+  border-radius:13px;background:var(--amber);border:1px solid var(--amber-deep);font-weight:700;font-size:14px;color:#1d1f23
+}
+
+/* ---------- tape panel (signature) ---------- */
+.resizer{
+  flex:none;width:9px;background:var(--surface);border-left:1px solid var(--line);
+  cursor:col-resize;position:relative;touch-action:none;user-select:none
+}
+.resizer{z-index:3}
+.resizer::before{content:"";position:absolute;top:0;bottom:0;left:-9px;right:-9px}
+.resizer::after{
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:3px;height:36px;border-radius:2px;background:var(--line-strong)
+}
+.resizer:hover::after,.resizer.on::after{background:var(--indigo)}
+.tape{
+  width:296px;flex:none;display:flex;flex-direction:row;min-height:0;overflow:hidden;position:relative;
+  background:var(--surface)
+}
+.log-split{
+  flex:none;width:11px;background:var(--surface);border-left:1px dashed var(--line-strong);
+  cursor:col-resize;position:relative;touch-action:none;user-select:none
+}
+.log-split{z-index:3}
+.log-split::before{content:"";position:absolute;top:0;bottom:0;left:-8px;right:-8px}
+.log-split::after{
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:3px;height:30px;border-radius:2px;background:var(--line-strong)
+}
+.log-split:hover::after,.log-split.on::after{background:var(--indigo)}
+.log-split.off{border-left-style:solid}
+.log-wrap.off{border:0}
+.log-wrap{flex:none;width:92px;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.log-tools{position:absolute;bottom:9px;right:11px;z-index:4;display:flex;gap:6px}
+.log-tools .btn{background:var(--surface);box-shadow:0 1px 5px rgba(40,40,80,.16)}
+.chain{
+  padding:14px 14px 48px;
+  font-family:var(--jp);font-size:19px;line-height:1.55;letter-spacing:.06em;word-break:break-all;
+  white-space:pre-wrap;
+  flex:1 1 auto;min-width:0;overflow:auto;user-select:text
+}
+.chain:empty::after{content:"再生を押すと、現在地の文字からここにつながっていきます。";font-size:12px;letter-spacing:0;color:var(--muted);line-height:1.7}
+.chain .last{background:var(--amber);border-radius:3px;padding:0 1px}
+.tape-body{flex:1 1 auto;overflow:auto;min-height:0;padding:8px 0 48px}
+ol.log{list-style:none;margin:0;padding:0}
+ol.log li{display:flex;gap:10px;align-items:baseline;padding:2.5px 11px 2.5px 2px;font-size:13px}
+ol.log li .i{width:26px;text-align:right;flex:none;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+ol.log li .lb{font-size:14px;letter-spacing:.04em}
+ol.log li.jump .i{color:var(--indigo);font-weight:700}   /* 開始点は番号を色分け */
+ol.log li.jump .lb{color:var(--indigo);font-weight:600}
+
+/* ---------- overlay editors ---------- */
+#overlay{position:absolute;inset:0;pointer-events:none}
+#overlay > *{pointer-events:auto}
+.editor{
+  position:absolute;transform:translate(-50%,-50%);border:2px solid var(--indigo);border-radius:6px;
+  background:#fff;padding:6px 8px;font-size:16px;text-align:center;box-shadow:var(--shadow);outline:none
+}
+.editor.prob{font-family:var(--mono);width:104px}
+.editor.name{width:118px;font-weight:600}
+.editor-tip{
+  position:absolute;transform:translate(-50%,10px);white-space:nowrap;font-size:11px;color:#fff;
+  background:rgba(35,38,43,.88);padding:3px 7px;border-radius:6px;pointer-events:none
+}
+.menu{
+  position:absolute;min-width:172px;padding:5px;border-radius:8px;background:var(--surface);
+  border:1px solid var(--line-strong);box-shadow:0 10px 30px rgba(40,40,80,.2);z-index:5
+}
+.menu button{
+  display:block;width:100%;text-align:left;padding:8px 10px;border:0;border-radius:5px;background:none;
+  font-size:13px;cursor:pointer
+}
+.menu button:hover{background:#eeeefa}
+.menu button.danger{color:var(--danger)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+
+/* ---------- dialog ---------- */
+dialog{
+  border:1px solid var(--line-strong);border-radius:10px;padding:0;max-width:560px;width:calc(100% - 32px);
+  background:var(--surface);color:var(--ink);box-shadow:0 24px 60px rgba(40,40,80,.3)
+}
+dialog::backdrop{background:rgba(28,28,58,.35)}
+.dlg-head{display:flex;align-items:center;padding:16px 20px 10px}
+.dlg-head h2{margin:0;font-size:16px;letter-spacing:.04em}
+.dlg-head .btn{margin-left:auto}
+.dlg-body{padding:0 20px 20px;max-height:70vh;overflow:auto;font-size:13px;line-height:1.85}
+.dlg-body h3{
+  margin:18px 0 6px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--muted);
+  text-transform:uppercase;font-weight:600
+}
+.dlg-body h3:first-child{margin-top:4px}
+.dlg-body ul{margin:0;padding-left:18px}
+.dlg-body li{margin:3px 0}
+.dlg-body .row{display:flex;align-items:center;gap:10px;margin:10px 0}
+.dlg-body .row .rl{flex:none;width:46px;font-size:12px;color:var(--muted)}
+.dlg-body .row input[type=range]{flex:1;max-width:220px}
+.dlg-body .row b{font-family:var(--mono);font-size:12px;min-width:44px}
+.dlg-body .row select{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line-strong);border-radius:5px;background:var(--surface);font-size:13px}
+.dlg-body .row input[type=checkbox]{width:16px;height:16px;accent-color:var(--indigo);flex:none}
+.dlg-body .note{font-size:11.5px;color:var(--muted);line-height:1.6}
+.dlg-body kbd{
+  font-family:var(--mono);font-size:11px;background:#e9e9f6;border:1px solid var(--line-strong);
+  border-bottom-width:2px;border-radius:4px;padding:1px 5px
+}
+
+@media (max-width:900px){
+  main{flex-direction:column}
+  .tape{width:auto;flex:none;height:38vh}
+  .resizer{width:auto;height:13px;border-left:0;border-top:1px solid var(--line);cursor:row-resize}
+  .resizer::before{left:0;right:0;top:-7px;bottom:-7px}
+  .resizer::after{width:40px;height:3px}
+  .chain{font-size:17px;padding:10px 14px 48px}
+  .board-wrap{min-height:130px}
+  .brand span{display:none}
+  .brand b{font-size:14px}
+  .topbar{padding:7px 9px;gap:6px}
+  .topbar .group{gap:6px}
+  .group.sep{padding-left:0;border-left:0}
+  .brand{order:0;margin-right:auto}
+  .group.ghosts{order:1}
+  .seg{order:2;flex:1 0 100%;justify-content:space-between}
+  .group.edits{order:3}
+  .speed .cap{white-space:nowrap}
+  .seg button{flex:1;justify-content:center;padding:6px 4px;font-size:12px}
+  .btn{padding:7px 10px;font-size:12.5px;border-radius:4px}
+  .statusbar{min-height:34px;padding:6px 12px;font-size:12px}
+  .transport{padding:8px 10px;gap:8px 6px}
+  .play{padding:8px 14px}
+  .speed{flex:1 1 46%;min-width:150px;justify-content:flex-start}
+  input[type=range]{width:100%;max-width:none;flex:1}
+  .readout{margin-left:auto;flex:1 1 38%;width:auto;justify-content:flex-end;font-size:11.5px;gap:10px}
+  ol.log li{padding:2px 11px 2px 2px}
+}
+@media (max-width:520px){
+  .readout .counts{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand"><b>マルコフ連鎖ラボ</b><span>markov playground</span></div>
+
+    <div class="seg" id="tools" role="group" aria-label="操作モード">
+      <button data-tool="select" aria-pressed="true"><span class="ic">✥</span>置く・動かす</button>
+      <button data-tool="connect" aria-pressed="false"><span class="ic">↷</span>つなぐ</button>
+      <button data-tool="rename" aria-pressed="false"><span class="ic">✎</span>文字</button>
+      <button data-tool="delete" aria-pressed="false"><span class="ic">⌫</span>消す</button>
+    </div>
+
+    <div class="group sep edits">
+      <button class="btn" id="undoBtn" title="元に戻す (Ctrl+Z)">元に戻す</button>
+      <button class="btn" id="redoBtn" title="やり直す (Ctrl+Y / Ctrl+Shift+Z)">やり直す</button>
+      <button class="btn" id="sampleBtn">例を読み込む</button>
+      <button class="btn" id="clearBtn">全部消す</button>
+    </div>
+
+    <div class="group sep ghosts">
+      <button class="btn ghost" id="saveBtn">保存</button>
+      <button class="btn ghost" id="loadBtn">読み込む</button>
+      <button class="btn ghost" id="voiceBtn">音声</button>
+      <button class="btn ghost" id="helpBtn">使い方</button>
+    </div>
+    <input type="file" id="fileInput" accept="application/json,.json" hidden>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div class="board-wrap" id="boardWrap">
+        <svg id="board" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12"
+                    markerUnits="userSpaceOnUse" orient="auto">
+              <path d="M0,0.6 L12,6 L0,11.4 L3,6 Z" fill="#6c6e8d"></path>
+            </marker>
+            <marker id="arrow-hot" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="13" markerHeight="13"
+                    markerUnits="userSpaceOnUse" orient="auto">
+              <path d="M0,0.6 L12,6 L0,11.4 L3,6 Z" fill="#c69007"></path>
+            </marker>
+            <marker id="arrow-temp" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12"
+                    markerUnits="userSpaceOnUse" orient="auto">
+              <path d="M0,0.6 L12,6 L0,11.4 L3,6 Z" fill="#4a4ea3"></path>
+            </marker>
+          </defs>
+          <g id="vp"></g>
+        </svg>
+        <div id="overlay"></div>
+        <div class="zoomers">
+          <button id="zoomIn" title="拡大">＋</button>
+          <button id="zoomOut" title="縮小">−</button>
+          <button id="zoomFit" title="全体を表示">⤢</button>
+        </div>
+      </div>
+
+      <div class="statusbar info" id="statusbar">
+        <span class="tag" id="statusTag">READY</span>
+        <span id="statusText">円を置いて、矢印でつないでみてください。</span>
+        <button class="btn" id="statusAction" hidden></button>
+      </div>
+
+      <div class="transport">
+        <button class="play" id="playBtn"><span id="playIcon">▶</span><span id="playText">再生</span></button>
+        <button class="btn" id="stepBtn">1歩すすむ</button>
+        <button class="btn" id="resetBtn">最初から</button>
+        <button class="btn" id="speakToggle" aria-pressed="false" title="通った円の文字を読み上げる"><span id="speakIcon">🔇</span> 読み上げ</button>
+        <div class="speed">
+          <span class="cap">速さ</span>
+          <input type="range" id="speed" min="1" max="12" value="4">
+        </div>
+        <div class="readout">
+          <span>現在地 <span class="now" id="nowLabel">—</span></span>
+          <span>ステップ <b id="stepCount">0</b></span>
+          <span class="counts">円 <b id="nodeCount">0</b>／矢印 <b id="edgeCount">0</b></span>
+        </div>
+      </div>
+    </section>
+
+    <div class="resizer" id="resizer" title="ドラッグでログの大きさを変えられます（ダブルクリックで元に戻ります）"></div>
+
+    <aside class="tape">
+      <div class="chain" id="chain"></div>
+      <div class="log-split" id="logSplit" title="ドラッグで番号つきログの幅を変えられます（左端まで寄せると隠れます／ダブルクリックで元に戻ります）"></div>
+      <div class="log-wrap" id="logWrap">
+        <div class="tape-body" id="tapeBody"><ol class="log" id="logList"></ol></div>
+      </div>
+      <div class="log-tools">
+        <button class="btn" id="copyLog">コピー</button>
+        <button class="btn" id="popLog">一つ消す</button>
+        <button class="btn" id="clearLog">全て消す</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<dialog id="voiceDlg">
+  <div class="dlg-head">
+    <h2>音声の設定</h2>
+    <button class="btn" id="voiceClose">閉じる</button>
+  </div>
+  <div class="dlg-body">
+    <div class="row"><input type="checkbox" id="vOn"><label for="vOn">通った円の文字を1つずつ読み上げる</label></div>
+    <div class="row"><span class="rl">声</span><select id="vVoice"></select></div>
+    <div class="row"><span class="rl">速さ</span><input type="range" id="vRate" min="0.1" max="2" step="0.1" value="1"><b id="vRateN">1.0</b></div>
+    <div class="row"><span class="rl">高さ</span><input type="range" id="vPitch" min="0" max="2" step="0.1" value="1"><b id="vPitchN">1.0</b></div>
+    <div class="row"><span class="rl">音量</span><input type="range" id="vVol" min="0" max="1" step="0.05" value="1"><b id="vVolN">100%</b></div>
+    <div class="row"><input type="checkbox" id="vWait"><label for="vWait">読み終わるまで次の1歩へ進まない</label></div>
+    <div class="row"><button class="btn" id="vTest">テストする</button></div>
+    <p class="note" id="vNote">読み上げには端末に入っている音声を使うので、声の種類や質は環境によって変わります。</p>
+  </div>
+</dialog>
+
+<dialog id="helpDlg">
+  <div class="dlg-head">
+    <h2>使い方</h2>
+    <button class="btn" id="helpClose">閉じる</button>
+  </div>
+  <div class="dlg-body">
+    <h3>マウス</h3>
+    <ul>
+      <li>空白を<b>クリック</b> → 円を追加</li>
+      <li>円の<b>中心あたりをドラッグ</b> → 移動／<b>ふち（外側）からドラッグ</b> → 矢印を作る</li>
+      <li>円を<b>クリック</b> → そこを現在地にする</li>
+      <li>円を<b>ダブルクリック</b> → 中の文字を変更</li>
+      <li>数字を<b>クリック</b> → 確率を編集（<code>0.5</code> / <code>1/2</code> / <code>50%</code>）</li>
+      <li>円を<b>右クリック</b> → 削除／矢印・数字を<b>右クリック</b> → その矢印を削除</li>
+      <li>文字を空にすると<b>空白の円</b>になります（ログには空白1文字として残ります）</li>
+      <li>背景をドラッグでスクロール、ホイールで拡大縮小</li>
+    </ul>
+    <h3>タッチ</h3>
+    <ul>
+      <li>上のモードを切り替えて使います。<b>置く・動かす</b>／<b>つなぐ</b>／<b>文字</b>／<b>消す</b></li>
+      <li>置く・動かす：空白をタップで追加、円をタップで現在地、ドラッグで移動、ふちからスワイプで矢印</li>
+      <li>つなぐ：円から円へスワイプするだけ（同じ円に戻すと自己ループ）</li>
+      <li>文字：円をタップして変更／ダブルタップでもOK</li>
+      <li>消す：円や矢印をタップ</li>
+      <li>円を<b>長押し</b> → メニュー（文字・現在地・削除）</li>
+      <li>2本指でピンチ＆スクロール</li>
+    </ul>
+    <h3>キーボード</h3>
+    <ul>
+      <li><kbd>Space</kbd> 再生／一時停止　<kbd>→</kbd> 1歩すすむ　<kbd>R</kbd> 最初から</li>
+      <li><kbd>V</kbd> 読み上げのオン／オフ</li>
+      <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> 元に戻す　<kbd>Ctrl</kbd>+<kbd>Y</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> やり直す　<kbd>Esc</kbd> 編集をやめる</li>
+    </ul>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+(function(){
+
+/* ============================================================
+   1. 設定値
+   ============================================================ */
+const CFG = {
+  R: 34,                 // 円の半径
+  ARROW_GAP: 10,         // 矢印の先端と円のすき間
+  EPS: 1e-6,             // 確率の同値判定
+  SUM_EPS: 1e-4,         // 合計が1かどうかの判定
+  ZOOM: { min:0.3, max:3, step:1.12, btn:1.2 },
+  MOVE_THRESHOLD: 3,     // 円を動かしたと見なす距離(px)
+  CONNECT_THRESHOLD: 8,  // 矢印を引き始めたと見なす距離(px)
+  SELF_LOOP_REACH: 40,   // 自分に戻る矢印にするのに必要なドラッグ距離(px)
+  PAN_THRESHOLD: 5,
+  TAP_MS: 400,           // 2回タップと見なす間隔
+  LONG_PRESS_MS: 520,
+  HISTORY_MAX: 80,
+  LOG_VIEW_MAX: 400,     // 番号つきログの表示件数
+  TAPE: { minW:250, keepBoardW:700, minH:150, keepBoardH:150 },
+  LOGCOL: { def:92, min:66, hide:40, keepChain:150 },
+  BLANK: "\u3000"        // 文字のない円は全角空白として扱う
+};
+const KANA = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわ";
+const MODE_MSG = {
+  select:"置く・動かすモード：空白をタップで円を追加、円をタップで現在地、ふちからスワイプで矢印。",
+  connect:"つなぐモード：円から円へスワイプすると矢印ができます。同じ円に戻すと自己ループです。",
+  rename:"文字モード：円をタップすると中の文字を変えられます。",
+  delete:"消すモード：円や矢印をタップすると消えます。"
+};
+const INTRO = "円をダブルクリックで文字変更、円を右クリックで消去、円のふちからドラッグで矢印を作る、数字をクリックで確率変更";
+
+/* ============================================================
+   2. 小さな道具
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const round = v => Math.round(v*1e9)/1e9;
+const sumP = list => list.reduce((t,e)=>t+e.p, 0);
+const capture = (el, id) => { try{ el.setPointerCapture(id); }catch(_){} };
+
+function gcd(a,b){ return b ? gcd(b, a%b) : a; }
+function fmtProb(v){
+  if(!isFinite(v) || Math.abs(v) < CFG.EPS) return "0";
+  if(Math.abs(v-1) < CFG.EPS) return "1";
+  for(const d of [2,3,4,5,6,7,8,9,10,12,14,15,16,18,20,24,25,32,50,100]){
+    const n = v*d;
+    if(Math.abs(n - Math.round(n)) < 1e-6){
+      const nn = Math.round(n), g = gcd(nn, d);
+      if(d/g <= 20) return (nn/g) + "/" + (d/g);
+    }
+  }
+  return (Math.round(v*1000)/1000).toString();
+}
+function parseProb(raw){
+  let s = String(raw).trim()
+    .replace(/½/g,"1/2").replace(/⅓/g,"1/3").replace(/⅔/g,"2/3")
+    .replace(/¼/g,"1/4").replace(/¾/g,"3/4").replace(/⅕/g,"1/5").replace(/／/g,"/");
+  if(!s) return null;
+  const pct = /[%％]$/.test(s);
+  if(pct) s = s.replace(/[%％]$/,"").trim();
+  const frac = s.match(/^(-?[\d.]+)\s*\/\s*([\d.]+)$/);
+  let v;
+  if(frac){
+    const a = parseFloat(frac[1]), b = parseFloat(frac[2]);
+    if(!isFinite(a) || !isFinite(b) || b === 0) return null;
+    v = a/b;
+  }else{
+    v = parseFloat(s);
+  }
+  if(!isFinite(v)) return null;
+  return clamp(pct ? v/100 : v, 0, 1);
+}
+
+/* ============================================================
+   3. DOM参照
+   ============================================================ */
+const ui = {
+  board:$("board"), vp:$("vp"), wrap:$("boardWrap"), overlay:$("overlay"),
+  tape:document.querySelector(".tape"), resizer:$("resizer"), split:$("logSplit"), logWrap:$("logWrap"),
+  chain:$("chain"), logList:$("logList"), tapeBody:$("tapeBody"),
+  statusbar:$("statusbar"), statusTag:$("statusTag"), statusText:$("statusText"), statusAction:$("statusAction"),
+  playBtn:$("playBtn"), playIcon:$("playIcon"), playText:$("playText"), stepBtn:$("stepBtn"),
+  undoBtn:$("undoBtn"), redoBtn:$("redoBtn"), speed:$("speed"),
+  nowLabel:$("nowLabel"), stepCount:$("stepCount"), nodeCount:$("nodeCount"), edgeCount:$("edgeCount"),
+  topbar:document.querySelector(".topbar"), transport:document.querySelector(".transport"),
+  speakToggle:$("speakToggle"), speakIcon:$("speakIcon"), vNote:$("vNote"), vVoice:$("vVoice"), vOn:$("vOn")
+};
+
+/* ============================================================
+   4. 状態
+   ============================================================ */
+const state = { nodes:[], edges:[], current:null, start:null, log:[], step:0 };
+const view  = { x:0, y:0, k:1 };
+let tool = "select";
+let playing = false, timer = null, lastEdge = null;
+let drag = null, pinch = null, longTimer = null, rafId = 0;
+let history = [], future = [];
+let lastTap = { t:0, id:null }, lastCreate = { t:0, x:0, y:0 };
+let seq = 0;
+
+const uid = p => p + (++seq) + "_" + Math.random().toString(36).slice(2,6);
+const nodeById = id => state.nodes.find(n=>n.id===id);
+const edgeById = id => state.edges.find(e=>e.id===id);
+const outs = id => state.edges.filter(e=>e.from===id);
+const labelOf = id => { const n = nodeById(id); return n ? (n.label.trim()==="" ? "空白" : n.label) : "？"; };
+
+// 「どの円からどの矢印が出ているか」を1度だけ集計する（描画・判定で使い回す）
+function outMap(){
+  const m = new Map();
+  for(const e of state.edges){
+    const list = m.get(e.from);
+    if(list) list.push(e); else m.set(e.from, [e]);
+  }
+  return m;
+}
+// 合計が1になっていない円（矢印2本以上）
+function badNodes(om){
+  const map = om || outMap(), set = new Set();
+  for(const [id, list] of map)
+    if(list.length >= 2 && Math.abs(sumP(list)-1) > CFG.SUM_EPS) set.add(id);
+  return set;
+}
+
+/* ============================================================
+   5. 座標と図形
+   ============================================================ */
+function toGraph(cx, cy){
+  const r = ui.board.getBoundingClientRect();
+  return { x:(cx-r.left-view.x)/view.k, y:(cy-r.top-view.y)/view.k };
+}
+const toScreen = (x,y) => ({ x:x*view.k+view.x, y:y*view.k+view.y });
+
+function hitNode(gx, gy, pad = 0){
+  for(let i = state.nodes.length-1; i >= 0; i--){
+    const n = state.nodes[i];
+    if(Math.hypot(n.x-gx, n.y-gy) <= CFG.R+pad) return n;
+  }
+  return null;
+}
+function trim(from, toward, r){
+  const dx = toward.x-from.x, dy = toward.y-from.y, d = Math.hypot(dx,dy) || 1;
+  return { x:from.x + dx/d*r, y:from.y + dy/d*r };
+}
+// 自己ループは、つながっている円がない方向へ出す
+function loopAngle(a){
+  let sx = 0, sy = 0;
+  for(const n of state.nodes){
+    if(n === a) continue;
+    const dx = n.x-a.x, dy = n.y-a.y, d = Math.hypot(dx,dy);
+    if(d > 360 || d < 1) continue;
+    const linked = state.edges.some(e =>
+      (e.from===a.id && e.to===n.id) || (e.to===a.id && e.from===n.id));
+    const w = linked ? 1.6 : 0.7;
+    sx += dx/d*w; sy += dy/d*w;
+  }
+  return Math.hypot(sx,sy) < 0.05 ? -Math.PI/2 : Math.atan2(-sy, -sx);
+}
+const f1 = n => n.toFixed(1);
+
+function selfLoopGeom(a){
+  const t = loopAngle(a);
+  const ux = Math.cos(t), uy = Math.sin(t), vx = -uy, vy = ux;
+  const at = (rad, spread) => ({
+    x: a.x + rad*(ux*Math.cos(spread) - uy*Math.sin(spread)),
+    y: a.y + rad*(uy*Math.cos(spread) + ux*Math.sin(spread))
+  });
+  const p1 = at(CFG.R, 0.42), p2 = at(CFG.R+9, -0.42);
+  const c1 = { x:a.x+(CFG.R+54)*ux + 46*vx, y:a.y+(CFG.R+54)*uy + 46*vy };
+  const c2 = { x:a.x+(CFG.R+54)*ux - 46*vx, y:a.y+(CFG.R+54)*uy - 46*vy };
+  return {
+    d:`M${f1(p1.x)},${f1(p1.y)} C${f1(c1.x)},${f1(c1.y)} ${f1(c2.x)},${f1(c2.y)} ${f1(p2.x)},${f1(p2.y)}`,
+    lx:a.x+(CFG.R+48)*ux, ly:a.y+(CFG.R+48)*uy
+  };
+}
+function edgeGeom(e){
+  const a = nodeById(e.from), b = nodeById(e.to);
+  if(!a || !b) return null;
+  if(a === b) return selfLoopGeom(a);
+  const dx = b.x-a.x, dy = b.y-a.y, d = Math.hypot(dx,dy) || 1;
+  const nx = -dy/d, ny = dx/d;                       // 往復の矢印が重ならないよう左右にずらす
+  const off = clamp(d*0.17, 20, 56);
+  const cx = (a.x+b.x)/2 + nx*off, cy = (a.y+b.y)/2 + ny*off;
+  const s = trim(a, {x:cx,y:cy}, CFG.R), t = trim(b, {x:cx,y:cy}, CFG.R+CFG.ARROW_GAP);
+  const mx = (s.x + 2*cx + t.x)/4, my = (s.y + 2*cy + t.y)/4;
+  return {
+    d:`M${f1(s.x)},${f1(s.y)} Q${f1(cx)},${f1(cy)} ${f1(t.x)},${f1(t.y)}`,
+    lx:mx + nx*13, ly:my + ny*13
+  };
+}
+
+/* ============================================================
+   6. 描画
+   ============================================================ */
+function applyView(){
+  ui.vp.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.k})`);
+}
+function edgeSvg(e, bad){
+  const g = edgeGeom(e);
+  if(!g) return "";
+  const hot = e.id === lastEdge;
+  const t = fmtProb(e.p), w = Math.max(28, t.length*9+16);
+  return `<path class="edge${hot?" hot":""}" d="${g.d}" marker-end="url(#${hot?"arrow-hot":"arrow"})"></path>`
+       + `<path class="edge-hit" data-edge="${e.id}" d="${g.d}"></path>`
+       + `<g class="plabel${bad?" bad":""}" data-plabel="${e.id}">`
+       +   `<rect x="${f1(g.lx-w/2)}" y="${f1(g.ly-13)}" width="${w}" height="26" rx="5"></rect>`
+       +   `<text x="${f1(g.lx)}" y="${f1(g.ly)}">${esc(t)}</text>`
+       + `</g>`;
+}
+function nodeSvg(n, bad){
+  const cur = n.id === state.current;
+  const txt = n.label;
+  const fs = txt.length <= 1 ? 24 : txt.length === 2 ? 18 : txt.length === 3 ? 14 : 12;
+  const shown = txt.length > 4 ? txt.slice(0,4)+"…" : txt;
+  return `<g class="node${cur?" cur":""}" data-node="${n.id}">`
+       + (cur ? `<circle class="halo" cx="${n.x}" cy="${n.y}" r="36"></circle>` : "")
+       + `<circle class="body" cx="${n.x}" cy="${n.y}" r="${CFG.R}"></circle>`
+       + (bad ? `<circle class="badring" cx="${n.x}" cy="${n.y}" r="${CFG.R+6}"></circle>` : "")
+       + `<text x="${n.x}" y="${n.y}" style="font-size:${fs}px">${esc(shown)}</text></g>`;
+}
+function tempEdgeSvg(){
+  if(!drag || drag.mode !== "connect" || !drag.pt) return "";
+  const a = nodeById(drag.from);
+  if(!a) return "";
+  const tgt = drag.over ? nodeById(drag.over) : null;
+  const end = (tgt && tgt !== a) ? trim(tgt, a, CFG.R+CFG.ARROW_GAP) : drag.pt;
+  const st = trim(a, end, CFG.R);
+  return `<path class="temp" d="M${f1(st.x)},${f1(st.y)} L${f1(end.x)},${f1(end.y)}" marker-end="url(#arrow-temp)"></path>`;
+}
+function render(bad){
+  const set = bad || badNodes();
+  const parts = [];
+  for(const e of state.edges) parts.push(edgeSvg(e, set.has(e.from)));
+  parts.push(tempEdgeSvg());
+  for(const n of state.nodes) parts.push(nodeSvg(n, set.has(n.id)));
+  ui.vp.innerHTML = parts.join("");
+  applyView();
+}
+// ドラッグ中は毎フレーム1回だけ描く
+function requestRender(){
+  if(rafId) return;
+  rafId = requestAnimationFrame(()=>{ rafId = 0; render(); });
+}
+function renderLog(){
+  const cell = l => l.label === "" ? CFG.BLANK : l.label;
+  ui.logList.innerHTML = state.log.slice(-CFG.LOG_VIEW_MAX).map(l =>
+    `<li class="${l.kind}"><span class="i">${l.i}</span><span class="lb">${esc(cell(l))}</span></li>`
+  ).join("");
+  const cells = state.log.map(cell);
+  if(!cells.length) ui.chain.textContent = "";
+  else ui.chain.innerHTML = esc(cells.slice(0,-1).join(""))
+     + `<span class="last">${esc(cells[cells.length-1])}</span>`;
+  ui.tapeBody.scrollTop = ui.tapeBody.scrollHeight;
+  ui.chain.scrollTop = ui.chain.scrollHeight;
+}
+function updateTransport(){
+  const has = !!state.current;
+  ui.nowLabel.textContent = has ? (nodeById(state.current)?.label || "␣") : "—";
+  ui.stepCount.textContent = state.step;
+  ui.nodeCount.textContent = state.nodes.length;
+  ui.edgeCount.textContent = state.edges.length;
+  ui.playBtn.disabled = !has;
+  ui.stepBtn.disabled = !has;
+  ui.undoBtn.disabled = history.length === 0;
+  ui.redoBtn.disabled = future.length === 0;
+  ui.playIcon.textContent = playing ? "❚❚" : "▶";
+  ui.playText.textContent = playing ? "一時停止" : "再生";
+  ui.playBtn.classList.toggle("on", playing);
+}
+
+/* ============================================================
+   7. メッセージ欄
+   ============================================================ */
+function setStatus(text, level = "info", action){
+  ui.statusbar.className = "statusbar " + level;
+  ui.statusTag.textContent = level === "error" ? "確認" : level === "warn" ? "注意" : "情報";
+  ui.statusText.textContent = text;
+  if(action){
+    ui.statusAction.hidden = false;
+    ui.statusAction.textContent = action.label;
+    ui.statusAction.onclick = action.fn;
+  }else{
+    ui.statusAction.hidden = true;
+    ui.statusAction.onclick = null;
+  }
+}
+// 合計が1になっていない円の案内（編集時・常時警告で共通）
+function badSumText(ids){
+  return ids.map(id => `「${labelOf(id)}」から出る確率の合計が ${fmtProb(sumP(outs(id)))}`).join("、")
+       + " です。赤い数字を合計1になるように直すか、右のボタンでまとめて直せます。";
+}
+// 描画＋メッセージ更新。合計が1でない円があればそちらを優先して出す
+function commit(text, level){
+  const bad = badNodes();
+  render(bad);
+  renderLog();
+  updateTransport();
+  if(bad.size) setStatus(badSumText([...bad]), "error", { label:"合計を1に直す", fn:fixAllBad });
+  else if(text) setStatus(text, level);
+}
+
+/* ============================================================
+   8. 元に戻す / やり直す
+   ============================================================ */
+const serialize = () => JSON.stringify({
+  nodes:state.nodes, edges:state.edges, current:state.current, start:state.start
+});
+function restore(json){
+  const s = JSON.parse(json);
+  state.nodes = s.nodes; state.edges = s.edges;
+  state.current = s.current; state.start = s.start;
+  lastEdge = null;
+}
+function snapshot(){
+  history.push(serialize());
+  if(history.length > CFG.HISTORY_MAX) history.shift();
+  future.length = 0;                      // 新しい操作をしたら「やり直す」は打ち切り
+}
+function undo(){
+  if(!history.length){ setStatus("これ以上戻せません.".replace(".","。"), "warn"); return; }
+  future.push(serialize());
+  restore(history.pop());
+  commit("ひとつ前の状態に戻しました。", "info");
+}
+function redo(){
+  if(!future.length){ setStatus("やり直せる操作がありません。", "warn"); return; }
+  history.push(serialize());
+  restore(future.pop());
+  commit("やり直しました。", "info");
+}
+
+/* ============================================================
+   9. 確率のルール
+   ============================================================ */
+function spread(list){                    // 均等に配り直す（合計はちょうど1）
+  const v = round(1/list.length);
+  list.forEach((e,i)=> e.p = i === list.length-1 ? round(1-v*(list.length-1)) : v);
+  return v;
+}
+// 矢印を足したとき
+function redistribute(nodeId){
+  const o = outs(nodeId);
+  if(!o.length) return null;
+  if(o.length === 1){
+    if(Math.abs(o[0].p-1) <= CFG.EPS) return null;
+    o[0].p = 1;
+    return `「${labelOf(nodeId)}」から出る矢印は1本だけなので、確率を 1 にしました。`;
+  }
+  const v = spread(o);
+  return `「${labelOf(nodeId)}」から出る矢印が${o.length}本になったので、確率を均等（各 ${fmtProb(v)}）に配り直しました。`;
+}
+// 矢印を消したとき：残りの確率はいじらない（1本だけになったときは 1 に直す）
+function afterEdgeRemoval(nodeId){
+  const o = outs(nodeId);
+  if(o.length !== 1 || Math.abs(o[0].p-1) <= CFG.EPS) return null;
+  o[0].p = 1;
+  return `「${labelOf(nodeId)}」から出る矢印が1本だけになったので、確率を 1 にしました。`;
+}
+// 数字を編集したとき
+function applyProbEdit(edge, value){
+  const o = outs(edge.from);
+  edge.p = clamp(round(value), 0, 1);
+  if(o.length === 1){
+    if(Math.abs(o[0].p-1) > CFG.EPS){
+      o[0].p = 1;
+      return { text:"矢印が1本だけなので、確率は 1 に固定されます。", level:"warn" };
+    }
+    return { text:"確率を 1 にしました。", level:"info" };
+  }
+  if(o.length === 2){
+    const other = o.find(e => e !== edge);
+    other.p = round(1 - edge.p);
+    return { text:`矢印が2本なので、「${labelOf(other.to)}」へ向かう方を自動で ${fmtProb(other.p)} に合わせました。`, level:"info" };
+  }
+  if(Math.abs(sumP(o)-1) > CFG.SUM_EPS) return { text:badSumText([edge.from]), level:"error" };
+  return { text:`確率を ${fmtProb(edge.p)} にしました。合計はちょうど 1 です。`, level:"info" };
+}
+function fixAllBad(){
+  const bad = badNodes();
+  if(!bad.size) return;
+  snapshot();
+  for(const id of bad){
+    const o = outs(id), sum = sumP(o);
+    if(sum <= CFG.EPS) spread(o);
+    else o.forEach(e => e.p = round(e.p/sum));
+  }
+  commit("確率の合計を 1 に直しました（比率はそのままです）。", "info");
+}
+
+/* ============================================================
+   10. 円と矢印の編集
+   ============================================================ */
+function nextLabel(){
+  const used = new Set(state.nodes.map(n=>n.label));
+  for(const c of KANA) if(!used.has(c)) return c;
+  return String(state.nodes.length+1);
+}
+function addNode(x, y, label){
+  const n = { id:uid("n"), label:label !== undefined ? label : nextLabel(), x:Math.round(x), y:Math.round(y) };
+  state.nodes.push(n);
+  if(!state.current){ state.current = n.id; state.start = n.id; }
+  return n;
+}
+function removeNode(id){
+  const label = labelOf(id);
+  state.nodes = state.nodes.filter(n => n.id !== id);
+  const touched = new Set();
+  state.edges = state.edges.filter(e => {
+    if(e.from !== id && e.to !== id) return true;
+    if(e.from !== id) touched.add(e.from);
+    return false;
+  });
+  let extra = "";
+  for(const t of touched){ const m = afterEdgeRemoval(t); if(m) extra = " " + m; }
+  if(state.current === id){ state.current = null; pause(); extra += " 現在地の円が消えたので停止しました。"; }
+  if(state.start === id) state.start = state.nodes[0]?.id || null;
+  return `「${label}」を削除しました。${extra}`;
+}
+function addEdge(from, to){
+  if(state.edges.some(e => e.from === from && e.to === to))
+    return { ok:false, note:"", level:"warn",
+             text:`「${labelOf(from)}」→「${labelOf(to)}」の矢印はすでにあります。` };
+  state.edges.push({ id:uid("e"), from, to, p:0 });
+  const note = redistribute(from) || "";
+  const self = from === to ? "（自分に戻る矢印）" : "";
+  return { ok:true, note, level:"info",
+           text:`「${labelOf(from)}」→「${labelOf(to)}」の矢印を作りました${self}。${note}` };
+}
+function removeEdge(id){
+  const e = edgeById(id);
+  if(!e) return "";
+  state.edges = state.edges.filter(x => x.id !== id);
+  if(lastEdge === id) lastEdge = null;
+  return `「${labelOf(e.from)}」→「${labelOf(e.to)}」の矢印を消しました。${afterEdgeRemoval(e.from) || ""}`;
+}
+
+/* ============================================================
+   11. シミュレーション
+   ============================================================ */
+function pushLog(node, kind = "walk"){
+  state.log.push({ i:state.log.length+1, label:node.label, kind });
+}
+// 記録開始：まだログが空なら、いまの現在地を最初の1文字として書き込む
+function ensureStartLogged(){
+  if(state.log.length || !state.current) return false;
+  const n = nodeById(state.current);
+  if(!n) return false;
+  pushLog(n, "jump");
+  return true;
+}
+function setCurrent(id, viaEdge){
+  state.current = id;
+  lastEdge = viaEdge || null;
+  const n = nodeById(id);
+  if(!n) return;
+  if(viaEdge) pushLog(n, "walk");       // 矢印を通ったときだけ記録（手動の指定は記録しない）
+  speak(n.label);
+}
+function pickEdge(list, sum){
+  let r = Math.random()*sum;
+  for(const e of list){ r -= e.p; if(r <= 0) return e; }
+  return list[list.length-1];
+}
+function step(){
+  if(!state.current){
+    setStatus("現在地がありません。円をクリックして現在地に設定してください。", "warn");
+    pause(); return;
+  }
+  ensureStartLogged();
+  const o = outs(state.current);
+  if(!o.length){
+    pause();
+    commit(`「${labelOf(state.current)}」から出る矢印がないので、ここで止まりました。`, "info");
+    return;
+  }
+  const sum = sumP(o);
+  if(sum <= CFG.EPS){
+    pause();
+    commit(`「${labelOf(state.current)}」から出る確率が全部0なので進めません。`, "error");
+    return;
+  }
+  const warn = Math.abs(sum-1) > CFG.SUM_EPS
+    ? `合計が ${fmtProb(sum)} なので、比率のまま1として扱って進みました。` : null;
+  const chosen = pickEdge(o, sum);
+  state.step++;
+  setCurrent(chosen.to, chosen.id);
+  commit(warn || `${fmtProb(chosen.p/sum)} の確率で「${labelOf(chosen.from)}」→「${labelOf(chosen.to)}」へ進みました。`,
+         warn ? "warn" : "info");
+}
+const speedMs = () => Math.round(2200 / +ui.speed.value);
+
+function play(){
+  if(!state.current){ setStatus("先に円をクリックして現在地を決めてください。", "warn"); return; }
+  const started = ensureStartLogged();     // 再生を押した時点の現在地から記録を始める
+  if(started){ renderLog(); speak(nodeById(state.current).label); }
+  playing = true;
+  updateTransport();
+  const loop = ()=>{
+    if(!playing) return;
+    step();
+    if(!playing) return;
+    if(speech.on && speech.wait){
+      // 「速さ」の間隔と読み終わりの、どちらも済んでから次の1歩へ
+      let n = 0;
+      const go = ()=>{ if(++n === 2 && playing) timer = setTimeout(loop, 0); };
+      timer = setTimeout(go, speedMs());
+      afterSpeech(go);
+    }else{
+      timer = setTimeout(loop, speedMs());
+    }
+  };
+  timer = setTimeout(loop, started ? Math.max(speedMs(), 420) : 120);
+}
+function pause(){
+  playing = false;
+  clearTimeout(timer); timer = null;
+  stopSpeech();
+  updateTransport();
+}
+const togglePlay = ()=> playing ? (pause(), setStatus("一時停止しました。", "info")) : play();
+
+function resetRun(){
+  pause();
+  const id = (state.start && nodeById(state.start)) ? state.start : (state.nodes[0]?.id || null);
+  state.current = id; state.step = 0; state.log = []; lastEdge = null;
+  commit(id ? `「${labelOf(id)}」を現在地に戻しました。再生を押すとここから記録します。` : "円がありません。", "info");
+}
+
+/* ============================================================
+   12. 読み上げ（Web Speech API）
+   ============================================================ */
+const TTS = typeof window.speechSynthesis !== "undefined";
+const speech = { on:false, voice:null, rate:1, pitch:1, volume:1, wait:false };
+let speaking = false, speakToken = 0, speakGuard = null, waiters = [];
+
+function speechDone(){
+  speaking = false;
+  clearTimeout(speakGuard);
+  const list = waiters; waiters = [];
+  list.forEach(f => { try{ f(); }catch(_){} });
+}
+const afterSpeech = cb => speaking ? waiters.push(cb) : cb();
+function stopSpeech(){
+  speakToken++;
+  if(TTS){ try{ speechSynthesis.cancel(); }catch(_){} }
+  speechDone();
+}
+function speak(text){
+  if(!TTS || !speech.on) return;
+  const tk = ++speakToken;
+  try{ speechSynthesis.cancel(); }catch(_){}
+  const t = String(text || "").replace(/[\s\u3000]+/g, "");
+  speaking = true;
+  clearTimeout(speakGuard);
+  if(!t){                                        // 空白の円は読まずに少し間を置く
+    speakGuard = setTimeout(()=>{ if(tk === speakToken) speechDone(); }, 220);
+    return;
+  }
+  const u = new SpeechSynthesisUtterance(t);
+  if(speech.voice) u.voice = speech.voice;
+  u.lang = speech.voice ? speech.voice.lang : "ja-JP";
+  u.rate = speech.rate; u.pitch = speech.pitch; u.volume = speech.volume;
+  u.onend = u.onerror = ()=>{ if(tk === speakToken) speechDone(); };
+  // 声が無い環境などで onend が来ないとき用の保険
+  speakGuard = setTimeout(()=>{ if(tk === speakToken) speechDone(); },
+    clamp(600 + t.length*450/Math.max(0.1, speech.rate), 800, 12000));
+  try{ speechSynthesis.speak(u); }catch(_){ speechDone(); }
+}
+function fillVoices(){
+  if(!TTS) return;
+  const list = speechSynthesis.getVoices();
+  if(!list.length) return;
+  const ja = list.filter(v => /^ja/i.test(v.lang));
+  const sorted = ja.concat(list.filter(v => !/^ja/i.test(v.lang)));
+  ui.vVoice.innerHTML = sorted.map((v,i)=>`<option value="${i}">${esc(v.name)}（${esc(v.lang)}）</option>`).join("");
+  ui.vVoice._voices = sorted;
+  if(!speech.voice || !sorted.includes(speech.voice)) speech.voice = sorted[0] || null;
+  ui.vVoice.value = String(Math.max(0, sorted.indexOf(speech.voice)));
+  if(!ja.length) ui.vNote.textContent = "この端末には日本語の音声が見つかりませんでした。別の声でも読み上げはできますが、かなの発音は不自然になります。";
+}
+function setSpeech(on){
+  speech.on = on && TTS;
+  ui.vOn.checked = speech.on;
+  ui.speakToggle.setAttribute("aria-pressed", String(speech.on));
+  ui.speakIcon.textContent = speech.on ? "🔊" : "🔇";
+  if(speech.on){
+    // iOS対策：ユーザー操作のうちに空の発話で初期化しておく
+    try{ speechSynthesis.resume(); speechSynthesis.speak(new SpeechSynthesisUtterance(" ")); }catch(_){}
+    fillVoices();
+    setStatus("読み上げをオンにしました。円を通るたびに、その文字を読み上げます。", "info");
+  }else{
+    stopSpeech();
+    setStatus("読み上げをオフにしました。", "info");
+  }
+}
+
+/* ============================================================
+   13. 入力欄とメニュー（盤面の上に重ねる）
+   ============================================================ */
+let activeEditor = null;
+function closeEditors(){
+  if(activeEditor){ const f = activeEditor; activeEditor = null; f(true); }
+  ui.overlay.innerHTML = "";
+}
+function openEditor(opts){
+  closeEditors();
+  const p = toScreen(opts.x, opts.y);
+  const input = document.createElement("input");
+  input.className = "editor " + opts.cls;
+  input.value = opts.value;
+  input.style.left = p.x+"px";
+  input.style.top = p.y+"px";
+  if(opts.cls === "name") input.maxLength = 12;
+  const tip = document.createElement("div");
+  tip.className = "editor-tip";
+  tip.textContent = opts.tip;
+  tip.style.left = p.x+"px";
+  tip.style.top = (p.y+22)+"px";
+  ui.overlay.append(input, tip);
+
+  let done = false;
+  const finish = ok => {
+    if(done) return;
+    done = true;
+    if(activeEditor === finish) activeEditor = null;
+    const v = input.value;
+    ui.overlay.innerHTML = "";
+    if(ok) opts.commit(v);
+  };
+  activeEditor = finish;
+  input.addEventListener("keydown", ev => {
+    if(ev.key === "Enter"){ ev.preventDefault(); finish(true); }
+    else if(ev.key === "Escape"){ ev.preventDefault(); finish(false); }
+    ev.stopPropagation();
+  });
+  // ネイティブのフォーカス移動より後に当てる（当てた直後の blur で閉じないように）
+  setTimeout(()=>{
+    if(done) return;
+    input.focus(); input.select();
+    input.addEventListener("blur", ()=>finish(true));
+  }, 0);
+}
+function editName(id){
+  const n = nodeById(id);
+  if(!n) return;
+  openEditor({ x:n.x, y:n.y, cls:"name", value:n.label, tip:"文字を入力 → Enter",
+    commit(v){ snapshot(); n.label = v.trim(); commit(); } });   // 文字変更はメッセージを出さない
+}
+function editProb(id){
+  const e = edgeById(id);
+  if(!e) return;
+  const g = edgeGeom(e);
+  if(!g) return;
+  openEditor({ x:g.lx, y:g.ly, cls:"prob", value:fmtProb(e.p), tip:"0.5 / 1/2 / 50% → Enter",
+    commit(v){
+      const p = parseProb(v);
+      if(p === null){
+        setStatus(`「${v}」は数字として読めませんでした。0.5 や 1/2、50% のように入力してください。`, "warn");
+        return;
+      }
+      snapshot();
+      const res = applyProbEdit(e, p);
+      commit(res.text, res.level);
+    } });
+}
+function openMenu(clientX, clientY, id){
+  closeEditors();
+  const r = ui.wrap.getBoundingClientRect();
+  const m = document.createElement("div");
+  m.className = "menu";
+  m.style.left = Math.min(clientX-r.left, r.width-186)+"px";
+  m.style.top  = Math.min(clientY-r.top, r.height-160)+"px";
+  m.innerHTML = `<button data-a="name">文字を変える</button>
+    <button data-a="cur">ここを現在地にする</button>
+    <button data-a="loop">自分への矢印を足す</button><hr>
+    <button data-a="del" class="danger">この円を消す</button>`;
+  m.addEventListener("pointerdown", ev => ev.stopPropagation());
+  m.addEventListener("click", ev => {
+    const a = ev.target.closest("button")?.dataset.a;
+    if(!a) return;
+    closeEditors();
+    if(a === "name") editName(id);
+    else if(a === "cur"){ snapshot(); setCurrent(id); commit(`現在地を「${labelOf(id)}」にしました。`, "info"); }
+    else if(a === "loop"){ snapshot(); const res = addEdge(id, id); commit(res.text, res.level); }
+    else if(a === "del"){ snapshot(); commit(removeNode(id), "info"); }
+  });
+  ui.overlay.appendChild(m);
+}
+
+/* ============================================================
+   14. 盤面の操作
+   ============================================================ */
+const pointers = new Map();
+
+// 円を1回タップ＝現在地、続けて2回＝文字の変更
+// （再描画で要素が入れ替わるため dblclick ではなく自前で判定する）
+function tapNode(id){
+  const now = Date.now();
+  if(now - lastTap.t < CFG.TAP_MS && lastTap.id === id){
+    lastTap = { t:0, id:null };
+    editName(id);
+    return;
+  }
+  lastTap = { t:now, id };
+  if(state.current === id){                 // すでに現在地でも、もう一度読み上げる
+    const n = nodeById(id);
+    if(n) speak(n.label);
+    setStatus("ここが現在地です。", "info");
+    return;
+  }
+  snapshot();
+  setCurrent(id);
+  commit(`現在地を「${labelOf(id)}」にしました。`, "info");
+}
+function onLabelHit(id){
+  if(tool === "delete"){ snapshot(); commit(removeEdge(id), "info"); return false; }
+  editProb(id);
+  return true;                              // 既定動作を止める（フォーカスを奪われないように）
+}
+
+ui.board.addEventListener("pointerdown", ev => {
+  closeEditors();
+  if(ev.pointerType === "mouse" && ev.button !== 0) return;   // 右クリックは contextmenu に任せる
+  pointers.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+  if(pointers.size === 2){ startPinch(); return; }
+  if(pointers.size > 2) return;
+  capture(ui.board, ev.pointerId);
+
+  const g = toGraph(ev.clientX, ev.clientY);
+  const plabel  = ev.target.closest("[data-plabel]");
+  const edgeHit = ev.target.closest("[data-edge]");
+  const nodeHit = ev.target.closest("[data-node]");
+
+  if(plabel){
+    if(onLabelHit(plabel.dataset.plabel)) ev.preventDefault();
+    return;
+  }
+  if(nodeHit){
+    const id = nodeHit.dataset.node, n = nodeById(id);
+    if(tool === "delete"){ snapshot(); commit(removeNode(id), "info"); return; }
+    if(tool === "rename"){ ev.preventDefault(); editName(id); return; }
+    const dist = Math.hypot(n.x-g.x, n.y-g.y);
+    drag = (tool === "connect" || dist > CFG.R*0.62)
+      ? { mode:"connect", from:id, pt:g, over:id, moved:false, sx:ev.clientX, sy:ev.clientY, far:0 }
+      : { mode:"move", id, dx:g.x-n.x, dy:g.y-n.y, moved:false };
+    if(ev.pointerType !== "mouse"){
+      clearTimeout(longTimer);
+      longTimer = setTimeout(()=>{
+        if(drag && !drag.moved){ drag = null; openMenu(ev.clientX, ev.clientY, id); }
+      }, CFG.LONG_PRESS_MS);
+    }
+    return;
+  }
+  if(edgeHit){
+    if(onLabelHit(edgeHit.dataset.edge)) ev.preventDefault();
+    return;
+  }
+  drag = { mode:"pan", sx:ev.clientX, sy:ev.clientY, vx:view.x, vy:view.y, moved:false };
+  ui.board.classList.add("grabbing");
+});
+
+window.addEventListener("pointermove", ev => {
+  if(pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+  if(pinch){ movePinch(); return; }
+  if(!drag) return;
+
+  if(drag.mode === "move"){
+    const n = nodeById(drag.id);
+    if(!n) return;
+    const g = toGraph(ev.clientX, ev.clientY);
+    if(!drag.moved && Math.hypot(g.x-drag.dx-n.x, g.y-drag.dy-n.y)*view.k > CFG.MOVE_THRESHOLD){
+      drag.moved = true; snapshot(); clearTimeout(longTimer);
+    }
+    if(drag.moved){
+      n.x = Math.round(g.x-drag.dx);
+      n.y = Math.round(g.y-drag.dy);
+      requestRender();
+    }
+  }else if(drag.mode === "connect"){
+    drag.pt = toGraph(ev.clientX, ev.clientY);
+    drag.far = Math.max(drag.far, Math.hypot(ev.clientX-drag.sx, ev.clientY-drag.sy));
+    if(!drag.moved && drag.far > CFG.CONNECT_THRESHOLD){ drag.moved = true; clearTimeout(longTimer); }
+    const t = hitNode(drag.pt.x, drag.pt.y, 6);
+    drag.over = t ? t.id : null;
+    if(drag.moved) requestRender();
+  }else{
+    const dx = ev.clientX-drag.sx, dy = ev.clientY-drag.sy;
+    if(!drag.moved && Math.hypot(dx,dy) > CFG.PAN_THRESHOLD) drag.moved = true;
+    if(drag.moved){ view.x = drag.vx+dx; view.y = drag.vy+dy; applyView(); }
+  }
+});
+
+window.addEventListener("pointerup", ev => {
+  pointers.delete(ev.pointerId);
+  clearTimeout(longTimer);
+  if(pinch){ if(pointers.size < 2) pinch = null; drag = null; return; }
+  ui.board.classList.remove("grabbing");
+  const d = drag;
+  drag = null;
+  if(!d) return;
+  const g = toGraph(ev.clientX, ev.clientY);
+
+  if(d.mode === "move"){
+    if(d.moved) commit();                   // 移動はメッセージを出さない
+    else tapNode(d.id);
+    return;
+  }
+  if(d.mode === "connect"){
+    if(!d.moved){ tapNode(d.from); return; }   // ふちをタップしただけ → 現在地の指定
+    const t = hitNode(g.x, g.y, 6);
+    if(t && t.id === d.from && d.far < CFG.SELF_LOOP_REACH){
+      setStatus("同じ円に戻すときは、いったん外まで大きくドラッグすると自分への矢印になります。", "warn");
+      render();
+      return;
+    }
+    if(!t){ render(); return; }                // 円の外で離したら、何もせず取りやめ
+    snapshot();
+    const res = addEdge(d.from, t.id);
+    commit(res.text, res.level);
+    return;
+  }
+  if(d.mode === "pan"){
+    if(d.moved || tool !== "select") return;
+    const now = Date.now();
+    // ダブルクリックで2個できてしまうのを防ぐ
+    if(now - lastCreate.t < CFG.TAP_MS && Math.hypot(g.x-lastCreate.x, g.y-lastCreate.y) < 30) return;
+    lastCreate = { t:now, x:g.x, y:g.y };
+    snapshot();
+    const n = addNode(g.x, g.y);
+    commit(`円「${n.label}」を追加しました。ふちからドラッグすると矢印を作れます。`, "info");
+  }
+});
+
+window.addEventListener("pointercancel", ev => {
+  pointers.delete(ev.pointerId);
+  clearTimeout(longTimer);
+  drag = null; pinch = null;
+});
+
+ui.board.addEventListener("contextmenu", ev => {
+  ev.preventDefault();
+  const undoTip = " 「元に戻す」で復活できます。";
+  const n = ev.target.closest("[data-node]");
+  if(n){ snapshot(); commit(removeNode(n.dataset.node) + undoTip, "info"); return; }
+  const id = ev.target.closest("[data-plabel]")?.dataset.plabel
+          || ev.target.closest("[data-edge]")?.dataset.edge;
+  if(id){ snapshot(); commit(removeEdge(id) + undoTip, "info"); return; }
+  setStatus("右クリックで消せるのは、円と矢印です。", "info");
+});
+
+/* ============================================================
+   15. 拡大縮小とスクロール
+   ============================================================ */
+function zoomAt(sx, sy, factor){            // sx,sy は盤面内の座標
+  const gx = (sx-view.x)/view.k, gy = (sy-view.y)/view.k;
+  view.k = clamp(view.k*factor, CFG.ZOOM.min, CFG.ZOOM.max);
+  view.x = sx - gx*view.k;
+  view.y = sy - gy*view.k;
+  applyView();
+}
+ui.board.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  closeEditors();
+  const r = ui.board.getBoundingClientRect();
+  zoomAt(ev.clientX-r.left, ev.clientY-r.top, ev.deltaY < 0 ? CFG.ZOOM.step : 1/CFG.ZOOM.step);
+}, { passive:false });
+
+function pinchInfo(){
+  const [a,b] = [...pointers.values()];
+  const r = ui.board.getBoundingClientRect();
+  return { d:Math.hypot(a.x-b.x, a.y-b.y) || 1, cx:(a.x+b.x)/2-r.left, cy:(a.y+b.y)/2-r.top };
+}
+function startPinch(){
+  drag = null;
+  closeEditors();
+  const p = pinchInfo();
+  pinch = { d:p.d, k:view.k, g:{ x:(p.cx-view.x)/view.k, y:(p.cy-view.y)/view.k } };
+}
+function movePinch(){
+  if(pointers.size < 2) return;
+  const p = pinchInfo();
+  view.k = clamp(pinch.k * (p.d/pinch.d), CFG.ZOOM.min, CFG.ZOOM.max);
+  view.x = p.cx - pinch.g.x*view.k;
+  view.y = p.cy - pinch.g.y*view.k;
+  applyView();
+}
+function zoomBy(f){
+  const r = ui.board.getBoundingClientRect();
+  zoomAt(r.width/2, r.height/2, f);
+}
+function fitView(){
+  const r = ui.board.getBoundingClientRect();
+  if(r.width < 40 || r.height < 40) return;
+  if(!state.nodes.length){ view.x = r.width/2; view.y = r.height/2; view.k = 1; applyView(); return; }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for(const n of state.nodes){
+    x0 = Math.min(x0, n.x-CFG.R); y0 = Math.min(y0, n.y-CFG.R);
+    x1 = Math.max(x1, n.x+CFG.R); y1 = Math.max(y1, n.y+CFG.R);
+  }
+  const pad = clamp(r.width*0.07, 26, 70);
+  view.k = clamp(Math.min((r.width-pad*2)/(x1-x0 || 1), (r.height-pad*2)/(y1-y0 || 1)), CFG.ZOOM.min, 1.6);
+  view.x = r.width/2 - (x0+x1)/2*view.k;
+  view.y = r.height/2 - (y0+y1)/2*view.k;
+  applyView();
+}
+
+/* ============================================================
+   16. ログ欄の大きさ（2本の仕切りバー）
+   ============================================================ */
+const isWide = () => window.innerWidth > 900;
+
+// バー共通のドラッグ処理
+function makeDragger(el, { axis, start, apply }){
+  el.addEventListener("pointerdown", ev => {
+    ev.preventDefault();
+    closeEditors();
+    capture(el, ev.pointerId);
+    el.classList.add("on");
+    const vertical = axis() === "y";
+    const origin = vertical ? ev.clientY : ev.clientX;
+    const base = start();
+    const move = e => apply(base - ((vertical ? e.clientY : e.clientX) - origin));
+    const up = ()=>{
+      el.classList.remove("on");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  });
+}
+
+function tapeLimits(){
+  if(isWide())
+    return { min:CFG.TAPE.minW, max:Math.max(CFG.TAPE.minW+10, window.innerWidth - CFG.TAPE.keepBoardW) };
+  const chrome = ui.topbar.offsetHeight + ui.statusbar.offsetHeight + ui.transport.offsetHeight;
+  return { min:CFG.TAPE.minH, max:Math.max(CFG.TAPE.minH, window.innerHeight - chrome - CFG.TAPE.keepBoardH) };
+}
+function setTapeSize(v){
+  const lim = tapeLimits(), val = clamp(v, lim.min, lim.max);
+  ui.tape.style.width  = isWide() ? val+"px" : "";
+  ui.tape.style.height = isWide() ? "" : val+"px";
+  if(ui.logWrap.style.width) setLogWidth(parseFloat(ui.logWrap.style.width));
+}
+function setLogWidth(v){
+  const max = Math.max(0, ui.tape.getBoundingClientRect().width - CFG.LOGCOL.keepChain);
+  let val = v < CFG.LOGCOL.hide ? 0 : Math.max(v, CFG.LOGCOL.min);
+  val = Math.min(val, max);
+  if(val < CFG.LOGCOL.hide) val = 0;                 // 端まで寄せたら完全に隠す
+  ui.logWrap.style.width = val+"px";
+  ui.logWrap.classList.toggle("off", val === 0);
+  ui.split.classList.toggle("off", val === 0);
+}
+function resetPanes(){
+  ui.tape.style.width = ""; ui.tape.style.height = ""; ui.logWrap.style.width = "";
+  ui.logWrap.classList.remove("off");
+  ui.split.classList.remove("off");
+}
+makeDragger(ui.resizer, {
+  axis: ()=> isWide() ? "x" : "y",
+  start: ()=>{ const r = ui.tape.getBoundingClientRect(); return isWide() ? r.width : r.height; },
+  apply: setTapeSize
+});
+makeDragger(ui.split, {
+  axis: ()=>"x",
+  start: ()=> ui.logWrap.getBoundingClientRect().width,
+  apply: setLogWidth
+});
+ui.resizer.addEventListener("dblclick", ()=>{
+  ui.tape.style.width = ""; ui.tape.style.height = "";
+  setLogWidth(ui.logWrap.getBoundingClientRect().width);
+});
+ui.split.addEventListener("dblclick", ()=> setLogWidth(CFG.LOGCOL.def));
+
+/* ============================================================
+   17. ツールバー・操作パネル
+   ============================================================ */
+$("tools").addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if(!b) return;
+  tool = b.dataset.tool;
+  for(const x of ev.currentTarget.children) x.setAttribute("aria-pressed", String(x === b));
+  ui.board.dataset.tool = tool;
+  setStatus(MODE_MSG[tool], "info");
+});
+ui.playBtn.onclick  = togglePlay;
+ui.stepBtn.onclick  = ()=>{ pause(); step(); };
+ui.undoBtn.onclick  = undo;
+ui.redoBtn.onclick  = redo;
+$("resetBtn").onclick = resetRun;
+$("zoomIn").onclick   = ()=> zoomBy(CFG.ZOOM.btn);
+$("zoomOut").onclick  = ()=> zoomBy(1/CFG.ZOOM.btn);
+$("zoomFit").onclick  = fitView;
+ui.speed.oninput = ()=>{ if(playing){ pause(); play(); } };
+
+$("popLog").onclick = ()=>{
+  if(!state.log.length){ setStatus("消せるログがありません。", "warn"); return; }
+  const last = state.log.pop();
+  state.step = Math.max(0, state.step-1);
+  renderLog(); updateTransport();
+  setStatus(`ログの最後の1文字「${last.label === "" ? "空白" : last.label}」を消しました。現在地はそのままです。`, "info");
+};
+$("clearLog").onclick = ()=>{
+  if(!state.log.length){ setStatus("ログはすでに空です。", "warn"); return; }
+  state.log = []; state.step = 0;
+  renderLog(); updateTransport();
+  setStatus("ログを全て消しました。再生を押すと現在地から記録し直します。", "info");
+};
+$("copyLog").onclick = async ()=>{
+  const text = state.log.map(l => l.label === "" ? CFG.BLANK : l.label).join("");
+  try{
+    await navigator.clipboard.writeText(text);
+    setStatus("ログの文字列をコピーしました。", "info");
+  }catch(_){
+    setStatus("コピーできませんでした。テープの文字を選択してコピーしてください。", "warn");
+  }
+};
+$("clearBtn").onclick = ()=>{
+  snapshot(); pause();
+  state.nodes = []; state.edges = []; state.current = null; state.start = null;
+  state.log = []; state.step = 0; lastEdge = null;
+  commit("全部消しました。空いている所をクリックすると円を置けます。", "info");
+};
+$("sampleBtn").onclick = ()=>{
+  snapshot();
+  const name = loadSample(Math.random() < 0.5 ? "shika" : "sumo");   // 2つの例を半々で
+  commit(`例（${name}）を読み込みました。`, "info");
+};
+$("helpBtn").onclick   = ()=> $("helpDlg").showModal();
+$("helpClose").onclick = ()=> $("helpDlg").close();
+$("saveBtn").onclick = ()=>{
+  const data = JSON.stringify({ v:1, nodes:state.nodes, edges:state.edges, start:state.start }, null, 2);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], { type:"application/json" }));
+  a.download = "markov-chain.json";
+  a.click();
+  setTimeout(()=> URL.revokeObjectURL(a.href), 3000);
+  setStatus("markov-chain.json として保存しました。", "info");
+};
+$("loadBtn").onclick = ()=> $("fileInput").click();
+$("fileInput").onchange = ev => {
+  const file = ev.target.files[0];
+  ev.target.value = "";
+  if(!file) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const d = JSON.parse(rd.result);
+      if(!Array.isArray(d.nodes)) throw 0;
+      snapshot(); pause();
+      state.nodes = d.nodes;
+      state.edges = d.edges || [];
+      state.start = d.start || state.nodes[0]?.id || null;
+      state.current = state.start;
+      state.log = []; state.step = 0; lastEdge = null;
+      if(state.current) pushLog(nodeById(state.current), "jump");
+      fitView();
+      commit("読み込みました。", "info");
+    }catch(_){
+      setStatus("このファイルは読み込めませんでした。ここで保存したJSONを選んでください。", "error");
+    }
+  };
+  rd.readAsText(file);
+};
+
+// 音声の設定
+ui.speakToggle.onclick = ()=> setSpeech(!speech.on);
+$("voiceBtn").onclick   = ()=>{ fillVoices(); $("voiceDlg").showModal(); };
+$("voiceClose").onclick = ()=> $("voiceDlg").close();
+ui.vOn.onchange    = ev => setSpeech(ev.target.checked);
+ui.vVoice.onchange = ev => { speech.voice = (ev.target._voices || [])[+ev.target.value] || null; };
+$("vRate").oninput  = ev => { speech.rate  = +ev.target.value; $("vRateN").textContent  = speech.rate.toFixed(1); };
+$("vPitch").oninput = ev => { speech.pitch = +ev.target.value; $("vPitchN").textContent = speech.pitch.toFixed(1); };
+$("vVol").oninput   = ev => { speech.volume = +ev.target.value; $("vVolN").textContent  = Math.round(speech.volume*100)+"%"; };
+$("vWait").onchange = ev => { speech.wait = ev.target.checked; };
+$("vTest").onclick  = ()=>{
+  if(!TTS) return;
+  const on = speech.on;
+  speech.on = true;
+  speak(state.current ? (nodeById(state.current)?.label || "し") : "し");
+  speech.on = on;
+};
+
+window.addEventListener("keydown", ev => {
+  const t = ev.target;
+  if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+  if(ev.key === "Escape"){ closeEditors(); return; }
+  const k = ev.key.toLowerCase();
+  if(ev.ctrlKey || ev.metaKey){                 // 修飾キーつき
+    if(k === "z"){ ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
+    else if(k === "y"){ ev.preventDefault(); redo(); }
+    return;                                     // Ctrl+V などは横取りしない
+  }
+  if(ev.altKey) return;
+  if(ev.key === " "){ ev.preventDefault(); togglePlay(); }
+  else if(ev.key === "ArrowRight"){ ev.preventDefault(); pause(); step(); }
+  else if(k === "r") resetRun();
+  else if(k === "v") setSpeech(!speech.on);
+});
+
+let wasWide = isWide();
+window.addEventListener("resize", ()=>{
+  closeEditors();
+  if(isWide() !== wasWide){ wasWide = isWide(); resetPanes(); return; }
+  if(ui.logWrap.style.width) setLogWidth(parseFloat(ui.logWrap.style.width));
+  const r = ui.tape.getBoundingClientRect();
+  if(isWide() ? ui.tape.style.width : ui.tape.style.height) setTapeSize(isWide() ? r.width : r.height);
+});
+
+// タッチ中にページごと動かさない
+ui.wrap.addEventListener("touchmove", ev => ev.preventDefault(), { passive:false });
+ui.wrap.addEventListener("touchstart", ev => { if(ev.touches.length > 1) ev.preventDefault(); }, { passive:false });
+document.addEventListener("touchmove", ev => { if(ev.touches.length > 1) ev.preventDefault(); }, { passive:false });
+document.addEventListener("gesturestart", ev => ev.preventDefault());
+document.addEventListener("dblclick", ev => { if(ev.target.closest("#boardWrap")) ev.preventDefault(); });
+
+/* ============================================================
+   18. 例と起動
+   ============================================================ */
+const SAMPLES = {
+  shika: {
+    name:"しかのこのこのここしたんたん",
+    start:"s_si",
+    nodes:[["s_n","ん",120,270],["s_b",CFG.BLANK,270,175],["s_ta","た",270,365],["s_si","し",430,270],
+           ["s_ka","か",590,175],["s_ko","こ",590,365],["s_no","の",740,270]],
+    edges:[["s_n","s_b",1/2],["s_n","s_ta",1/2],["s_b","s_b",1/2],["s_b","s_si",1/2],["s_ta","s_n",1],
+           ["s_si","s_ka",1/2],["s_si","s_ta",1/2],["s_ka","s_no",1],
+           ["s_ko","s_no",1/2],["s_ko","s_si",1/4],["s_ko","s_ko",1/4],["s_no","s_ko",1]]
+  },
+  sumo: {
+    name:"スモスモスモスモスモスモスーモ",
+    start:"m_su",
+    nodes:[["m_sp",CFG.BLANK,430,100],["m_su","ス",300,270],["m_mo","モ",560,270],["m_bar","ー",430,440]],
+    edges:[["m_su","m_mo",6/7],["m_su","m_bar",1/7],["m_mo","m_su",6/7],["m_mo","m_sp",1/7],
+           ["m_bar","m_mo",1],["m_sp","m_su",1]]
+  }
+};
+function loadSample(key){
+  pause();
+  const sp = SAMPLES[key];
+  state.nodes = sp.nodes.map(([id,label,x,y]) => ({ id, label, x, y }));
+  state.edges = sp.edges.map(([from,to,p]) => ({ id:uid("e"), from, to, p:round(p) }));
+  state.current = sp.start;
+  state.start = sp.start;
+  state.log = []; state.step = 0; lastEdge = null;
+  fitView();
+  return sp.name;
+}
+
+loadSample("shika");                       // 最初は必ずこちら
+render(); renderLog(); updateTransport();
+setStatus(INTRO, "info");
+window.addEventListener("load", ()=>{ fitView(); setStatus(INTRO, "info"); });
+
+})();
+</script>
+</body>
+</html>

@@ -15,6 +15,7 @@
 - [広告でよく見るゲーム](./gate-runner.html)
 - [難易度曲線が終わってるシューティング](./geometric-shooter.html)
 - [無限に続くイライラ棒](./infinite-irairabou.html)
+- [重力の様子がおかしいブロック崩し](./gravity-breakout.html)
 ### 本当に謎
 - [だれでも激つよプログラマーになれるターミナル](./hacker_typer_terminal.html)
 - [ブラウザのタブで返信するカスチャットボット](./kotori-title-chatbot.html)

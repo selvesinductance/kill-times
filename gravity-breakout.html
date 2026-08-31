@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>重力場ブロック崩し</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07080B; --panel:#0E1015; --line:#171A21; --edge:#262B36;
+    --fg:#E9E6DE; --fg2:#7D8494; --fg3:#4B5262;
+    --cyan:#7CD9F2; --amber:#FFB454; --rose:#FF6E8A;
+    --sans:"Zen Kaku Gothic New", system-ui, -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg)}
+  body{color:var(--fg);font-family:var(--sans);-webkit-font-smoothing:antialiased;
+       display:flex;justify-content:center;padding:20px 16px 40px;
+       -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+       -webkit-tap-highlight-color:transparent;overscroll-behavior:contain}
+  .doc{-webkit-user-select:text;user-select:text}
+  #app{width:100%;display:flex;justify-content:center}
+  #app.delta{--sans:"DotGothic16","Zen Kaku Gothic New",sans-serif;--mono:"DotGothic16",monospace;
+             font-family:var(--sans);letter-spacing:.02em}
+  #app.delta .stat__v,#app.delta .cell__v,#app.delta .rtab td{letter-spacing:0}
+  .pxload{position:absolute;left:-9999px;font-family:"DotGothic16"}
+  .board{width:100%;max-width:900px}
+
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:11px}
+  .title{margin:0;font-size:18px;font-weight:700;letter-spacing:.15em}
+  .party{background:linear-gradient(90deg,#FF5A5A,#FFB454,#8FE07A,#59E0FF,#B58CFF,#FF63C4,#FF5A5A);
+         background-size:220% 100%;-webkit-background-clip:text;background-clip:text;
+         color:transparent;-webkit-text-fill-color:transparent;animation:partySlide 2.6s linear infinite}
+  @keyframes partySlide{from{background-position:0 0}to{background-position:220% 0}}
+  @media (prefers-reduced-motion: reduce){ .party{animation:none} }
+  .title small{display:block;font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.3em;color:var(--fg3);margin-bottom:5px}
+  .stats{display:flex;gap:1px;flex-wrap:wrap}
+  .stat{padding:5px 13px;background:var(--panel);border:1px solid var(--edge);min-width:74px}
+  .stat__k{display:block;font-size:9px;letter-spacing:.2em;color:var(--fg3)}
+  .stat__v{font-family:var(--mono);font-size:18px;font-weight:600;line-height:1.25}
+  .stat__v .div{font-size:12px;color:var(--fg3);margin-left:1px}
+  @media (max-width:1000px){ .stat--time{display:none} }
+  .ball{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin:6px 4px 4px 0}
+  .ball.spent{background:transparent;box-shadow:inset 0 0 0 1px var(--fg3)}
+
+  .plot{position:relative;border:1px solid var(--edge);background:#06070A;overflow:hidden;touch-action:none}
+  #cv{display:block;width:100%;height:auto;aspect-ratio:880/560;touch-action:none;cursor:none}
+  .veil{position:absolute;inset:0;display:none;place-items:center;background:rgba(6,7,10,.9);backdrop-filter:blur(2px)}
+  .veil.on{display:grid}
+  .veil{overflow:auto}
+  .veil .inner{text-align:center;padding:22px;max-width:560px}
+  .veil h2{margin:0 0 4px;font-size:21px;letter-spacing:.12em}
+  .veil .eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--cyan);margin-bottom:12px}
+  .veil p{margin:0 0 16px;color:var(--fg2);font-size:13px;line-height:1.9}
+  .veil p b{color:var(--fg);font-weight:500}
+  .rtab{width:100%;border-collapse:collapse;font-size:12px;text-align:left;margin-top:2px}
+  .rtab th{font-size:9px;letter-spacing:.18em;color:var(--fg3);font-weight:500;padding-bottom:5px}
+  .rtab td{padding:4px 0;border-bottom:1px solid rgba(38,43,54,.9);color:var(--fg2);line-height:1.45}
+  .rtab th:nth-child(n+2),.rtab td:nth-child(n+2){text-align:right;font-family:var(--mono);white-space:nowrap}
+  .rtab th:nth-child(2),.rtab td:nth-child(2){width:104px}
+  .rtab th:nth-child(3),.rtab td:nth-child(3){width:86px}
+  .rtab td:nth-child(3){color:var(--fg3)}
+  .rtab .sub{display:block;font-size:9.5px;color:var(--fg3);font-family:var(--mono);white-space:nowrap}
+  .rtab .tot td{border-bottom:0;color:var(--fg);padding-top:8px}
+  .rtab em{font-style:normal;font-size:8.5px;color:var(--amber);letter-spacing:.06em;margin-left:4px}
+  .veil .fig{font-family:var(--mono);font-size:34px;font-weight:600;color:var(--amber);line-height:1}
+  .veil .figk{font-size:9px;letter-spacing:.28em;color:var(--fg3);margin:5px 0 16px}
+
+.fxbar{display:flex;align-items:center;gap:12px;border:1px solid var(--edge);border-top:0;
+        background:var(--panel);padding:7px 14px;min-height:34px;flex-wrap:wrap}
+  .fxbar .k{font-size:9px;letter-spacing:.2em;color:var(--fg3);flex:none}
+  .chip{display:inline-block;font-size:11px;line-height:1.5;color:var(--c);border:1px solid var(--c);
+        padding:1px 8px;margin-right:6px}
+  .chip em{font-style:normal;font-family:var(--mono);opacity:.75;margin-left:4px}
+  .fx__none{font-size:11px;color:var(--fg3)}
+  @keyframes hueCycle{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}
+  .rain{animation:hueCycle 3.5s linear infinite}
+  @media (prefers-reduced-motion: reduce){ .rain{animation:none} }
+  .readout{display:grid;grid-template-columns:1fr auto;border:1px solid var(--edge);border-top:0;background:var(--panel)}
+  .shot{padding:10px 14px 11px;border-left:2px solid var(--cyan)}
+  .shot__k{font-size:9px;letter-spacing:.22em;color:var(--fg3);margin-bottom:6px}
+  .cells{display:flex;gap:24px;flex-wrap:wrap}
+  .cell__k{font-size:10px;color:var(--fg2)}
+  .cell__v{font-family:var(--mono);font-size:16px;font-weight:600}
+  .cell__v .u{font-size:9.5px;font-weight:400;color:var(--fg3);margin-left:2px}
+  .cell__v.dim{color:var(--fg3)}
+  .side{display:flex;align-items:center;gap:6px;padding:10px 14px}
+  .btn{font-family:var(--sans);font-size:12px;letter-spacing:.06em;padding:7px 14px;
+       border:1px solid var(--edge);background:transparent;color:var(--fg2);cursor:pointer}
+  .btn:hover{border-color:var(--fg2);color:var(--fg)}
+  .btn--sub{display:block;margin:9px auto 0;font-size:11px;padding:5px 12px;color:var(--fg3);border-color:var(--edge)}
+  .btn--sub:hover{background:transparent;border-color:var(--fg2);color:var(--fg2)}
+  .btn--go{border-color:var(--cyan);color:var(--cyan)}
+  .btn--go:hover{background:var(--cyan);color:#06070A}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+.doc{display:grid;grid-template-columns:minmax(260px,1fr) minmax(300px,1.2fr);gap:22px;
+       margin-top:26px;border-top:1px solid var(--edge);padding-top:16px}
+  .doc h2{margin:0 0 8px;font-size:9.5px;letter-spacing:.22em;color:var(--fg3);font-weight:500}
+  .doc table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .doc td{padding:6px 0;border-bottom:1px solid rgba(38,43,54,.7);color:var(--fg2);
+          vertical-align:top;line-height:1.65}
+  .doc td:first-child{color:var(--fg);white-space:nowrap;padding-right:14px;width:1%}
+  .doc .mono{font-family:var(--mono);font-size:11px;color:var(--fg)}
+  .doc .k{display:inline-block;width:18px;height:18px;line-height:17px;text-align:center;
+          font-family:var(--mono);font-size:10px;color:var(--c);border:1px solid var(--c);margin-right:8px}
+  .doc .note{margin:10px 0 0;font-size:11px;color:var(--fg3);line-height:1.8}
+  @media (max-width:640px){ .doc{grid-template-columns:1fr;gap:16px} }
+  .hint{margin-top:10px;font-size:12.5px;color:var(--fg2);line-height:1.8;display:flex;gap:9px;align-items:baseline}
+  .hint b{color:var(--fg);font-weight:500}
+  kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--edge);padding:1px 5px;color:var(--fg2)}
+  .phase{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--cyan);border:1px solid var(--cyan);padding:1px 6px;white-space:nowrap}
+
+  @media (max-width:640px){
+    .readout{grid-template-columns:1fr}
+    .side{border-top:1px solid var(--edge);justify-content:flex-end}
+    .cells{gap:16px}
+    .title{font-size:15px}
+    .stat{min-width:60px;padding:4px 10px}
+    .stat__v{font-size:15px}
+  }
+</style>
+</head>
+<body>
+<div id="app"><span class="pxload">.</span><div class="board">
+  <div class="head">
+    <h1 class="title"><small>GRAVITY FIELD SURVEY</small><span id="t-name">重力場ブロック崩し</span></h1>
+    <div class="stats">
+      <div class="stat"><span class="stat__k">STAGE</span><span class="stat__v" id="s-lv">1/5</span></div>
+      <div class="stat stat--time"><span class="stat__k">TIME</span><span class="stat__v" id="s-tm">0:00.0</span></div>
+      <div class="stat"><span class="stat__k">SCORE</span><span class="stat__v" id="s-sc">0</span></div>
+      <div class="stat"><span class="stat__k">BALLS</span><span id="s-bl"></span></div>
+      <div class="stat" style="min-width:140px"><span class="stat__k">重力場</span><span class="stat__v" id="s-fd" style="font-size:13px;letter-spacing:.02em">未解析</span></div>
+    </div>
+  </div>
+
+  <div class="plot">
+    <canvas id="cv"></canvas>
+    <div class="veil on" id="veil"><div class="inner">
+      <div class="eyebrow" id="v-e"></div>
+      <h2 id="v-t"></h2><p id="v-p"></p>
+      <div class="fig" id="v-f"></div><div class="figk" id="v-fk"></div>
+      <button class="btn btn--go" id="v-b"></button>
+      <button class="btn btn--sub" id="v-b2"></button>
+      <button class="btn btn--sub" id="v-b3"></button>
+    </div></div>
+  </div>
+
+  <div class="fxbar"><span class="k">効果</span><span id="fx-list"></span></div>
+
+  <div class="readout">
+    <div class="shot">
+      <div class="shot__k">弾道予測</div>
+      <div class="cells">
+        <div><div class="cell__k">落ちてくる位置</div><div class="cell__v" id="r-ip">—</div></div>
+        <div><div class="cell__k">読める時間</div><div class="cell__v" id="r-hz">0.0<span class="u">秒</span></div></div>
+        <div><div class="cell__k">この先こわれる</div><div class="cell__v" id="r-br">0<span class="u">個</span></div></div>
+        <div><div class="cell__k">弾速</div><div class="cell__v" id="r-sp">0<span class="u">px/s</span></div></div>
+        <div><div class="cell__k">連続破壊</div><div class="cell__v" id="r-cb">0<span class="u">連</span></div></div>
+      </div>
+    </div>
+    <div class="side"><button class="btn" id="btn-pause">一時停止</button></div>
+  </div>
+
+  <div class="hint"><span class="phase" id="h-ph">READY</span><span id="h-tx"></span></div>
+
+  <footer class="doc">
+    <section>
+      <h2>SCORE</h2>
+      <table>
+        <tr><td>ブロックを壊す</td><td><span class="mono">連続破壊数 × ステージ数 × 残りボール数</span></td></tr>
+        <tr><td>硬いブロックに当てる</td><td><span class="mono">1 × ステージ数 × 残りボール数</span><br>まだ壊れずヒットだけしたとき</td></tr>
+        <tr><td>アイテムを拾う</td><td><span class="mono">1</span></td></tr>
+        <tr><td>タイムボーナス</td><td id="doc-par"></td></tr>
+      </table>
+      <p class="note">連続破壊はパドルに触れるたび0に戻ります。上限はないので、壁の上に長く居座るほど1個あたりの点が伸びます。ボールを落とすと以降の倍率も下がります。</p>
+    </section>
+    <section>
+      <h2 id="doc-h">ITEMS</h2>
+      <table id="doc-items"></table>
+    </section>
+  </footer>
+</div></div>
+
+<script>
+// ── SIM START ──────────────────────────────────────────────────────────
+const G = {
+  // 盤面の大きさ
+  W:880, H:560, R:5, PADW:72, PADH:9, PADY:505, PADV:3000,
+  // ブロックの並び
+  COLS:22, MX:0, TOP:120, PITCHY:16, GAP:2,
+  // 物理と予測
+  BASE:680, MAXV:1100, DT:1/480, MAXSIM:8, HZ:1.8, HZ2:3.6,
+  // 遊びの決まりごと
+  LIVES:5, DROP:0.05, FXT:18, PAR:1200
+};
+G.PITCHX = (G.W - G.MX*2) / G.COLS;
+
+const STAGES = [
+  { id:'01', name:'無重力', note:'力は働いていません。弾はまっすぐ進み、当たった角度でそのまま跳ね返ります。',
+    pattern:[
+      '..111111111111111111..',
+      '..111111111111111111..',
+      '..111111111111111111..',
+      '..111111111111111111..',
+      '..111111111111111111..'],
+    g:() => [0,0] },
+
+  { id:'02', name:'まっすぐ下向き', note:'一定の力で下に引かれます。パドルの中央で打つほど高く上がります。',
+    pattern:[
+      '......1111..1111......',
+      '.....111111111111.....',
+      '....111..1111..111....',
+      '....111..1111..111....',
+      '....11111111111111....',
+      '.....111......111.....'],
+    g:() => [0,370] },
+
+  { id:'03', name:'中央へ寄せる谷', note:'左右から中央へ押し戻す力。端のブロックほど当てにくくなります。',
+    pattern:[
+      '.......2222222........',
+      '.....1111111222.......',
+      '.....111111122222.....',
+      '......22222222222.....',
+      '......22222222222.....',
+      '......222...222.......'],
+    g:(x) => [-320*Math.tanh((x - G.W/2)/50), 140] },
+
+  { id:'04', name:'回りつづける重力', note:'力の向きが3.6秒でひと回り。同じ場所から撃っても、撃つ時刻で軌道が変わります。',
+    pattern:[
+      '..333333333333333..3..',
+      '..31....2...2...2..3..',
+      '..31.12.2.2.2.2.2..3..',
+      '..31.12.2.2.2.2.2..3..',
+      '..31112...2...2....3..',
+      '..333333333333333333..'],
+    moving:true,
+    g:(x,y,t) => { const w = 2*Math.PI/2.4; return [Math.sin(w*t)*430, Math.cos(w*t)*430 + 45]; } },
+
+  { id:'05', name:'まわる重力井戸', note:'中心に吸い込む一点。しかもその中心が5秒周期で楕円を描いて回っています。',
+    moving:true,
+    pattern:[
+      '..1..1..33..33..1..1..',
+      '.1..1..33333333..1..1.',
+      '.1..1..33333333..1..1.',
+      '..1..1..333333..1..1..',
+      '...1..1..3333..1..1...',
+      '....1..1..33..1..1....'],
+    g:(x,y,t) => {
+      const w = 2*Math.PI*t/5;                        // 井戸そのものが楕円を描いて回る
+      const wx = G.W/2 + 190*Math.sin(w), wy = G.TOP + 3*G.PITCHY + 110 + 155*Math.cos(w);
+      const dx = wx-x, dy = wy-y, r2 = dx*dx + dy*dy + 9000;
+      const inv = 2.6e7 / (r2*Math.sqrt(r2));
+      return [dx*inv, dy*inv + 200];
+    } }
+];
+
+function buildStage(n){
+  const p = STAGES[n].pattern, rows = p.length, cols = G.COLS;
+  const blocks = [], grid = new Int16Array(rows*cols).fill(-1);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++){
+    const ch = p[r][c];
+    if (ch === '.') continue;
+    grid[r*cols+c] = blocks.length;
+    blocks.push({ x:G.MX + c*G.PITCHX + G.GAP/2, y:G.TOP + r*G.PITCHY,
+                  w:G.PITCHX - G.GAP, h:G.PITCHY - G.GAP, hp:+ch, max:+ch });
+  }
+  return { blocks, grid, rows, cols };
+}
+
+// 状態 s={x,y,vx,vy} から先を計算する。パドルは考えに入れない。
+// idle は「最後にブロックへ当たってからの経過秒」。ブロックを削り続けている限り
+// 回収力は働かないので、窪みに入り込んで稼ぐような長い飛行を邪魔しない。
+function predict(stage, board, hp0, s, tAbs, idle, R){
+  const { blocks, grid, rows, cols } = board;
+  const hp = hp0.slice();
+  const gf = STAGES[stage].g;
+  if (!R) R = G.R;
+  const dt = G.DT;
+  let x = s.x, y = s.y, vx = s.vx, vy = s.vy, t = 0, k = 0;
+  const samples = [{x, y, vx, vy, t:0}], events = [];
+    let end = 'cap', destroyed = 0, below = false, lastHitT = -(idle || 0);
+  const crossings = [];
+
+  while (t < G.MAXSIM){
+    const g = gf(x, y, tAbs + t);
+    const pull = Math.max(0, t - lastHitT - 8) * 170;   // 手ごたえが途絶えたら下へ促す
+    vx += g[0]*dt; vy += (g[1] + pull)*dt;
+    const sp = Math.hypot(vx, vy);
+    if (sp > G.MAXV){ const q = G.MAXV/sp; vx *= q; vy *= q; }
+    x += vx*dt; y += vy*dt; t += dt; k++;
+
+    let hit = false;
+    if (x < R){ x = R; vx = -vx; hit = true; }
+    else if (x > G.W - R){ x = G.W - R; vx = -vx; hit = true; }
+    if (y < R){ y = R; vy = -vy; hit = true; }
+
+    const c0 = Math.max(0, Math.floor((x - R - G.MX)/G.PITCHX));
+    const c1 = Math.min(cols-1, Math.floor((x + R - G.MX)/G.PITCHX));
+    const r0 = Math.max(0, Math.floor((y - R - G.TOP)/G.PITCHY));
+    const r1 = Math.min(rows-1, Math.floor((y + R - G.TOP)/G.PITCHY));
+    outer:
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++){
+      const i = grid[r*cols+c];
+      if (i < 0 || hp[i] <= 0) continue;
+      const b = blocks[i];
+      const px = x < b.x ? b.x : (x > b.x+b.w ? b.x+b.w : x);
+      const py = y < b.y ? b.y : (y > b.y+b.h ? b.y+b.h : y);
+      const dx = x-px, dy = y-py;
+      if (dx*dx + dy*dy >= R*R) continue;
+      let axis;
+      if (dx === 0 && dy === 0){
+        const oL = x-b.x, oR = b.x+b.w-x, oT = y-b.y, oB = b.y+b.h-y;
+        const m = Math.min(oL,oR,oT,oB);
+        axis = (m === oL || m === oR) ? 'x' : 'y';
+      } else if (dx === 0) axis = 'y';
+      else if (dy === 0) axis = 'x';
+      else axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (axis === 'x'){ vx = -vx; x = dx > 0 ? b.x+b.w+R+.01 : b.x-R-.01; }
+      else { vy = -vy; y = dy > 0 ? b.y+b.h+R+.01 : b.y-R-.01; }
+      hp[i]--;
+      if (hp[i] <= 0) destroyed++;
+      events.push({ t, i, hp:hp[i], gone:hp[i] <= 0, n:destroyed });
+      lastHitT = t;
+      hit = true;
+      break outer;
+    }
+
+    if (y >= G.PADY - R){
+      if (!below && vy > 0){ below = true; if (crossings.length < 12) crossings.push({x, t}); }
+    } else below = false;
+    if (hit || k % 2 === 0) samples.push({x, y, vx, vy, t});
+    if (y - R > G.H){ end = 'out'; break; }
+  }
+  if (samples[samples.length-1].t !== t) samples.push({x, y, vx, vy, t});
+  return { samples, events, end, crossings, destroyed, dur:t, idle:t - lastHitT };
+}
+// ── SIM END ────────────────────────────────────────────────────────────
+
+// ── アイテム ───────────────────────────────────────────────────────────
+const ITEMS = [
+  { k:'P', name:'高精度予測',  col:'#FF6E8A' },
+  { k:'W', name:'パドル2倍',   col:'#FFD166' },
+  { k:'C', name:'キャッチ',    col:'#8FE07A' },
+  { k:'B', name:'大玉',        col:'#FF9E4A' },
+  { k:'L', name:'レーザー',    col:'#FF5A5A' },
+  { k:'♥', name:'ボール +1',   col:'#7CD9F2' },
+  { k:'G', name:'重力場解析',  col:'#B58CFF' },
+  { k:'R', name:'ゲーミング',  col:'#59E0FF', rain:true, pin:3 },
+  { k:'♪', name:'木製',       col:'#C08A50', pin:2 },
+  { k:'▲', name:'デルタ',      col:'#FFFFFF', pin:1 }
+];
+
+// ── 画面まわりの下ごしらえ ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const CSSVAR = k => getComputedStyle(document.documentElement).getPropertyValue('--'+k).trim();
+const C_GRID = CSSVAR('line'), C_BALL = CSSVAR('amber');
+const BC = [null, {f:'#2C3A47', e:'#5A7488'}, {f:'#7E4F2A', e:'#C68A46'}, {f:'#7E3149', e:'#C4566F'}];
+const WD = [null, {f:'#8A6238', e:'#C1955E'}, {f:'#6C4728', e:'#A57146'}, {f:'#4C3120', e:'#7C5533'}];
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ── 木琴の音 ────────────────────────────────────────────────────────
+// 「木製ブロック」の間だけ、ブロックを壊した音がここのファイルに変わります。
+// 連続破壊の1個目〜8個目にそれぞれ対応。HTMLと同じ場所にファイルを置いて
+// パスを書き入れてください（例: 'sounds/xylo1.mp3'）。
+// 空のままのもの、読み込めなかったものは鳴らさず無音で代用します。
+const XYLO_SRC = [
+  './sounds/C.ogg',   // 1個目
+  './sounds/D.ogg',   // 2個目
+  './sounds/E.ogg',   // 3個目
+  './sounds/F.ogg',   // 4個目
+  './sounds/G.ogg',   // 5個目
+  './sounds/HA.ogg',   // 6個目
+  './sounds/HB.ogg',   // 7個目
+  './sounds/HC.ogg'    // 8個目以降
+];
+const XYLO = XYLO_SRC.map(src => {
+  if (!src) return null;
+  const a = new Audio(src);
+  a.preload = 'auto'; a.ok = true;
+  a.addEventListener('error', () => { a.ok = false; });
+  return a;
+});
+function xylo(i){
+  const a = XYLO[Math.max(0, Math.min(XYLO.length-1, i))];
+  if (!a || !a.ok || a.error) return;          // 未指定・読み込み失敗は無音
+  try {
+    const c = a.cloneNode();
+    c.volume = .8;
+    const pr = c.play();
+    if (pr && pr.catch) pr.catch(() => { a.ok = false; });
+  } catch(e){ a.ok = false; }
+}
+
+// ── 効果音（波形をその場で作るので音声ファイルは要らない） ────────────
+const Snd = (() => {
+  let ctx = null, master = null, nbuf = null, conv = null, on = true;
+  function init(){
+    if (ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = .25; master.connect(ctx.destination);
+  }
+  function resume(){ init(); if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  function noiseBuf(){
+    if (!nbuf){
+      nbuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const d = nbuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random()*2-1;
+    }
+    return nbuf;
+  }
+  function reverb(){                       // 残響用のインパルス応答をその場で作る
+    if (!conv){
+      conv = ctx.createConvolver();
+      const n = (ctx.sampleRate*2.6)|0, buf = ctx.createBuffer(2, n, ctx.sampleRate);
+      for (let c = 0; c < 2; c++){
+        const d = buf.getChannelData(c);
+        for (let i = 0; i < n; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/n, 2.6);
+      }
+      conv.buffer = buf;
+      const wet = ctx.createGain(); wet.gain.value = .85;
+      conv.connect(wet); wet.connect(master);
+    }
+    return conv;
+  }
+  function send(g, amt){
+    if (!amt) return;
+    const rg = ctx.createGain(); rg.gain.value = amt;
+    g.connect(rg); rg.connect(reverb());
+  }
+  function tone(o){
+    if (!on || !ctx) return;
+    const { f=440, f2=null, type='square', dur=.08, vol=.3, delay=0 } = o;
+    const t0 = ctx.currentTime + delay;
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(f, t0);
+    if (f2) osc.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t0+dur);
+    g.gain.setValueAtTime(.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0+.005);
+    g.gain.exponentialRampToValueAtTime(.0001, t0+dur);
+    osc.connect(g); g.connect(master); send(g, o.rev);
+    osc.start(t0); osc.stop(t0+dur+.02);
+  }
+  function noise(o){
+    if (!on || !ctx) return;
+    const { dur=.1, vol=.2, f=1200, q=1, type='lowpass', delay=0 } = o;
+    const t0 = ctx.currentTime + delay;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf();
+    const flt = ctx.createBiquadFilter(); flt.type = type; flt.frequency.value = f; flt.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(.0001, t0+dur);
+    src.connect(flt); flt.connect(g); g.connect(master); send(g, o.rev);
+    src.start(t0, Math.random()*.8, dur);
+  }
+  return { resume, tone, noise,
+    get on(){ return on; }, set on(v){ on = v; if (v) resume(); } };
+})();
+const semi = n => Math.pow(2, n/12);
+const SFX = {
+  launch(){ Snd.tone({f:200,f2:760,type:'square',dur:.13,vol:.2}); },
+  paddle(){ Snd.tone({f:240,f2:140,type:'sine',dur:.09,vol:.45});
+            Snd.noise({dur:.03,vol:.16,f:900,type:'bandpass',q:2}); },
+  wall(){   Snd.noise({dur:.03,vol:.10,f:2000,type:'bandpass',q:4});
+            Snd.tone({f:520,type:'sine',dur:.03,vol:.10}); },
+  brk(n){   const i = Math.min(7, Math.max(0, n-1));       // C4から半音ずつ、8個目で頭打ち
+            if (S.fx.wood > 0){ if (Snd.on) xylo(i); return; }
+            Snd.tone({f:262*semi(i),type:'triangle',dur:.11,vol:.28});
+            Snd.noise({dur:.035,vol:.10,f:3000,type:'highpass'}); },
+  hard(){   Snd.tone({f:150,f2:110,type:'square',dur:.06,vol:.22});
+            Snd.noise({dur:.04,vol:.10,f:600,type:'lowpass'}); },
+  drop(){   Snd.tone({f:1320,type:'sine',dur:.05,vol:.12});
+            Snd.tone({f:1980,type:'sine',dur:.05,vol:.09,delay:.055}); },
+  item(){   [0,4,7,12].forEach((v,k) => Snd.tone({f:523*semi(v),type:'triangle',dur:.09,vol:.2,delay:k*.055})); },
+  life(){   [0,7,12,16,19].forEach((v,k) => Snd.tone({f:523*semi(v),type:'sine',dur:.14,vol:.22,delay:k*.06})); },
+  hold(){   Snd.tone({f:660,f2:900,type:'sine',dur:.07,vol:.25}); },
+  big(){    Snd.tone({f:170,f2:80,type:'sawtooth',dur:.3,vol:.28}); },
+  laser(){  Snd.tone({f:1500,f2:90,type:'sawtooth',dur:.45,vol:.24});
+            Snd.noise({dur:.4,vol:.2,f:2600,type:'highpass'}); },
+  zap(k){   Snd.tone({f:600*semi(k%12),type:'square',dur:.06,vol:.13,delay:.05+k*.035}); },
+  die(big){ const v = big ? [.30,.15,.05,.01,.005] : [.30];  // 最後の1球は小さくなりながら5回
+            v.forEach((vol,i) =>
+              Snd.tone({f:320,f2:60,type:'sawtooth',dur:.55,vol,delay:i*.22})); },
+  clear(){  [0,4,7,12,16,19].forEach((v,k) => Snd.tone({f:392*semi(v),type:'triangle',dur:.22,vol:.22,delay:k*.1})); }
+};
+
+function fit(){
+  const d = Math.min(devicePixelRatio||1, 2);
+  cv.width = G.W*d; cv.height = G.H*d; ctx.setTransform(d,0,0,d,0,0);
+}
+fit(); addEventListener('resize', fit);
+
+let cursor = 0, tick = 0;
+const S = {
+  // 進行
+  phase:'title', stage:0, board:null, started:false, paused:false, auto:false, party:false,
+  // 得点と記録
+  lives:G.LIVES, score:0, div:1, stScore:[0,0,0,0,0], newRec:[false,false,false,false,false],
+  time:0, combo:0, seen:new Set(),
+  // ボールとパドル
+  ball:{x:G.W/2, y:G.PADY-G.R-1}, vel:{x:0,y:0}, padCx:G.W/2, padTo:G.W/2, holdOff:0,
+  // 予測した弾道の再生位置
+  path:null, tRel:0, evi:0, pathAbs:0, winOff:0, tAbs:0, sinceHit:0,
+  // アイテムの効果
+  fx:newFx(), drops:[], beams:[], freeze:0, wireLev:0,
+  // 入力と演出
+  keys:{l:false,r:false}, ptr:{x:0,y:0,on:false}, readyClock:0, autoWait:0,
+  ready:{pad:-1, R:0, W:0},
+  trail:[], parts:[]
+};
+// 効果の初期値。時間で減るものは秒、それ以外は回数か予約フラグ
+const TIMED_FX = ['pred','wide','field','rain','wood','wire'];
+function newFx(){
+  return { pred:0, wide:0, field:0, rain:0, wood:0, wire:0, stick:false, big:0, bigQ:false, laser:false };
+}
+const curR  = () => (S.fx.big > 0 ? 10 : G.R);
+const curW  = () => G.PADW * (S.fx.wide > 0 ? 2 : 1);
+const curHZ = () => (S.fx.pred > 0 ? G.HZ2 : G.HZ);
+// ── 進行中の状態から引き出す値 ─────────────────────────────────────────
+let GA = 1, WIRE = false;                    // 描画パスごとの不透明度と線画フラグ
+const ga = a => { ctx.globalAlpha = a*GA; };
+const FT = (sz, wt) => (WIRE ? '400 '+sz+'px "DotGothic16", monospace'
+                             : wt+' '+sz+'px "IBM Plex Mono", monospace');
+const PCOL  = () => (WIRE ? '255,255,255' : (S.fx.pred > 0 ? '255,110,138' : '124,217,242'));
+const hpSnapshot = () => S.board.blocks.map(b => b.hp);
+const nowT = () => (S.phase === 'fly' ? S.tRel : 0);
+function nextCross(p, now){
+  const lim = curHZ() - S.winOff;
+  for (const c of p.crossings) if (c.t > now && c.t <= lim) return c;
+  return null;
+}
+// ── ハイスコア ─────────────────────────────────────────────────────────
+const HSKEY = 'gravity-breakout:highscores';
+const HS = { stages:[0,0,0,0,0], time:0, total:0 };
+(async () => {                              // 保存領域があれば読み込む（無ければその場限り）
+  try {
+    if (window.storage && window.storage.get){
+      const r = await window.storage.get(HSKEY);
+      if (r && r.value){
+        const v = JSON.parse(r.value);
+        if (Array.isArray(v.stages)) for (let i = 0; i < 5; i++) HS.stages[i] = v.stages[i]|0;
+        if (typeof v.time === 'number') HS.time = v.time;
+        if (typeof v.total === 'number') HS.total = v.total;
+      }
+    }
+  } catch(e){}
+})();
+function saveHS(){
+  try { if (window.storage && window.storage.set) window.storage.set(HSKEY, JSON.stringify(HS)); } catch(e){}
+}
+function recordStage(i){
+  if (S.party) return;                       // お祭りモード中は記録しない
+  if (S.stScore[i] > HS.stages[i]){ HS.stages[i] = S.stScore[i]; S.newRec[i] = true; saveHS(); }
+}
+const finalScore = () => Math.floor(S.score / S.div);
+const restartRun = () => { veil(false); S.auto = false; resetRun(); startStage(0); };
+function resetRun(){
+  S.lives = G.LIVES; S.score = 0; S.div = 1; S.time = 0;
+  S.stScore = [0,0,0,0,0]; S.newRec = [false,false,false,false,false];
+}
+function addScore(n){ S.score += n; S.stScore[S.stage] += n; }
+const fmtN = n => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US');
+const fmtSgn = n => (n > 0 ? '+' : n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US');
+function fmtTime(t){
+  const m = Math.floor(t/60), s = t - m*60;
+  return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+}
+const mult = () => (S.stage + 1) * S.lives;   // ステージ数 × 残りボール数
+const aliveCount = () => S.board.blocks.reduce((n,b) => n + (b.hp>0?1:0), 0);
+
+// ── ステージと弾道の管理 ───────────────────────────────────────────────
+function startStage(n){
+  S.stage = n; S.board = buildStage(n);
+  S.tAbs = 0; S.padCx = S.padTo = G.W/2; S.combo = 0;
+  S.fx = newFx(); S.freeze = 0;
+  S.drops.length = 0; S.beams.length = 0;
+  toReady();
+}
+function toReady(){
+  S.phase = 'ready'; S.combo = 0; S.winOff = 0;
+  S.ball = { x:S.padCx, y:G.PADY-curR()-1 }; S.vel = {x:0,y:0};
+  S.trail.length = 0; S.path = null; sync();
+}
+function readyPath(){
+  const R = curR(), th = 30*Math.PI/180;
+  const s = { x:S.padCx, y:G.PADY-R-1, vx:Math.sin(th)*G.BASE, vy:-Math.cos(th)*G.BASE };
+  S.path = predict(S.stage, S.board, hpSnapshot(), s, S.tAbs, 0, R);
+  S.pathAbs = S.tAbs; S.tRel = 0; S.evi = 0; S.winOff = 0; S.sinceHit = 0; cursor = 0;
+}
+// キャッチ中: パドルの上で待たせる
+function holdPath(){
+  const R = curR(), half = curW()/2;
+  let off = S.holdOff/(half + R); off = Math.max(-1, Math.min(1, off));
+  const th = off*(62*Math.PI/180);
+  const s = { x:S.padCx + S.holdOff, y:G.PADY-R-.5,
+              vx:Math.sin(th)*G.BASE, vy:-Math.cos(th)*G.BASE };
+  S.path = predict(S.stage, S.board, hpSnapshot(), s, S.tAbs, 0, R);
+  S.pathAbs = S.tAbs; S.tRel = 0; S.evi = 0; S.winOff = 0; S.sinceHit = 0; cursor = 0;
+  S.ball = {x:s.x, y:s.y}; S.vel = {x:0,y:0};
+}
+function launch(){
+  SFX.launch(); readyPath();
+  S.ball = { x:S.path.samples[0].x, y:S.path.samples[0].y };
+  S.phase = 'fly'; sync();
+}
+function release(){
+  SFX.launch(); holdPath();
+  S.vel = {x:S.path.samples[0].vx, y:S.path.samples[0].vy};
+  S.phase = 'fly'; sync();
+}
+function repath(s, absT){
+  S.path = predict(S.stage, S.board, hpSnapshot(), s, absT, S.sinceHit, curR());
+  S.pathAbs = absT; S.tRel = 0; S.evi = 0; cursor = 0;
+}
+
+
+// ── HUD ────────────────────────────────────────────────────────────────
+function sync(){
+  $('s-lv').textContent = (S.stage+1) + '/5';
+  $('s-tm').textContent = fmtTime(S.time);
+  $('s-sc').innerHTML = S.score.toLocaleString('en-US')
+    + (S.div > 1 ? '<span class="div">/'+S.div+'</span>' : '');
+  let b = ''; for (let i = 0; i < G.LIVES; i++) b += '<span class="ball'+(i<S.lives?'':' spent')+'"></span>';
+  $('s-bl').innerHTML = b;
+  const known = S.seen.has(S.stage) || S.fx.field > 0;
+  $('s-fd').textContent = known ? STAGES[S.stage].name : '未解析';
+  $('s-fd').style.color = (S.fx.field > 0 && !S.seen.has(S.stage)) ? '#B58CFF' : '';
+  fxChips();
+  const p = S.path;
+  if (p){
+    const now = nowT(), lim = curHZ() - S.winOff;
+    const ip = nextCross(p, now);
+    $('r-ip').innerHTML = ip ? Math.round(ip.x)+'<span class="u">px</span>' : '<span class="dim">この先は不明</span>';
+    $('r-ip').className = 'cell__v' + (ip?'':' dim');
+    const rest = Math.max(0, Math.min(p.dur, lim) - now);
+    $('r-hz').innerHTML = rest.toFixed(1)+'<span class="u">秒</span>';
+    $('r-hz').className = 'cell__v' + (rest > 0 ? '' : ' dim');
+    let left = 0;
+    for (let i = S.evi; i < p.events.length && p.events[i].t <= lim; i++) if (p.events[i].gone) left++;
+    $('r-br').innerHTML = left+'<span class="u">個</span>';
+    $('r-sp').innerHTML = Math.round(Math.hypot(S.vel.x,S.vel.y))+'<span class="u">px/s</span>';
+    $('r-cb').innerHTML = S.combo+'<span class="u">連</span>';
+  }
+  $('h-ph').textContent = {title:'READY',ready:'READY',hold:'HOLD',fly:'IN FLIGHT',clear:'CLEAR',over:'GAME OVER',end:'COMPLETE'}[S.phase];
+  if (S.auto && (S.phase === 'ready' || S.phase === 'hold' || S.phase === 'fly')){
+    $('h-tx').innerHTML = '<b>オートプレイ中</b>。パドルは常にボールの下につきます（<kbd>A</kbd> で解除）。';
+    return;
+  }
+  $('h-tx').innerHTML = {
+    title:'', clear:'', over:'', end:'',
+    ready:'パドルを動かして<b>クリックまたは <kbd>Space</kbd> で発射</b>。打ち出す向きは右上30°で固定です。',
+    hold:'ボールをつかまえています。<b>クリックまたは <kbd>Space</kbd> で発射</b>。予測線を見ながら狙えます。',
+    fly:'予測が出るのは<b>パドルに触れてから'+curHZ().toFixed(1)+'秒ぶんだけ</b>。パドルは凸レンズのような形をしていて、当たった場所によって跳ねる方向が変わります。'
+  }[S.phase];
+}
+function fxChips(){
+  const f = S.fx, out = [];
+  const add = (i, txt, left) => out.push('<span class="chip'+(ITEMS[i].rain?' rain':'')
+    + '" style="--c:'+ITEMS[i].col+';opacity:'+(left === undefined ? 1 : pulse(left, .5)).toFixed(2)+'">'
+    + ITEMS[i].k + ' ' + ITEMS[i].name + ' <em>' + txt + '</em></span>');
+  if (f.pred > 0) add(0, f.pred.toFixed(1)+'s', f.pred);
+  if (f.wide > 0) add(1, f.wide.toFixed(1)+'s', f.wide);
+  if (f.stick)    add(2, '次の1回');
+  if (f.bigQ)     add(3, '次の接触から');
+  else if (f.big > 0) add(3, 'あと'+f.big+'回');
+  if (f.laser)    add(4, '次の接触で発射');
+  if (f.field> 0) add(6, f.field.toFixed(1)+'s', f.field);
+  if (f.rain > 0) add(7, f.rain.toFixed(1)+'s', f.rain);
+  if (f.wood > 0) add(8, f.wood.toFixed(1)+'s', f.wood);
+  if (f.wire > 0) add(9, f.wire.toFixed(1)+'s', f.wire);
+  $('fx-list').innerHTML = out.length ? out.join('') : '<span class="fx__none">なし</span>';
+}
+// 幕。o は {eyebrow, title, body, fig, figLabel, buttons:[[文字,処理], ...]}
+function veil(o){
+  $('veil').classList.toggle('on', !!o);
+  if (!o) return;
+  $('v-e').textContent = o.eyebrow || '';
+  $('v-t').textContent = o.title || '';
+  $('v-p').innerHTML   = o.body || '';
+  $('v-p').style.display = o.body ? '' : 'none';
+  $('v-f').textContent  = o.fig || '';
+  $('v-fk').textContent = o.figLabel || '';
+  $('v-t').classList.toggle('party', S.party && !S.started);
+  ['v-b','v-b2','v-b3'].forEach((id, i) => {
+    const el = $(id), spec = (o.buttons || [])[i];
+    el.style.display = spec ? '' : 'none';
+    if (spec){ el.textContent = spec[0]; el.onclick = spec[1]; }
+  });
+  $('v-b').focus();
+}
+
+// ── 入力 ───────────────────────────────────────────────────────────────
+// 入力は目標位置を決めるだけ。実際のパドルは PADV を上限に追いかける
+const clampPad = x => { const h = curW()/2; return Math.max(h, Math.min(G.W-h, x)); };
+function movePad(x){
+  if (S.freeze > 0 || S.paused) return;   // レーザー中と一時停止中は動かさない
+  S.padTo = clampPad(x);
+}
+function trackPad(dt){
+  S.padTo = clampPad(S.padTo);
+  const m = G.PADV*dt, d = S.padTo - S.padCx;
+  S.padCx = clampPad(S.padCx + Math.max(-m, Math.min(m, d)));
+}
+function localX(e){ const r = cv.getBoundingClientRect(); return (e.clientX-r.left)/r.width*G.W; }
+function localY(e){ const r = cv.getBoundingClientRect(); return (e.clientY-r.top)/r.height*G.H; }
+cv.addEventListener('pointermove', e => {
+  S.ptr.x = localX(e); S.ptr.y = localY(e); S.ptr.on = true;
+  if (!S.auto) movePad(S.ptr.x);
+});
+cv.addEventListener('pointerleave', () => { S.ptr.on = false; });
+cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); if (!S.auto) movePad(localX(e)); });
+function primary(){
+  if (S.phase === 'ready') launch();
+  else if (S.phase === 'hold') release();
+}
+cv.addEventListener('pointerup', () => { if (!S.auto) primary(); });
+addEventListener('keydown', e => {
+  if (e.key === 'a' || e.key === 'A'){ S.auto = !S.auto; S.autoWait = 0; sync(); return; }
+  if (S.auto) return;
+  if (e.key === 'ArrowLeft') S.keys.l = true;
+  if (e.key === 'ArrowRight') S.keys.r = true;
+  if (e.key === ' ' || e.key === 'Enter'){ primary(); e.preventDefault(); }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
+});
+addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft') S.keys.l = false;
+  if (e.key === 'ArrowRight') S.keys.r = false;
+});
+const dropRate = () => (S.party ? .5 : G.DROP);
+// 効果が切れる直前だけ、残りが少ないほど速く明滅させる
+function pulse(t, depth){
+  if (t <= 0 || t > 5) return 1;
+  const u = 5 - t;                            // 警告に入ってからの経過秒
+  const ph = 2*u*u;                           // 角速度 4u rad/s。止まった状態から加速していく
+  return 1 - depth*(.5 - .5*Math.cos(ph));    // 明るい状態から沈んで戻る
+}
+function setParty(v){
+  S.party = v;
+  $('t-name').classList.toggle('party', v);
+  $('v-t').classList.toggle('party', v);
+  $('doc-h').textContent = 'ITEMS — ブロックを壊すと' + (dropRate()*100).toFixed(0) + '%で落ちてくる';
+}
+for (const el of [$('t-name'), $('v-t')])
+  el.addEventListener('click', () => { if (!S.started) setParty(!S.party); });
+function showTitle(){
+  S.paused = false; S.auto = false; S.started = false;
+  resetRun(); startStage(0);
+  readyPath();          // タイトルの裏に見せる線だけ用意しておく
+  const go = auto => { veil(false); S.auto = auto; S.started = true; resetRun(); startStage(0); };
+  veil({ eyebrow:'GRAVITY FIELD SURVEY', title:'重力場ブロック崩し',
+    body:'5つのステージには、それぞれ違う<b>目に見えない重力</b>がかかっています。<br>手がかりは<b>水色の弾道予測線</b>だけ。線の曲がり方から、その場の力を読み取ってください。',
+    buttons: [['はじめる', () => go(false)], ['オートプレイを見る', () => go(true)]] });
+}
+function showPause(){
+  veil({ eyebrow:'PAUSED', title:'一時停止',
+    fig: S.score.toLocaleString('en-US') + (S.div > 1 ? ' / ' + S.div : ''), figLabel:'SCORE',
+    buttons: [
+      ['再開', () => setPause(false)],
+      [Snd.on ? '♪ 音あり' : '♪ 音なし', () => { Snd.on = !Snd.on; showPause(); }],
+      ['タイトルに戻る', () => showTitle()]
+    ]});
+}
+function setPause(on){
+  if (on){
+    if (!S.started) return;
+    if (S.phase !== 'ready' && S.phase !== 'hold' && S.phase !== 'fly') return;
+    S.paused = true; showPause();
+  } else { S.paused = false; S.keys.l = S.keys.r = false; veil(false); }
+}
+$('btn-pause').addEventListener('click', () => setPause(!S.paused));
+addEventListener('pointerdown', () => Snd.resume(), true);
+addEventListener('keydown', e => {
+  Snd.resume();
+  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape'){ setPause(!S.paused); e.preventDefault(); }
+}, true);
+
+// ── 進行 ───────────────────────────────────────────────────────────────
+// ── アイテムと得点 ─────────────────────────────────────────────────────
+function applyEvents(untilT){
+  const p = S.path;
+  while (S.evi < p.events.length && p.events[S.evi].t <= untilT){
+    const ev = p.events[S.evi++], b = S.board.blocks[ev.i];
+    b.hp = ev.hp;
+    if (ev.gone){
+      S.combo++;
+      addScore(S.combo * mult());
+      burst(b); maybeDrop(b); SFX.brk(S.combo);
+    } else { addScore(mult()); SFX.hard(); }
+  }
+}
+function maybeDrop(b){
+  if (Math.random() >= dropRate()) return;
+  S.drops.push({ x:b.x+b.w/2, y:b.y+b.h/2, type:(Math.random()*ITEMS.length)|0 });
+  SFX.drop();
+}
+function grabItem(type){
+  const f = S.fx;
+  // 時間で効くものは重ねて拾うと足し算になる
+  if (type === 0) f.pred += G.FXT;
+  else if (type === 1){ f.wide += G.FXT; movePad(S.padTo); }
+  else if (type === 2) f.stick = true;
+  else if (type === 3) f.bigQ = true;
+  else if (type === 4) f.laser = true;
+  else if (type === 5){ if (S.lives < G.LIVES) S.lives++; }
+  else if (type === 6) f.field += G.FXT;
+  else if (type === 7) f.rain += G.FXT;
+  else if (type === 8) f.wood += G.FXT;
+  else if (type === 9) f.wire += G.FXT;
+  addScore(1);
+  (type === 5 ? SFX.life : SFX.item)();
+  sync();
+}
+// パドルの真上にあるブロックをまとめて消す
+function zap(){
+  const half = curW()/2, L = S.padCx - half, Rt = S.padCx + half;
+  let n = 0;
+  for (const b of S.board.blocks){
+    if (b.hp <= 0 || b.x + b.w < L || b.x > Rt) continue;
+    b.hp = 0; n++; S.combo++; addScore(S.combo * mult()); burst(b); maybeDrop(b);
+    if (n <= 10) SFX.zap(n-1);
+  }
+  S.beams.push({ x:S.padCx, w:curW(), t:0 });
+  SFX.laser();
+  return n;
+}
+function burst(b){
+  if (REDUCED) return;
+  const col = BC[b.max].e;
+  for (let i = 0; i < 8; i++) S.parts.push({
+    x:b.x+Math.random()*b.w, y:b.y+Math.random()*b.h,
+    vx:(Math.random()-.5)*150, vy:(Math.random()-.6)*150,
+    t:0, life:.45+Math.random()*.3, s:1.5+Math.random()*2.5, c:col });
+}
+// ── パドル接触・落球・クリア ───────────────────────────────────────────
+function paddleBounce(sm){
+  applyEvents(sm.t);
+  const f = S.fx;
+  S.combo = 0; S.winOff = 0; S.sinceHit = 0;   // 打ち返したら仕切り直し
+  S.pathAbs = S.pathAbs + sm.t;
+  if (f.laser){ f.laser = false; zap(); S.freeze = .55; }   // 時間を止めて一掃
+  if (f.bigQ){ f.bigQ = false; f.big = 3; SFX.big(); }      // ここから大玉
+  else if (f.big > 0) f.big--;                              // 3回触れたら戻る
+  const R = curR(), half = curW()/2;
+  if (aliveCount() === 0){ clearStage(); return; }
+  if (S.fx.stick){                       // キャッチ: くっつけて発射を待つ
+    S.fx.stick = false;
+    S.holdOff = Math.max(-half+3, Math.min(half-3, sm.x - S.padCx));
+    S.tAbs = S.pathAbs; S.phase = 'hold';
+    SFX.hold(); holdPath(); sync(); return;
+  }
+  let off = (sm.x - S.padCx)/(half + R);
+  off = Math.max(-1, Math.min(1, off));
+  const th = off*(62*Math.PI/180);
+  const st = { x:sm.x, y:G.PADY - R - .5, vx:Math.sin(th)*G.BASE, vy:-Math.cos(th)*G.BASE };
+  S.ball = {x:st.x, y:st.y}; S.vel = {x:st.vx, y:st.vy};
+  SFX.paddle();
+  repath(st, S.pathAbs);
+  sync();                       // 打ち返した瞬間に読み取り欄も更新する
+}
+function die(){
+  S.lives--;
+  const over = S.lives <= 0;
+  SFX.die(over);
+  if (over){
+    S.phase = 'over';
+    veil({ eyebrow:'GAME OVER', title:'ボールを使い切りました',
+      body:'ステージ '+(S.stage+1)+' の重力場は <b>'+STAGES[S.stage].name+'</b> でした。<br>'
+        + 'コンティニューすると、この盤面のままボールが5個に戻ります。'
+        + 'そのかわり、最後にスコアを割る数が <b>'+S.div+' → '+(S.div*2)+'</b> になります。',
+      fig: finalScore().toLocaleString('en-US'), figLabel:'FINAL SCORE',
+      buttons: [['コンティニュー', () => continueGame()], ['はじめから', restartRun]] });
+    sync(); return;
+  }
+  toReady();
+}
+function continueGame(){
+  veil(false);
+  S.div *= 2;                       // 割り算は最後にまとめて行う
+  S.lives = G.LIVES;
+  S.fx = newFx();
+  S.drops.length = 0; S.beams.length = 0; S.freeze = 0; S.combo = 0;
+  toReady();
+}
+function clearStage(){
+  SFX.clear(); S.seen.add(S.stage);
+  recordStage(S.stage);
+  const st = STAGES[S.stage], last = S.stage === STAGES.length-1;
+  S.phase = 'clear';
+  const heal = !last && S.lives < G.LIVES;
+  if (heal) S.lives++;
+  veil({ eyebrow:'STAGE '+st.id+' CLEAR', title:'この面の重力場は「'+st.name+'」',
+    body: st.note + (heal ? '<br><b>ボールが1つ戻りました。</b>' : ''),
+    fig: S.score.toLocaleString('en-US'), figLabel:'SCORE',
+    buttons: [[ last ? 'リザルトを見る' : '次のステージへ',
+                last ? () => showResult() : () => { veil(false); startStage(S.stage+1); } ]] });
+  sync();
+}
+function showResult(){
+  S.phase = 'end';
+  const bonus = Math.round((G.PAR - S.time) * 10);   // 基準タイムから0.1秒ごとに1点
+  const total = Math.max(0, finalScore() + bonus);
+  const newTime = !S.party && bonus > HS.time, newTot = !S.party && total > HS.total;
+  if (newTime) HS.time = bonus;
+  if (newTot) HS.total = total;
+  if (!S.party) saveHS();
+  let tab = '<table class="rtab"><tr><th>内訳</th><th>今回</th><th>ベスト</th></tr>';
+  for (let i = 0; i < 5; i++)
+    tab += '<tr><td>ステージ '+(i+1)+'</td><td>'+fmtN(S.stScore[i])
+         + (S.newRec[i] ? ' <em>NEW</em>' : '')+'</td><td>'+fmtN(HS.stages[i])+'</td></tr>';
+  tab += '<tr><td>タイムボーナス <span class="sub">'+fmtTime(S.time)+' / 基準 '+fmtTime(G.PAR)+'</span></td><td>'
+       + fmtSgn(bonus) + (newTime ? ' <em>NEW</em>' : '') + '</td><td>'+fmtSgn(HS.time)+'</td></tr>';
+  if (S.div > 1)
+    tab += '<tr><td>コンティニュー '+Math.round(Math.log2(S.div))+'回</td><td colspan="2">ステージ合計を ÷'+S.div+'</td></tr>';
+  tab += '<tr class="tot"><td>合計</td><td>'+fmtN(total)+(newTot ? ' <em>NEW</em>' : '')
+       + '</td><td>'+fmtN(HS.total)+'</td></tr></table>';
+  veil({ eyebrow:'ALL FIELDS SURVEYED', title:'5つの重力場を踏破', body:tab,
+    fig: fmtN(total), figLabel:'FINAL SCORE', buttons: [['はじめから', restartRun]] });
+  sync();
+}
+
+// ── 毎フレームの更新 ───────────────────────────────────────────────────
+function tickFx(dt){
+  const f = S.fx;
+  for (const k of TIMED_FX) if (f[k] > 0) f[k] = Math.max(0, f[k]-dt);
+  movePad(S.padTo);                               // パドル幅が変わったときのはみ出し防止
+}
+function decay(dt){
+  for (let i = S.trail.length-1; i >= 0; i--) if ((S.trail[i].t += dt) > .3) S.trail.splice(i,1);
+  for (let i = S.parts.length-1; i >= 0; i--){
+    const q = S.parts[i];
+    q.t += dt; q.x += q.vx*dt; q.y += q.vy*dt; q.vy += 260*dt;
+    if (q.t > q.life) S.parts.splice(i,1);
+  }
+  for (let i = S.beams.length-1; i >= 0; i--) if ((S.beams[i].t += dt) > .55) S.beams.splice(i,1);
+}
+function stepDrops(dt){
+  const half = curW()/2;
+  for (let i = S.drops.length-1; i >= 0; i--){
+    const d = S.drops[i];
+    d.y += 165*dt;
+    if (d.y+7 >= G.PADY && d.y-7 <= G.PADY+G.PADH
+        && d.x >= S.padCx-half-12 && d.x <= S.padCx+half+12){
+      grabItem(d.type); S.drops.splice(i,1); continue;
+    }
+    if (d.y > G.H+24) S.drops.splice(i,1);
+  }
+}
+function autoPlay(dt){
+  // 常にボールの真下へ。ただし少しずらして、返す角度が毎回変わるようにする
+  const tgt = S.ball.x + Math.sin(S.tAbs*.9)*26;
+  const mv = Math.max(-1500*dt, Math.min(1500*dt, tgt - S.padCx));
+  movePad(S.padCx + mv);
+  if (S.phase === 'ready' || S.phase === 'hold'){
+    S.autoWait += dt;
+    if (S.autoWait > .7){ S.autoWait = 0; primary(); }
+  } else S.autoWait = 0;
+}
+function step(dt){
+  S.time += dt;
+  if (S.auto) autoPlay(dt);
+  else {
+    if (S.keys.l) movePad(S.padTo - 560*dt);
+    if (S.keys.r) movePad(S.padTo + 560*dt);
+  }
+  trackPad(dt);
+  if (S.freeze > 0){                       // レーザーの間だけ時間が止まる
+    S.freeze = Math.max(0, S.freeze - dt);
+    decay(dt);
+    if ((tick++ & 3) === 0) sync();
+    return;
+  }
+  tickFx(dt); stepDrops(dt);
+
+  if (S.phase === 'ready' || S.phase === 'hold'){
+    const hold = S.phase === 'hold';
+    S.tAbs += dt; S.readyClock += dt;
+    // 時刻で重力が変わらない面では、条件が同じなら結果も同じなので計算しない
+    const R = curR(), W = curW(), rd = S.ready;
+    if (!S.path || rd.pad !== S.padCx || rd.R !== R || rd.W !== W
+        || (STAGES[S.stage].moving && S.readyClock > .08)){
+      S.readyClock = 0; rd.pad = S.padCx; rd.R = R; rd.W = W;
+      hold ? holdPath() : readyPath();
+    }
+    S.ball = hold ? {x:S.padCx + S.holdOff, y:G.PADY-curR()-.5}
+                  : {x:S.padCx, y:G.PADY-curR()-1};
+    S.vel = {x:0,y:0};
+  } else if (S.phase === 'fly'){
+    const p = S.path, prev = S.tRel, R = curR(), half = curW()/2;
+    S.tRel += dt; S.tAbs = S.pathAbs + S.tRel;
+    // このフレームで通過したサンプルを見て、パドル接触を拾う
+    let bounced = null;
+    while (cursor < p.samples.length && p.samples[cursor].t <= prev) cursor++;
+    for (let i = cursor; i < p.samples.length && p.samples[i].t <= S.tRel; i++){
+      const sm = p.samples[i];
+      if (sm.vy > 0 && sm.y + R >= G.PADY && sm.y - R <= G.PADY + G.PADH
+          && sm.x >= S.padCx - half - R && sm.x <= S.padCx + half + R){ bounced = sm; break; }
+    }
+    if (bounced){ cursor = 0; paddleBounce(bounced); }
+    else {
+      applyEvents(S.tRel);
+      const at = sampleAt(p, S.tRel), pv = S.vel;
+      if ((pv.x > 0) !== (at.vx > 0) && (at.x < 22 || at.x > G.W-22)) SFX.wall();
+      else if (pv.y < 0 && at.vy > 0 && at.y < 22) SFX.wall();
+      S.ball = {x:at.x, y:at.y}; S.vel = {x:at.vx, y:at.vy};
+      S.trail.push({x:at.x, y:at.y, t:0});
+      if (aliveCount() === 0){ clearStage(); return; }
+      if (S.tRel >= p.dur){
+        cursor = 0;
+        if (p.end === 'out') die();
+        else {   // 24秒で計算しきれないときは、続きを継ぎ足す
+          const l = p.samples[p.samples.length-1];
+          S.winOff += l.t; S.sinceHit = p.idle;
+          repath({x:l.x,y:l.y,vx:l.vx,vy:l.vy}, S.pathAbs+l.t);
+        }
+      }
+    }
+  }
+  decay(dt);
+  if ((tick++ & 3) === 0) sync();
+}
+function sampleAt(p, t){
+  const a = p.samples;
+  let lo = 0, hi = a.length-1;
+  if (t <= 0) return a[0];
+  if (t >= a[hi].t) return a[hi];
+  while (hi - lo > 1){ const m = (lo+hi)>>1; if (a[m].t <= t) lo = m; else hi = m; }
+  const s0 = a[lo], s1 = a[hi], sp = s1.t - s0.t, u = sp > 0 ? (t - s0.t)/sp : 0;
+  return { x:s0.x+(s1.x-s0.x)*u, y:s0.y+(s1.y-s0.y)*u, vx:s0.vx+(s1.vx-s0.vx)*u, vy:s0.vy+(s1.vy-s0.vy)*u };
+}
+
+// ── 描画 ───────────────────────────────────────────────────────────────
+// ── 描画 ───────────────────────────────────────────────────────────────
+const DGRID = [                                 // 紫の方眼。2枚が逆向きに流れ続ける
+  { sp:64, vx: 13, vy: 10, c:'rgba(150,40,175,.08)' },   // 右下へ
+  { sp:40, vx:-23, vy:-17, c:'rgba(206,72,226,.12)' }    // 左上へ
+];
+function drawGrid(){
+  ctx.strokeStyle = C_GRID; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 40; x < G.W; x += 40){ ctx.moveTo(x+.5,0); ctx.lineTo(x+.5,G.H); }
+  for (let y = 40; y < G.H; y += 40){ ctx.moveTo(0,y+.5); ctx.lineTo(G.W,y+.5); }
+  ctx.stroke();
+}
+function drawDeltaGrid(){
+  const t = S.tAbs;
+  for (const L of DGRID){
+    const ox = ((L.vx*t) % L.sp + L.sp) % L.sp, oy = ((L.vy*t) % L.sp + L.sp) % L.sp;
+    ctx.strokeStyle = L.c; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = ox - L.sp; x < G.W + L.sp; x += L.sp){ const q = Math.round(x)+.5; ctx.moveTo(q,0); ctx.lineTo(q,G.H); }
+    for (let y = oy - L.sp; y < G.H + L.sp; y += L.sp){ const q = Math.round(y)+.5; ctx.moveTo(0,q); ctx.lineTo(G.W,q); }
+    ctx.stroke();
+  }
+}
+function draw(){
+  ctx.fillStyle = '#06070A'; ctx.fillRect(0,0,G.W,G.H);
+  const gw = S.wireLev;
+  if (gw < 1){ ctx.globalAlpha = 1-gw; drawGrid(); }
+  if (gw > 0){ ctx.globalAlpha = gw;   drawDeltaGrid(); }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = 'rgba(124,217,242,.10)'; ctx.setLineDash([3,7]);
+  ctx.beginPath(); ctx.moveTo(0,G.PADY-curR()+.5); ctx.lineTo(G.W,G.PADY-curR()+.5); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const w = S.wireLev;                        // 通常の絵と線画をたすき掛けで入れ替える
+  if (w < 1){ GA = 1-w; WIRE = false; scene(); }
+  if (w > 0){ GA = w;   WIRE = true;  scene(); }
+  GA = 1; WIRE = false; ctx.globalAlpha = 1;
+  drawPointer();
+}
+function drawPointer(){                         // 実際のマウス位置をうっすら
+  const p = S.ptr;
+  if (!p.on || S.auto || S.paused) return;
+  if (S.phase !== 'ready' && S.phase !== 'hold' && S.phase !== 'fly') return;
+  ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(p.x-6.5, p.y); ctx.lineTo(p.x+6.5, p.y);
+  ctx.moveTo(p.x, p.y-6.5); ctx.lineTo(p.x, p.y+6.5);
+  ctx.stroke();
+}
+function scene(){
+  ctx.globalAlpha = GA;
+  if (S.fx.field > 0) drawField();
+  drawBlocks();
+  if (S.path && S.phase !== 'over') drawPath();
+  drawBeams(); drawParts(); drawDrops(); drawPaddle(); drawBall();
+  ctx.globalAlpha = 1;
+}
+function drawField(){
+  const gf = STAGES[S.stage].g, t = S.tAbs, a = Math.min(1, S.fx.field/1.5);
+  const FC = WIRE ? '255,255,255' : '181,140,255';
+  ctx.save(); ctx.lineWidth = 1.2; ctx.lineCap = 'butt';
+  for (let x = 44; x < G.W; x += 73) for (let y = 38; y < G.H-28; y += 66){
+    const g = gf(x, y, t), m = Math.hypot(g[0], g[1]);
+    if (m < 8){
+      ctx.fillStyle = 'rgba('+FC+','+(.20*a).toFixed(2)+')';
+      ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI*2); ctx.fill();
+      continue;
+    }
+    const L = Math.min(32, 10 + m*.03), ux = g[0]/m, uy = g[1]/m;
+    const al = (.12 + Math.min(.3, m/1800))*a;
+    const tx = x + ux*L/2, ty = y + uy*L/2;              // 矢の先
+    const hl = Math.min(7, L*.45), hw = hl*.5;           // 矢じりの長さと半幅
+    const px = -uy, py = ux;                             // 直交方向
+    ctx.strokeStyle = 'rgba('+FC+','+al.toFixed(2)+')';
+    ctx.beginPath();
+    ctx.moveTo(x-ux*L/2, y-uy*L/2);
+    ctx.lineTo(tx-ux*hl*.6, ty-uy*hl*.6);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba('+FC+','+(al+.16).toFixed(2)+')';
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx-ux*hl+px*hw, ty-uy*hl+py*hw);
+    ctx.lineTo(tx-ux*hl-px*hw, ty-uy*hl-py*hw);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawDrops(){
+  ctx.save();
+  ctx.font = FT(10, 600);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const d of S.drops){
+    const it = ITEMS[d.type];
+    const col = WIRE ? '#FFFFFF'
+      : (it.rain ? 'hsl('+Math.floor((S.tAbs*150 + d.y*1.4)%360)+',85%,66%)' : it.col);
+    ctx.fillStyle = 'rgba(6,7,10,.9)';
+    ctx.fillRect(d.x-12, d.y-7.5, 24, 15);
+    ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+    ctx.shadowColor = col; ctx.shadowBlur = WIRE ? 0 : 9;
+    ctx.strokeRect(d.x-11.5, d.y-7, 23, 14);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = col; ctx.fillText(it.k, d.x, d.y+.5);
+  }
+  ctx.restore();
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+function drawBeams(){
+  const BCol = WIRE ? '255,255,255' : '255,90,90';
+  for (const bm of S.beams){
+    const a = Math.max(0, 1 - bm.t/.55), x = bm.x - bm.w/2;
+    if (!WIRE){
+      const g = ctx.createLinearGradient(0, G.PADY, 0, 0);
+      g.addColorStop(0, 'rgba('+BCol+','+(a*.5).toFixed(2)+')');
+      g.addColorStop(1, 'rgba('+BCol+','+(a*.04).toFixed(2)+')');
+      ctx.fillStyle = g; ctx.fillRect(x, 0, bm.w, G.PADY);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,'+(a*.55).toFixed(2)+')';
+    ctx.fillRect(x, 0, 1.5, G.PADY); ctx.fillRect(x+bm.w-1.5, 0, 1.5, G.PADY);
+  }
+}
+// 予測の見える範囲で壊れるブロックを、当たる順に並べて返す
+function upcomingBreaks(){
+  const order = new Map();
+  if (!S.path) return order;
+  const lim = curHZ() - S.winOff;
+  for (let i = S.evi; i < S.path.events.length && S.path.events[i].t <= lim; i++){
+    const ev = S.path.events[i];
+    if (ev.gone && !order.has(ev.i)) order.set(ev.i, order.size+1);
+  }
+  return order;
+}
+function drawBlocks(){
+  const rain = S.fx.rain > 0, wood = S.fx.wood > 0;
+  for (const b of S.board.blocks){
+    if (b.hp <= 0) continue;
+    const c = BC[b.hp];
+    if (WIRE){                                  // 線画: 枠だけ。中は塗って方眼を隠す
+      ctx.fillStyle = '#06070A'; ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1;
+      ctx.strokeRect(b.x+.5, b.y+.5, b.w-1, b.h-1);
+      for (let k = 1; k < b.hp; k++)
+        ctx.strokeRect(b.x+.5+k*2.5, b.y+.5+k*2.5, b.w-1-k*5, b.h-1-k*5);
+      continue;
+    }
+    if (wood){
+      const w = WD[b.hp];
+      ctx.fillStyle = w.f; ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = w.e; ctx.fillRect(b.x, b.y, b.w, 1.5);
+      ctx.strokeStyle = 'rgba(0,0,0,.22)'; ctx.lineWidth = 1;   // 木目
+      ctx.beginPath();
+      ctx.moveTo(b.x+2, b.y+5.5); ctx.lineTo(b.x+b.w-2, b.y+5.5);
+      ctx.moveTo(b.x+2, b.y+10.5); ctx.lineTo(b.x+b.w-6, b.y+10.5);
+      ctx.stroke();
+    } else if (rain){
+      const h = Math.floor((b.x*.35 + b.y*1.4 + S.tAbs*150) % 360);
+      ctx.fillStyle = 'hsl('+h+',62%,42%)'; ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = 'hsl('+h+',85%,70%)'; ctx.fillRect(b.x, b.y, b.w, 1.5);
+    } else {
+    ctx.fillStyle = c.f; ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = c.e; ctx.fillRect(b.x, b.y, b.w, 1.5);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1;
+    ctx.strokeRect(b.x+.5, b.y+.5, b.w-1, b.h-1);
+  }
+  drawUpcoming();
+}
+// これから壊れるブロックに枠と順番をつける
+function drawUpcoming(){
+  const order = upcomingBreaks();
+  if (!order.size) return;
+  ctx.font = FT(10, 600);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const PC = PCOL();
+  for (const [i,n] of order){
+    const b = S.board.blocks[i];
+    if (!b) continue;
+    ctx.strokeStyle = 'rgba('+PC+',.85)'; ctx.lineWidth = WIRE ? 2.4 : 1.2;
+    ctx.strokeRect(b.x+1, b.y+1, b.w-2, b.h-2);
+    if (n <= 9){
+      ctx.fillStyle = 'rgba('+PC+',.9)';
+      ctx.fillRect(b.x+b.w-13, b.y+2, 11, 11);
+      ctx.fillStyle = '#06070A'; ctx.fillText(String(n), b.x+b.w-7.5, b.y+8);
+    }
+  }
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+function tier(from, to, alpha, w){
+  const p = S.path, a = p.samples;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < a.length; i++){
+    const s = a[i];
+    if (s.t > to) break;
+    if (s.t < from) continue;
+    if (!started){ ctx.moveTo(s.x, s.y); started = true; } else ctx.lineTo(s.x, s.y);
+  }
+  if (!started) return;
+  ctx.strokeStyle = 'rgba('+PCOL()+','+alpha+')';
+  ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.stroke();
+}
+function drawPath(){
+  const p = S.path, now = nowT(), cross = nextCross(p, now);
+  const hz = curHZ(), off = S.winOff, PC = PCOL();
+  const lim = Math.min(p.dur, hz - off, cross ? cross.t + .05 : Infinity);
+  const b1 = hz/3 - off, b2 = 2*hz/3 - off, k = pulse(S.fx.pred, .38);
+  if (now < lim){
+    ctx.save();
+    ctx.shadowColor = 'rgba('+PC+',.55)'; ctx.shadowBlur = 6;
+    tier(now, Math.min(lim, b1), .95*k, 1.6);
+    ctx.shadowBlur = 0;
+    tier(Math.max(now, b1-.03), Math.min(lim, b2), .42*k, 1.4);
+    ctx.setLineDash([5,6]);
+    tier(Math.max(now, b2-.03), lim, .2*k, 1.1);
+    ctx.setLineDash([]);
+    // 読める範囲の終わり
+    if (lim < p.dur - .05){
+      const e = sampleAt(p, lim);
+      ctx.strokeStyle = 'rgba('+PC+',.4)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(e.x, e.y, 4.5, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(e.x-7, e.y-7); ctx.lineTo(e.x+7, e.y+7);
+      ctx.moveTo(e.x+7, e.y-7); ctx.lineTo(e.x-7, e.y+7); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  const ip = cross;
+  if (ip){
+    const fade = Math.max(.25, 1 - (ip.t-now)/3) * pulse(S.fx.pred, .38), R = curR(), w = curW();
+    ctx.strokeStyle = 'rgba('+PC+','+fade.toFixed(2)+')'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(ip.x, G.PADY-R, 7, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([2,4]);
+    ctx.beginPath(); ctx.moveTo(ip.x, G.PADY-R+8); ctx.lineTo(ip.x, G.PADY+G.PADH+10); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba('+PC+',.28)';
+    ctx.strokeRect(ip.x-w/2, G.PADY+.5, w, G.PADH-1);
+    ctx.fillStyle = 'rgba('+PC+',.65)';
+    ctx.font = FT(10, 500); ctx.textAlign = 'center';
+    ctx.fillText((ip.t-now).toFixed(1)+'s', ip.x, G.PADY+G.PADH+22);
+    ctx.textAlign = 'start';
+  }
+}
+function drawPaddle(){
+  const w = curW(), x = S.padCx - w/2, wide = S.fx.wide > 0;
+  if (WIRE){
+    ctx.fillStyle = '#06070A'; ctx.fillRect(x, G.PADY, w, G.PADH);
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.4;
+    ctx.strokeRect(x+.7, G.PADY+.7, w-1.4, G.PADH-1.4);
+    if (wide){                               // 2倍は入れ子の枠で示す
+      ga(pulse(S.fx.wide, .8));
+      ctx.strokeRect(x+3.5, G.PADY+3.5, w-7, G.PADH-7);
+      ga(1);
+    }
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(S.padCx-8, G.PADY+G.PADH-2, 16, 1.4);
+    if (S.fx.laser){ ctx.fillRect(x, G.PADY-3, w, 1.4); }
+    return;
+  }
+  const gr = ctx.createLinearGradient(0, G.PADY, 0, G.PADY+G.PADH);
+  gr.addColorStop(0, '#F4F1E8'); gr.addColorStop(1, '#9AA2B2');
+  ctx.fillStyle = gr; ctx.fillRect(x, G.PADY, w, G.PADH);
+  if (wide){                                 // 効果色は素の色の上に重ねる
+    const g2 = ctx.createLinearGradient(0, G.PADY, 0, G.PADY+G.PADH);
+    g2.addColorStop(0, '#FFEFC6'); g2.addColorStop(1, '#D6A032');
+    ga(pulse(S.fx.wide, .8));                // 切れそうになると素の色が透ける
+    ctx.fillStyle = g2; ctx.fillRect(x, G.PADY, w, G.PADH);
+    ga(1);
+  }
+  ctx.fillStyle = 'rgba('+PCOL()+',.9)'; ctx.fillRect(S.padCx-8, G.PADY+G.PADH-2, 16, 2);
+  if (S.fx.laser){                           // 装填ずみ
+    ctx.fillStyle = '#FF5A5A';
+    ctx.fillRect(x, G.PADY-3, w, 2);
+  }
+}
+function drawParts(){
+  for (const q of S.parts){
+    ga(Math.max(0, 1-q.t/q.life));
+    ctx.fillStyle = WIRE ? '#FFFFFF' : q.c;
+    ctx.fillRect(q.x, q.y, q.s, q.s);
+  }
+  ga(1);
+}
+function drawBall(){
+  const R = curR();
+  for (const t of S.trail){
+    ga(Math.max(0, .3*(1-t.t/.3)));
+    ctx.fillStyle = WIRE ? '#FF1F2E' : C_BALL;
+    ctx.beginPath(); ctx.arc(t.x, t.y, R*.65, 0, Math.PI*2); ctx.fill();
+  }
+  ga(1);
+  if (WIRE){                                  // 赤い魂
+    ctx.fillStyle = '#FF1F2E';
+    ctx.beginPath(); ctx.arc(S.ball.x, S.ball.y, R, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#7A0A12'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(S.ball.x, S.ball.y, R, 0, Math.PI*2); ctx.stroke();
+    return;
+  }
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,180,84,.8)'; ctx.shadowBlur = 12;
+  ctx.fillStyle = C_BALL;
+  ctx.beginPath(); ctx.arc(S.ball.x, S.ball.y, R, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// ── 起動 ───────────────────────────────────────────────────────────────
+let prev = performance.now();
+// 線画モードの濃度。明度を動かさないので、途中で色が潰れることも眩しくなることもない
+const appEl = $('app');
+let deltaOn = false;
+function wireTheme(dt){
+  const tgt = S.fx.wire > 0 ? 1 : 0;
+  const spd = (tgt ? 1/1.4 : 1/1.8) * dt;      // 線画へ1.4秒、戻りに1.8秒
+  const d = tgt - S.wireLev;
+  S.wireLev += Math.max(-spd, Math.min(spd, d));
+  S.wireLev = Math.max(0, Math.min(1, S.wireLev));
+  const on = S.wireLev >= .5;                  // 文字送りは途中で混ぜられないので半分で切り替える
+  if (on !== deltaOn){ deltaOn = on; appEl.classList.toggle('delta', on); }
+}
+function loop(now){
+  let dt = (now-prev)/1000; prev = now;
+  if (dt > .05) dt = .05;
+  wireTheme(dt);
+  if (S.started && !S.paused && (S.phase === 'ready' || S.phase === 'hold' || S.phase === 'fly')) step(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+const DOCS = [
+  '18秒間、予測が1.8秒ぶんから3.6秒ぶんに伸びます。線と着地点の印は赤に変わります。',
+  '18秒間、パドルの横幅が2倍になります。',
+  '次の1回だけ、当たったボールがパドルにくっつきます。予測線を見ながら好きなときに発射できます。',
+  '次にパドルへ触れた瞬間から半径が2倍になり、3回触れると元に戻ります。',
+  '次にパドルへ触れた瞬間、時間が止まってパドルの真上にあるブロックが全部消えます。',
+  'ボールが1つ増えます（上限5)。',
+  '18秒間、その面の重力の向きと強さが矢印で見えます。右上の表示も解析済みになります。',
+  '18秒間、ブロックが虹色に光ります。それだけです。',
+  '18秒間、ブロックを壊した時の音が木琴になります。それだけです。',
+  '18秒間、既視感のある画面になります。それだけです。'
+];
+function hueOf(hex){
+  const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+  const mx = Math.max(r,g,b), d = mx - Math.min(r,g,b);
+  if (!d) return 0;
+  const h = 60 * (mx === r ? ((g-b)/d)%6 : mx === g ? (b-r)/d+2 : (r-g)/d+4);
+  return h < 0 ? h+360 : h;
+}
+$('doc-par').innerHTML = '全ステージクリアしたときだけ、基準タイム <span class="mono">'
+  + fmtTime(G.PAR) + '</span> と比べて <span class="mono">0.1秒</span> 早いごとに <span class="mono">+1</span>、'
+  + '遅いごとに <span class="mono">-1</span>';
+$('doc-h').textContent = 'ITEMS — ブロックを壊すと' + (dropRate()*100).toFixed(0) + '%で落ちてくる';
+$('doc-items').innerHTML = ITEMS.map((it,i) => i)
+  // 色相順。ただし虹色のものは単一の色相を持たないので末尾へ
+  .sort((a,b) => ((ITEMS[a].pin||0) - (ITEMS[b].pin||0)) || (hueOf(ITEMS[a].col) - hueOf(ITEMS[b].col)))
+  .map(i => '<tr><td><i class="k'+(ITEMS[i].rain?' rain':'')+'" style="--c:'+ITEMS[i].col+'">'+ITEMS[i].k+'</i>'
+    + ITEMS[i].name + '</td><td>' + DOCS[i] + '</td></tr>').join('');
+
+showTitle();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

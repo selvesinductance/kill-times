@@ -193,9 +193,9 @@ const G = {
   // ブロックの並び
   COLS:22, MX:0, TOP:120, PITCHY:16, GAP:2,
   // 物理と予測
-  BASE:680, MAXV:1100, DT:1/480, MAXSIM:8, HZ:1.8, HZ2:3.6,
+  BASE:680, MAXV:1100, DT:1/480, HZ:2.0, HZ2:4.0, MAXSIM:8,
   // 遊びの決まりごと
-  LIVES:5, DROP:0.05, FXT:18, PAR:1200
+  LIVES:5, DROP:0.05, FXT:20, PAR:1200
 };
 G.PITCHX = (G.W - G.MX*2) / G.COLS;
 
@@ -271,10 +271,8 @@ function buildStage(n){
   return { blocks, grid, rows, cols };
 }
 
-// 状態 s={x,y,vx,vy} から先を計算する。パドルは考えに入れない。
-// idle は「最後にブロックへ当たってからの経過秒」。ブロックを削り続けている限り
-// 回収力は働かないので、窪みに入り込んで稼ぐような長い飛行を邪魔しない。
-function predict(stage, board, hp0, s, tAbs, idle, R){
+// 状態 s={x,y,vx,vy} から先を計算する。パドルは考えに入れない
+function predict(stage, board, hp0, s, tAbs, R){
   const { blocks, grid, rows, cols } = board;
   const hp = hp0.slice();
   const gf = STAGES[stage].g;
@@ -282,13 +280,12 @@ function predict(stage, board, hp0, s, tAbs, idle, R){
   const dt = G.DT;
   let x = s.x, y = s.y, vx = s.vx, vy = s.vy, t = 0, k = 0;
   const samples = [{x, y, vx, vy, t:0}], events = [];
-    let end = 'cap', destroyed = 0, below = false, lastHitT = -(idle || 0);
+  let end = 'cap', destroyed = 0, below = false;
   const crossings = [];
 
   while (t < G.MAXSIM){
     const g = gf(x, y, tAbs + t);
-    const pull = Math.max(0, t - lastHitT - 8) * 170;   // 手ごたえが途絶えたら下へ促す
-    vx += g[0]*dt; vy += (g[1] + pull)*dt;
+    vx += g[0]*dt; vy += g[1]*dt;
     const sp = Math.hypot(vx, vy);
     if (sp > G.MAXV){ const q = G.MAXV/sp; vx *= q; vy *= q; }
     x += vx*dt; y += vy*dt; t += dt; k++;
@@ -324,7 +321,6 @@ function predict(stage, board, hp0, s, tAbs, idle, R){
       hp[i]--;
       if (hp[i] <= 0) destroyed++;
       events.push({ t, i, hp:hp[i], gone:hp[i] <= 0, n:destroyed });
-      lastHitT = t;
       hit = true;
       break outer;
     }
@@ -336,7 +332,7 @@ function predict(stage, board, hp0, s, tAbs, idle, R){
     if (y - R > G.H){ end = 'out'; break; }
   }
   if (samples[samples.length-1].t !== t) samples.push({x, y, vx, vy, t});
-  return { samples, events, end, crossings, destroyed, dur:t, idle:t - lastHitT };
+  return { samples, events, end, crossings, destroyed, dur:t };
 }
 // ── SIM END ────────────────────────────────────────────────────────────
 
@@ -369,36 +365,23 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // パスを書き入れてください（例: 'sounds/xylo1.mp3'）。
 // 空のままのもの、読み込めなかったものは鳴らさず無音で代用します。
 const XYLO_SRC = [
-  './sounds/C.ogg',   // 1個目
-  './sounds/D.ogg',   // 2個目
-  './sounds/E.ogg',   // 3個目
-  './sounds/F.ogg',   // 4個目
-  './sounds/G.ogg',   // 5個目
-  './sounds/HA.ogg',   // 6個目
-  './sounds/HB.ogg',   // 7個目
-  './sounds/HC.ogg'    // 8個目以降
+  '../sounds/C.ogg',   // 1個目
+  '../sounds/D.ogg',   // 2個目
+  '../sounds/E.ogg',   // 3個目
+  '../sounds/F.ogg',   // 4個目
+  '../sounds/G.ogg',   // 5個目
+  '../sounds/HA.ogg',   // 6個目
+  '../sounds/HB.ogg',   // 7個目
+  '../sounds/HC.ogg'    // 8個目以降
 ];
-const XYLO = XYLO_SRC.map(src => {
-  if (!src) return null;
-  const a = new Audio(src);
-  a.preload = 'auto'; a.ok = true;
-  a.addEventListener('error', () => { a.ok = false; });
-  return a;
-});
-function xylo(i){
-  const a = XYLO[Math.max(0, Math.min(XYLO.length-1, i))];
-  if (!a || !a.ok || a.error) return;          // 未指定・読み込み失敗は無音
-  try {
-    const c = a.cloneNode();
-    c.volume = .8;
-    const pr = c.play();
-    if (pr && pr.catch) pr.catch(() => { a.ok = false; });
-  } catch(e){ a.ok = false; }
-}
+const xylo = i => Snd.sample(Math.max(0, Math.min(XYLO_SRC.length-1, i)), .8);
 
 // ── 効果音（波形をその場で作るので音声ファイルは要らない） ────────────
 const Snd = (() => {
   let ctx = null, master = null, nbuf = null, conv = null, on = true;
+  const SMP = [];              // 復号ずみの音。false は使えないもの
+  const EL = [];               // fetch が使えない環境向けの控え
+  let elReady = false;
   function init(){
     if (ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -406,7 +389,59 @@ const Snd = (() => {
     ctx = new AC();
     master = ctx.createGain(); master.gain.value = .25; master.connect(ctx.destination);
   }
-  function resume(){ init(); if (ctx && ctx.state === 'suspended') ctx.resume(); }
+    function resume(){
+    init();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    loadSamples();
+    if (!elReady){                             // 操作の中でしか解錠できない
+      elReady = true;
+      for (const list of EL) if (list) unlockEl(list);
+    }
+  }
+  // 音声ファイルは Web Audio に取り込む。iOS Safari では Audio 要素を
+  // 複製すると再生できないため、復号した波形を鳴らす形にしてある
+  function loadSamples(){
+    if (!ctx) return;
+    XYLO_SRC.forEach((url, i) => {
+      if (!url || SMP[i] !== undefined) return;
+      SMP[i] = null;                           // 読み込み中
+      fetch(url).then(r => r.arrayBuffer()).then(buf => new Promise((ok, ng) => {
+        let done = false;
+        const good = b => { if (!done){ done = true; ok(b); } };
+        const bad  = () => { if (!done){ done = true; ng(); } };
+        try { const r2 = ctx.decodeAudioData(buf, good, bad); if (r2 && r2.then) r2.then(good, bad); }
+        catch(e){ bad(); }
+      })).then(b => { SMP[i] = b; })
+        .catch(() => { SMP[i] = false; prepEl(i); });
+    });
+  }
+  function prepEl(i){                          // file:// など fetch が通らない場合
+    if (EL[i] || !XYLO_SRC[i]) return;
+    EL[i] = [0,1].map(() => { const a = new Audio(XYLO_SRC[i]); a.preload = 'auto'; return a; });
+    EL[i].turn = 0;
+    if (elReady) unlockEl(EL[i]);
+  }
+  function unlockEl(list){
+    for (const a of list){
+      try { const p = a.play(); if (p && p.catch) p.catch(() => {}); a.pause(); a.currentTime = 0; }
+      catch(e){}
+    }
+  }
+  function sample(i, vol){
+    if (!on || !ctx) return;
+    const b = SMP[i];
+    if (b){
+      const src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = b; g.gain.value = vol;
+      src.connect(g); g.connect(master); src.start();
+      return;
+    }
+    const list = EL[i];
+    if (!list) return;
+    const a = list[list.turn = (list.turn + 1) % list.length];
+    try { a.currentTime = 0; a.volume = vol; const p = a.play(); if (p && p.catch) p.catch(() => {}); }
+    catch(e){}
+  }
   function noiseBuf(){
     if (!nbuf){
       nbuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -459,7 +494,7 @@ const Snd = (() => {
     src.connect(flt); flt.connect(g); g.connect(master); send(g, o.rev);
     src.start(t0, Math.random()*.8, dur);
   }
-  return { resume, tone, noise,
+  return { resume, tone, noise, sample,
     get on(){ return on; }, set on(v){ on = v; if (v) resume(); } };
 })();
 const semi = n => Math.pow(2, n/12);
@@ -470,7 +505,7 @@ const SFX = {
   wall(){   Snd.noise({dur:.03,vol:.10,f:2000,type:'bandpass',q:4});
             Snd.tone({f:520,type:'sine',dur:.03,vol:.10}); },
   brk(n){   const i = Math.min(7, Math.max(0, n-1));       // C4から半音ずつ、8個目で頭打ち
-            if (S.fx.wood > 0){ if (Snd.on) xylo(i); return; }
+            if (S.fx.wood > 0){ xylo(i); return; }
             Snd.tone({f:262*semi(i),type:'triangle',dur:.11,vol:.28});
             Snd.noise({dur:.035,vol:.10,f:3000,type:'highpass'}); },
   hard(){   Snd.tone({f:150,f2:110,type:'square',dur:.06,vol:.22});
@@ -506,7 +541,7 @@ const S = {
   // ボールとパドル
   ball:{x:G.W/2, y:G.PADY-G.R-1}, vel:{x:0,y:0}, padCx:G.W/2, padTo:G.W/2, holdOff:0,
   // 予測した弾道の再生位置
-  path:null, tRel:0, evi:0, pathAbs:0, winOff:0, tAbs:0, sinceHit:0,
+  path:null, tRel:0, evi:0, pathAbs:0, winOff:0, tAbs:0,
   // アイテムの効果
   fx:newFx(), drops:[], beams:[], freeze:0, wireLev:0,
   // 入力と演出
@@ -590,8 +625,8 @@ function toReady(){
 function readyPath(){
   const R = curR(), th = 30*Math.PI/180;
   const s = { x:S.padCx, y:G.PADY-R-1, vx:Math.sin(th)*G.BASE, vy:-Math.cos(th)*G.BASE };
-  S.path = predict(S.stage, S.board, hpSnapshot(), s, S.tAbs, 0, R);
-  S.pathAbs = S.tAbs; S.tRel = 0; S.evi = 0; S.winOff = 0; S.sinceHit = 0; cursor = 0;
+  S.path = predict(S.stage, S.board, hpSnapshot(), s, S.tAbs, R);
+  S.pathAbs = S.tAbs; S.tRel = 0; S.evi = 0; S.winOff = 0; cursor = 0;
 }
 // キャッチ中: パドルの上で待たせる
 function holdPath(){
@@ -600,8 +635,8 @@ function holdPath(){
   const th = off*(62*Math.PI/180);
   const s = { x:S.padCx + S.holdOff, y:G.PADY-R-.5,
               vx:Math.sin(th)*G.BASE, vy:-Math.cos(th)*G.BASE };
-  S.path = predict(S.stage, S.board, hpSnapshot(), s, S.tAbs, 0, R);
-  S.pathAbs = S.tAbs; S.tRel = 0; S.evi = 0; S.winOff = 0; S.sinceHit = 0; cursor = 0;
+  S.path = predict(S.stage, S.board, hpSnapshot(), s, S.tAbs, R);
+  S.pathAbs = S.tAbs; S.tRel = 0; S.evi = 0; S.winOff = 0; cursor = 0;
   S.ball = {x:s.x, y:s.y}; S.vel = {x:0,y:0};
 }
 function launch(){
@@ -615,7 +650,7 @@ function release(){
   S.phase = 'fly'; sync();
 }
 function repath(s, absT){
-  S.path = predict(S.stage, S.board, hpSnapshot(), s, absT, S.sinceHit, curR());
+  S.path = predict(S.stage, S.board, hpSnapshot(), s, absT, curR());
   S.pathAbs = absT; S.tRel = 0; S.evi = 0; cursor = 0;
 }
 
@@ -841,7 +876,7 @@ function burst(b){
 function paddleBounce(sm){
   applyEvents(sm.t);
   const f = S.fx;
-  S.combo = 0; S.winOff = 0; S.sinceHit = 0;   // 打ち返したら仕切り直し
+  S.combo = 0; S.winOff = 0;
   S.pathAbs = S.pathAbs + sm.t;
   if (f.laser){ f.laser = false; zap(); S.freeze = .55; }   // 時間を止めて一掃
   if (f.bigQ){ f.bigQ = false; f.big = 3; SFX.big(); }      // ここから大玉
@@ -1013,9 +1048,9 @@ function step(dt){
       if (S.tRel >= p.dur){
         cursor = 0;
         if (p.end === 'out') die();
-        else {   // 24秒で計算しきれないときは、続きを継ぎ足す
+        else {   // 一度に計算しきれないときは、続きを継ぎ足す
           const l = p.samples[p.samples.length-1];
-          S.winOff += l.t; S.sinceHit = p.idle;
+          S.winOff += l.t;
           repath({x:l.x,y:l.y,vx:l.vx,vy:l.vy}, S.pathAbs+l.t);
         }
       }
@@ -1238,15 +1273,15 @@ function drawPath(){
   const p = S.path, now = nowT(), cross = nextCross(p, now);
   const hz = curHZ(), off = S.winOff, PC = PCOL();
   const lim = Math.min(p.dur, hz - off, cross ? cross.t + .05 : Infinity);
-  const b1 = hz/3 - off, b2 = 2*hz/3 - off, k = pulse(S.fx.pred, .38);
+  const b1 = 1 - off, b2 = 2 - off, k = pulse(S.fx.pred, .38);   // 1秒/2秒で固定
   if (now < lim){
     ctx.save();
     ctx.shadowColor = 'rgba('+PC+',.55)'; ctx.shadowBlur = 6;
-    tier(now, Math.min(lim, b1), .95*k, 1.6);
+    tier(now, Math.min(lim, b1), .95*k, 1.7);
     ctx.shadowBlur = 0;
-    tier(Math.max(now, b1-.03), Math.min(lim, b2), .42*k, 1.4);
+    tier(Math.max(now, b1-.03), Math.min(lim, b2), .40*k, 1.4);
     ctx.setLineDash([5,6]);
-    tier(Math.max(now, b2-.03), lim, .2*k, 1.1);
+    tier(Math.max(now, b2-.03), lim, .22*k, 1.3);
     ctx.setLineDash([]);
     // 読める範囲の終わり
     if (lim < p.dur - .05){
@@ -1358,17 +1393,18 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 
+const FXS = G.FXT + '秒間、';                  // 時間で効く効果の頭
 const DOCS = [
-  '18秒間、予測が1.8秒ぶんから3.6秒ぶんに伸びます。線と着地点の印は赤に変わります。',
-  '18秒間、パドルの横幅が2倍になります。',
+  FXS + '予測が' + G.HZ.toFixed(1) + '秒ぶんから' + G.HZ2.toFixed(1) + '秒ぶんに伸びます。線と着地点の印は赤に変わります。',
+  FXS + 'パドルの横幅が2倍になります。',
   '次の1回だけ、当たったボールがパドルにくっつきます。予測線を見ながら好きなときに発射できます。',
   '次にパドルへ触れた瞬間から半径が2倍になり、3回触れると元に戻ります。',
   '次にパドルへ触れた瞬間、時間が止まってパドルの真上にあるブロックが全部消えます。',
   'ボールが1つ増えます（上限5)。',
-  '18秒間、その面の重力の向きと強さが矢印で見えます。右上の表示も解析済みになります。',
-  '18秒間、ブロックが虹色に光ります。それだけです。',
-  '18秒間、ブロックを壊した時の音が木琴になります。それだけです。',
-  '18秒間、既視感のある画面になります。それだけです。'
+  FXS + 'その面の重力の向きと強さが矢印で見えます。右上の表示も解析済みになります。',
+  FXS + 'ブロックが虹色に光ります。それだけです。',
+  FXS + 'ブロックを壊した時の音が木琴になります。それだけです。',
+  FXS + '既視感のある画面になります。それだけです。'
 ];
 function hueOf(hex){
   const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;

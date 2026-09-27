@@ -32,3 +32,4 @@ https://kill-times.vercel.app/
 - [./fonts](./fonts) 美咲フォントがあります
 - [./jsx](./jsx) htmlを作る前のやつが入ってます
 - [./sounds](./sounds) 効果音が入ってます
+- [./img](./img) ファビコンが入ってます

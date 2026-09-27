@@ -1,0 +1,42 @@
+<title>Freeze Break</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0c16;
+    --fg: #eef0ff;
+  }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--fg);
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;             /* 連打やダブルタップ・ピンチで画面が拡大しないように */
+  }
+  #wrap { position: relative; width: 100%; height: 100%; touch-action: none; }
+  #world, #stage {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  #world { visibility: hidden; }   /* 3D化した区間だけ見せる */
+  #stage { touch-action: none; }
+</style>
+<div id="wrap">
+  <canvas id="world" aria-hidden="true"></canvas>
+  <canvas id="stage" aria-label="Freeze Break ゲーム画面"></canvas>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+//__SCRIPT__
+</script>

@@ -135,7 +135,7 @@ footer {
     display: none;
     cursor: not-allowed;
 }
-@media (max-width: 610px) {
+@media (max-width: 725px) {
     .caution {
     display: block;
     font-size: x-small;
@@ -187,12 +187,12 @@ a.behind {
 .ADs {
     margin: 256px auto;
 }
-@media (min-width: 728px) {
+@media (min-width: 725px) {
     .mobileAd {
     display: none;
     }
 }
-@media (max-width: 728px) {
+@media (max-width: 725px) {
     .PCAd, .ADs {
     display: none;
     }

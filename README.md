@@ -11,7 +11,7 @@
 - [存在意義が全くないライフゲームの亜種](./simulators/gendered-lifegame.html)
 - [スプラトゥーンでも見るか～](./simulators/territory_battle)
 ### [ゲーム](./games/)
-- [ありえなマインスイーパー](./games/reckless_minesweeper.html)
+- [ありえなマインスイーパー](./games/the_minesweeper_of_fate.html)
 - [広告でよく見るゲーム](./games/gate-runner.html)
 - [難易度曲線が終わってるシューティング](./games/geometric-shooter.html)
 - [無限に続くイライラ棒](./games/infinite-irairabou.html)

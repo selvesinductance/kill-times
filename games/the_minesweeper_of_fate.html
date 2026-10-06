@@ -28,7 +28,6 @@
 :root{
   color-scheme:dark;
   --kon-0:#070a1a;      /* 地の藍 */
-  --kon-1:#0f1636;      /* 面 */
   --kon-2:#1b2455;      /* 牌の面 */
   --kon-3:#29346f;      /* 牌のハイライト */
   --kin:#d8b25a;        /* 金泥 */
@@ -75,6 +74,9 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;opac
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
 button{font:inherit;color:inherit;touch-action:manipulation;}
 :focus-visible{outline:2px solid var(--kin-hi);outline-offset:2px;}
+/* 数字は Bodoni の「小さい文字用」の字形（光学サイズ6＝細線が太め）で描く。
+   標準の字形は細線が極細で、小さく表示すると 4 の斜線が消えて 1 と見分けにくい */
+.cell,.mini,.sm-cell,.prog,.mines-v,.item .count,.panel p b,.sm-sec,.tally{font-variation-settings:"opsz" 6;}
 
 .wrap{width:100%;max-width:540px;margin-inline:auto;position:relative;z-index:1;display:flex;flex-direction:column;gap:14px;}
 
@@ -139,7 +141,25 @@ h1{margin:0;font-family:var(--f-display);font-weight:900;white-space:nowrap;
 .board-frame.aiming{box-shadow:0 0 0 1px rgba(229,72,79,.85),0 0 0 5px var(--kon-0),0 0 0 6px rgba(229,72,79,.3),0 0 34px rgba(229,72,79,.25),0 18px 40px rgba(0,0,0,.55);}
 .board-frame.boom{animation:frameshake .45s ease;}
 .board-frame.flagmode{outline:1px dashed rgba(240,138,142,.7);outline-offset:9px;}
+.board-frame.ended .board{pointer-events:none;}  /* 決着後は盤面を眺めるだけ（押せる見た目にしない） */
 .board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:clamp(3px,1.1cqw,7px);}
+
+/* 盤面の下：置いた印の数 / まだ確定していない数。
+   数字はそれぞれ2桁分の固定幅の箱に入れるので、桁が変わっても行の幅も位置も動かない */
+/* 盤面の下の行：左に印の数、右に（決着後に結果パネルを閉じたとき）「結果を見る」。高さは固定して、ボタンが出ても下がずれない */
+.under-board{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:28px;margin-top:10px;}
+.reopen{flex-shrink:0;border:1px solid var(--kin);border-radius:99px;padding:5px 12px;background:rgba(216,178,90,.08);color:var(--kin-hi);
+  font-weight:700;font-size:12px;line-height:1.4;cursor:pointer;white-space:nowrap;transition:background .15s;animation:bannerIn .25s var(--ease-out);}
+.reopen:hover{background:rgba(216,178,90,.18);}
+.tally{display:flex;justify-content:flex-start;gap:clamp(12px,4vw,20px);padding-left:2px;
+  font-family:var(--f-num);font-weight:700;font-size:clamp(11px,3.55vw,13px);line-height:1;color:var(--mist);font-variant-numeric:lining-nums tabular-nums;} /* 文字の大きさは見出しの説明文と同じ */
+.tl{display:inline-flex;align-items:baseline;white-space:nowrap;}
+.tl .e{font-family:var(--f-body);font-size:.9em;margin-right:3px;align-self:center;}
+.tl .n,.tl .t{display:inline-block;width:2ch;}
+.tl .n{text-align:right;color:var(--paper);transition:color .2s;}
+.tl .t{text-align:left;}
+.tl .sl{margin-inline:2px;color:var(--kin-lo);}
+.tl.over .n{color:var(--shu-soft);}  /* 未確定の数より多く置いている */
 
 /* 照準バナー：盤の上に重ねて表示（レイアウトを動かさない） */
 .banner{position:absolute;left:0;right:0;bottom:calc(100% + 12px);z-index:6;display:flex;align-items:center;gap:8px;
@@ -216,7 +236,7 @@ h1{margin:0;font-family:var(--f-display);font-weight:900;white-space:nowrap;
 .cell.f-sure-safe:not(.revealed){box-shadow:inset 0 0 0 1px rgba(147,216,195,.65),inset 0 -12px 16px -10px rgba(147,216,195,.4),var(--tile-drop),0 4px 8px rgba(0,0,0,.35);}
 /* 経典の印は金の後光つき */
 .cell.f-sure-bomb .flag,.cell.f-sure-safe .flag{filter:drop-shadow(0 0 2px rgba(245,227,163,.95)) drop-shadow(0 0 4px rgba(216,178,90,.7));}
-.cell.revealed.f-lie .v{opacity:.38;}
+.cell.revealed.f-lie .v{opacity:.5;}  /* 嘘かも：薄くするが字形は読める濃さに */
 .cell.revealed.f-real .v{color:#dcfff2;text-shadow:0 0 10px rgba(147,216,195,.65);}
 
 /* --- 配牌の演出 --- */
@@ -371,11 +391,16 @@ h1{margin:0;font-family:var(--f-display);font-weight:900;white-space:nowrap;
 .overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px 18px;
   background:radial-gradient(circle at 50% 42%,rgba(15,22,54,.72),rgba(4,6,16,.94));backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
   animation:fade .4s ease both;}
-.panel{width:100%;max-width:360px;text-align:center;padding:28px 22px 22px;border-radius:16px;
+.panel{position:relative;width:100%;max-width:360px;text-align:center;padding:28px 22px 22px;border-radius:16px;
   background:linear-gradient(170deg,#18214f,#0c1234);
   box-shadow:0 0 0 1px var(--line),0 0 0 5px #0c1234,0 0 0 6px var(--line-soft),0 24px 60px rgba(0,0,0,.6);
   animation:panelIn .5s var(--ease-out) both;}
 .panel .big{font-size:46px;line-height:1;}
+/* 右上の×：パネルを閉じて盤面を見る */
+.panel-close{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;border-radius:50%;cursor:pointer;
+  display:grid;place-items:center;border:1px solid var(--line);background:rgba(7,10,26,.45);color:var(--mist);transition:color .15s,border-color .15s,background .15s;}
+.panel-close:hover{color:var(--kin-hi);border-color:var(--kin);background:rgba(216,178,90,.1);}
+.panel-close svg{width:12px;height:12px;display:block;}
 .panel h2{margin:12px 0 4px;font-family:var(--f-display);font-weight:900;font-size:30px;letter-spacing:.06em;
   background:linear-gradient(180deg,var(--kin-hi),var(--kin));-webkit-background-clip:text;background-clip:text;color:transparent;}
 .panel.lose h2{background:linear-gradient(180deg,#ffd6d8,var(--shu));-webkit-background-clip:text;background-clip:text;}
@@ -470,7 +495,7 @@ h1{margin:0;font-family:var(--f-display);font-weight:900;white-space:nowrap;
     grid-template-areas:"hd hd" "board hud" "board inv" "board ctl" "board ." "rules rules";
     grid-template-rows:auto auto auto auto 1fr auto;}
   .hd{grid-area:hd;margin-bottom:22px;}
-  .sub{font-size:13.5px;}
+  .sub,.tally{font-size:13.5px;}
   .hud{grid-area:hud;}
   .board-zone{grid-area:board;}
   .board-frame{padding:14px;border-radius:20px;}
@@ -528,6 +553,10 @@ h1{margin:0;font-family:var(--f-display);font-weight:900;white-space:nowrap;
     </div>
     <div class="board-frame" id="frame">
       <div class="board" id="board" role="group" aria-label="盤面"></div>
+    </div>
+    <div class="under-board">
+      <div class="tally" id="tally"></div>
+      <button type="button" class="reopen" id="ovReopen" hidden>結果を見る</button>
     </div>
   </div>
 
@@ -615,6 +644,9 @@ h1{margin:0;font-family:var(--f-display);font-weight:900;white-space:nowrap;
 <!-- 決着 -->
 <div class="overlay" id="overlay" hidden>
   <div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+    <button type="button" class="panel-close" id="ovClose" aria-label="閉じて盤面を見る" title="閉じて盤面を見る">
+      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
+    </button>
     <div class="big" id="ovIcon">🎊</div>
     <h2 id="ovTitle"></h2>
     <p id="ovText"></p>
@@ -730,6 +762,16 @@ const FLAGS = {
 // 未開封：爆弾かも → 保留 → 解除 ／ 数字：嘘かも → 本物かも → 保留 → 解除
 const FLAG_CYCLE = { hidden: ['bomb', 'hold', null], num: ['lie', 'real', 'hold', null] };
 const BLOCKING_FLAGS = new Set(['bomb', 'sure-bomb']); // タップしても開かない印
+// 盤面の下に数を出す印（表示順）。
+// 分母＝まだ確定していない数：盤面にある数から、確定して見えている分（金・赤の数字、開いた爆弾）を引く
+const TALLY = [
+  { key: 'real', flags: ['real'],              emoji: '⭕', name: '本物かも', of: '本物の数字',
+    total: () => state.cells.filter(x => !x.bomb && x.truthful && !(x.revealed && x.gold)).length },
+  { key: 'lie',  flags: ['lie'],               emoji: '❌', name: '嘘かも',   of: '嘘の数字',
+    total: () => state.cells.filter(x => !x.bomb && !x.truthful && !(x.revealed && x.liar)).length },
+  { key: 'bomb', flags: ['bomb', 'sure-bomb'], emoji: '🚩', name: '爆弾かも', of: '爆弾',
+    total: () => state.cells.filter(x => x.bomb && !x.revealed).length },
+];
 
 const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.6s-7.7-4.7-9.7-9.5C.9 7.8 3 4.4 6.5 4.4c2.2 0 3.7 1.3 4.6 2.7l.9 1.3.9-1.3c.9-1.4 2.4-2.7 4.6-2.7 3.5 0 5.6 3.4 4.2 6.7-2 4.8-9.7 9.5-9.7 9.5z"/></svg>';
 
@@ -828,14 +870,14 @@ function newGame(deal = true) {
     cells, inv: dealHand(),
     hp: RULES.startHp, maxHp: RULES.startHp,
     revealedSafe: 0, goal: cfg.goal, totalBombs: cfg.bombs,
-    jokerCharges: 0, catCharges: 0, aiming: null, over: false, won: false,
+    jokerCharges: 0, catCharges: 0, aiming: null, over: false,
   };
   deathSnapshot = null;
   flags = new Array(N).fill(null);
   ui.previewAnchor = null; ui.aimPicks = [];
   resetRenderCache();
   $('mines').textContent = cfg.bombs;
-  $('overlay').hidden = true;
+  hideResult();
   render();
   if (deal) dealBoard();
 }
@@ -1019,9 +1061,17 @@ function fireCrystal() {
    プレイヤーに見えている情報だけで、爆弾か安全かが確定する未開封マスを求める。
    使う情報：本物と保証された数字（周りの爆弾数＝その値）、嘘と保証された数字（周りの爆弾数≠その値）、
              開いた爆弾、盤面全体の爆弾数。保証のない数字や占いは嘘の可能性があるので使わない。
-   すべての「矛盾しない爆弾の置き方」で同じ答えになるマスだけを確定とする。
+   考え方：マスごとに「爆弾になる置き方が1つでもあるか」「安全になる置き方が1つでもあるか」を探す。
+           片方しか見つからなければ確定。置き方を全部数えずに、反例を1つ見つけた時点で打ち切る。
+   手順：1) 数字1つだけで決まるマスを先に決める
+         2) マスを共有する数字どうしを「まとまり」に分ける
+         3) まとまりごとに、取りうる爆弾数を調べる（盤面全体の爆弾数と突き合わせるため）
+         4) マスごとに反例を探す。見つけた置き方は他のマスの判定にも使い回す
+         5) どの数字にも関わらないマスは、盤面全体の爆弾数だけで決まるかを調べる
+   探索が上限を超えたら「どちらもありうる」とみなす（確定させない＝誤った印は付けない）。
    戻り値：Map(マス番号 → 1＝爆弾 / 0＝安全) */
-const ENUM_BUDGET = 400000; // 総当たりの上限。超えたまとまりは何も確定させない（安全側に倒す）
+const SEARCH_BUDGET = 40000;   // 1回の探索で調べる手の上限（PCで約0.07秒）
+const TOTAL_BUDGET = 80000;    // 1回の推論全体で調べる手の上限（PCで約0.13秒、遅い端末で約0.45秒）
 
 function deduce() {
   const { hidden, remaining, cons } = collectConstraints();
@@ -1032,8 +1082,11 @@ function deduce() {
   const rest = reduceConstraints(cons, known);
   const { groups, inGroup } = groupConstraints(rest);
   const outside = hidden.filter(j => !known.has(j) && !inGroup.has(j)); // どの制約にも関わらない未開封マス
-  const comps = [...groups.values()].map(g => enumerateGroup(g, bombsLeft));
-  applyGlobalCount(comps, outside, bombsLeft, known);
+  const budget = { left: TOTAL_BUDGET };
+  const solvers = [...groups.values()].map(g => new GroupSolver(g, budget));
+  solvers.forEach(sv => sv.findCounts());
+  resolveGroupCells(solvers, outside.length, bombsLeft, known);
+  resolveOutside(solvers, outside, bombsLeft, known);
   return known;
 }
 
@@ -1103,75 +1156,237 @@ function groupConstraints(rest) {
   return { groups, inGroup: parent };
 }
 
-// まとまりの中の置き方を総当たりし、「爆弾がk個のとき、このマスは爆弾／安全になり得るか」を記録する
-function enumerateGroup(gcons, bombsLeft) {
-  const order = [], seen = new Set();
-  gcons.forEach(k => k.cells.forEach(j => { if (!seen.has(j)) { seen.add(j); order.push(j); } }));
-  const n = order.length, pos = new Map(order.map((j, p) => [j, p]));
-  const consOf = order.map(() => []);
-  const assigned = new Int32Array(gcons.length), left = new Int32Array(gcons.length);
-  gcons.forEach((k, ci) => { left[ci] = k.cells.length; k.cells.forEach(j => consOf[pos.get(j)].push(ci)); });
-  const val = new Int8Array(n), K = new Uint8Array(n + 1);
-  const bombK = order.map(() => new Uint8Array(n + 1)), safeK = order.map(() => new Uint8Array(n + 1));
-  let budget = ENUM_BUDGET, overflow = false;
-  const ok = ci => {
-    const k = gcons[ci], a = assigned[ci], l = left[ci];
-    return k.eq !== undefined ? (a <= k.eq && a + l >= k.eq) : (l > 0 || a !== k.ne);
-  };
-  const rec = (p, b) => {
-    if (overflow) return;
-    if (--budget < 0) { overflow = true; return; }
-    if (b > bombsLeft) return;
-    if (p === n) { K[b] = 1; for (let q = 0; q < n; q++) (val[q] ? bombK[q] : safeK[q])[b] = 1; return; }
-    for (let v = 0; v <= 1; v++) {
-      val[p] = v; let good = true;
-      for (const ci of consOf[p]) { assigned[ci] += v; left[ci]--; }
-      for (const ci of consOf[p]) if (!ok(ci)) { good = false; break; }
-      if (good) rec(p + 1, b + v);
-      for (const ci of consOf[p]) { assigned[ci] -= v; left[ci]++; }
+// --- まとまり1つ分の探索 ---
+// 数字の条件（eq：合計がちょうどv、ne：合計がvではない）を満たす爆弾の置き方を1つ探す。
+// 同じ数字の組にだけ接しているマスどうしは入れ替えても同じなので「束」にまとめ、
+// 束ごとに「爆弾がいくつ入るか」だけを決める（1マスずつ試すと同じ形を何度も調べてしまうため）。
+// 1つ決めるたびに、条件から連鎖して決まる束を先に決め、矛盾したらすぐ引き返す。
+class GroupSolver {
+  constructor(gcons, budget) {
+    const order = [], seen = new Set();
+    gcons.forEach(k => k.cells.forEach(j => { if (!seen.has(j)) { seen.add(j); order.push(j); } }));
+    const pos = new Map(order.map((j, p) => [j, p]));
+    this.order = order;
+    this.n = order.length;
+    this.budget = budget;
+    this.cons = gcons.map(k => ({ eq: k.eq !== undefined, v: k.eq !== undefined ? k.eq : k.ne }));
+    // 束：接している数字の組が同じマスの集まり
+    const sig = order.map(() => []);
+    gcons.forEach((k, ci) => k.cells.forEach(j => sig[pos.get(j)].push(ci)));
+    const byKey = new Map();
+    order.forEach((_, p) => {
+      const key = sig[p].join(',');
+      if (!byKey.has(key)) byKey.set(key, { cells: [], cons: sig[p] });
+      byKey.get(key).cells.push(p);
+    });
+    this.bundles = [...byKey.values()];
+    this.size = Int16Array.from(this.bundles, b => b.cells.length);
+    this.bundleOf = new Int16Array(this.n);
+    this.bundles.forEach((b, q) => b.cells.forEach(p => { this.bundleOf[p] = q; }));
+    this.consBundles = this.cons.map(() => []);           // 数字ごとに、接している束
+    this.bundles.forEach((b, q) => b.cons.forEach(ci => this.consBundles[ci].push(q)));
+    const B = this.bundles.length, C = this.cons.length;
+    this.x = new Int16Array(B);                           // 束に入る爆弾の数（-1＝未定）
+    this.dlo = new Int16Array(B); this.dhi = new Int16Array(B);  // 束に入りうる爆弾数の範囲
+    this.a = new Int32Array(C);                           // 数字ごとの「決めた爆弾の数」
+    this.umin = new Int32Array(C); this.umax = new Int32Array(C); // 未定の束から加わりうる最小・最大
+    this.uc = new Int32Array(C);                          // 未定の束の数
+    this.trail = [];
+    this.lo = 0; this.hi = this.n;                        // まとまり全体の爆弾数の範囲（探索ごとに設定）
+    this.K = new Uint8Array(this.n + 1);                  // このまとまりで取りうる爆弾数
+    // 見つけた置き方の記録：seen[v][p][k]＝「マスpがvで、まとまり全体の爆弾数がk」の置き方がある
+    this.seen = [0, 1].map(() => order.map(() => new Uint8Array(this.n + 1)));
+    this.pref = 0;
+  }
+
+  assign(q, v) {
+    this.x[q] = v; this.trail.push(q);
+    this.total += v; this.tmin -= this.dlo[q]; this.tmax -= this.dhi[q]; this.ucAll--;
+    for (const ci of this.bundles[q].cons) { this.a[ci] += v; this.umin[ci] -= this.dlo[q]; this.umax[ci] -= this.dhi[q]; this.uc[ci]--; }
+  }
+  undoTo(len) {
+    while (this.trail.length > len) {
+      const q = this.trail.pop(), v = this.x[q];
+      this.total -= v; this.tmin += this.dlo[q]; this.tmax += this.dhi[q]; this.ucAll++;
+      for (const ci of this.bundles[q].cons) { this.a[ci] -= v; this.umin[ci] += this.dlo[q]; this.umax[ci] += this.dhi[q]; this.uc[ci]++; }
+      this.x[q] = -1;
     }
-  };
-  rec(0, 0);
-  if (overflow) { K.fill(1); return { order, K, unknown: true }; }
-  return { order, K, bombK, safeK };
+  }
+  // 束 q に v 個と決める（範囲外なら矛盾）
+  force(q, v) { if (v < this.dlo[q] || v > this.dhi[q]) return false; this.assign(q, v); return true; }
+
+  // 条件から決まる束を、変化がなくなるまで決める。矛盾したら false
+  propagate() {
+    for (let changed = true; changed;) {
+      changed = false;
+      for (let ci = 0; ci < this.cons.length; ci++) {
+        const c = this.cons[ci], a = this.a[ci], uc = this.uc[ci];
+        if (c.eq) {
+          if (a + this.umin[ci] > c.v || a + this.umax[ci] < c.v) return false;
+          if (uc === 0) continue;
+          if (a + this.umin[ci] === c.v) { for (const q of this.consBundles[ci]) if (this.x[q] < 0) this.assign(q, this.dlo[q]); changed = true; }
+          else if (a + this.umax[ci] === c.v) { for (const q of this.consBundles[ci]) if (this.x[q] < 0) this.assign(q, this.dhi[q]); changed = true; }
+          else if (uc === 1) {   // 未定の束が1つだけなら、入る数は決まる
+            const q = this.consBundles[ci].find(q => this.x[q] < 0);
+            if (!this.force(q, c.v - a)) return false;
+            changed = true;
+          }
+        } else {
+          if (uc === 0) { if (a === c.v) return false; continue; }
+          if (uc === 1) {        // 未定の束が1つで、その束の選択肢が2つなら、禁じられた方でない方に決まる
+            const q = this.consBundles[ci].find(q => this.x[q] < 0), bad = c.v - a;
+            if (this.dhi[q] - this.dlo[q] === 1 && (bad === this.dlo[q] || bad === this.dhi[q])) {
+              this.assign(q, bad === this.dlo[q] ? this.dhi[q] : this.dlo[q]); changed = true;
+            }
+          }
+        }
+      }
+      // まとまり全体の爆弾数は lo〜hi に収める
+      if (this.total + this.tmin > this.hi || this.total + this.tmax < this.lo) return false;
+      if (this.ucAll > 0 && this.total + this.tmin === this.hi) {
+        for (let q = 0; q < this.x.length; q++) if (this.x[q] < 0) this.assign(q, this.dlo[q]);
+        changed = true;
+      } else if (this.ucAll > 0 && this.total + this.tmax === this.lo) {
+        for (let q = 0; q < this.x.length; q++) if (this.x[q] < 0) this.assign(q, this.dhi[q]);
+        changed = true;
+      }
+    }
+    return true;
+  }
+
+  // 次に決める束：未定の束が最も少ない eq の数字から、選択肢の少ない束を選ぶ（矛盾に早く気づける）
+  choose() {
+    let bestC = -1, bestU = Infinity;
+    for (let ci = 0; ci < this.cons.length; ci++) {
+      const u = this.uc[ci];
+      if (this.cons[ci].eq && u > 0 && u < bestU) { bestU = u; bestC = ci; }
+    }
+    const pool = bestC >= 0 ? this.consBundles[bestC] : this.x.keys();
+    let best = -1, bestW = Infinity;
+    for (const q of pool) if (this.x[q] < 0 && this.dhi[q] - this.dlo[q] < bestW) { bestW = this.dhi[q] - this.dlo[q]; best = q; }
+    return best;
+  }
+
+  dfs(nodes) {
+    if (--this.budget.left < 0 || ++nodes.n > SEARCH_BUDGET) throw GroupSolver.TIMEOUT;
+    if (!this.propagate()) return false;
+    const q = this.choose();
+    if (q < 0) return true;
+    const lo = this.dlo[q], hi = this.dhi[q], up = this.pref === 0;
+    for (let i = 0; i <= hi - lo; i++) {
+      const mark = this.trail.length;
+      this.assign(q, up ? lo + i : hi - i);
+      if (this.dfs(nodes)) return true;
+      this.undoTo(mark);
+    }
+    return false;
+  }
+
+  // 置き方を1つ探す。fixP≧0 ならそのマスを fixV に固定し、まとまり全体の爆弾数は lo〜hi に限る。
+  // 戻り値：'yes'（見つけて記録した）／'no'（存在しない）／'unknown'（上限を超えた）
+  search(fixP, fixV, lo, hi) {
+    if (lo > hi) return 'no';
+    this.lo = lo; this.hi = hi;
+    this.x.fill(-1); this.trail.length = 0;
+    this.dlo.fill(0); this.dhi.set(this.size);
+    if (fixP >= 0) {   // マスを固定する＝そのマスの束に「少なくとも1つ爆弾」または「少なくとも1つ安全」
+      const q = this.bundleOf[fixP];
+      if (fixV === 1) this.dlo[q] = 1; else this.dhi[q] = this.size[q] - 1;
+      if (this.dlo[q] > this.dhi[q]) return 'no';
+    }
+    this.total = 0; this.tmin = 0; this.tmax = 0; this.ucAll = this.x.length;
+    for (let q = 0; q < this.x.length; q++) { this.tmin += this.dlo[q]; this.tmax += this.dhi[q]; }
+    this.cons.forEach((_, ci) => {
+      this.a[ci] = 0; this.uc[ci] = this.consBundles[ci].length;
+      this.umin[ci] = 0; this.umax[ci] = 0;
+      for (const q of this.consBundles[ci]) { this.umin[ci] += this.dlo[q]; this.umax[ci] += this.dhi[q]; }
+    });
+    this.pref ^= 1;  // 探すたびに先に試す値を入れ替えて、いろいろな置き方を見つける
+    let found;
+    try { found = this.dfs({ n: 0 }); }
+    catch (e) { if (e === GroupSolver.TIMEOUT) return 'unknown'; throw e; }
+    if (!found) return 'no';
+    // 束に入る数が決まれば、束の中のどのマスが爆弾でもよい
+    const t = this.total;
+    this.bundles.forEach((b, q) => b.cells.forEach(p => {
+      if (this.x[q] >= 1) this.seen[1][p][t] = 1;
+      if (this.x[q] <= this.size[q] - 1) this.seen[0][p][t] = 1;
+    }));
+    this.K[t] = 1;
+    this.lastTotal = t;
+    return 'yes';
+  }
+
+  // 取りうる爆弾数をすべて調べる：まず1つ見つけ、そこから最小・最大へ広げ、間の抜けを1つずつ確かめる。
+  // 調べきれなかった数は「ありうる」とみなす
+  findCounts() {
+    const r = this.search(-1, 0, 0, this.n);
+    if (r !== 'yes') { if (r === 'unknown') this.K.fill(1); return; }
+    let min = this.lastTotal, max = this.lastTotal;
+    for (;;) {   // もっと少ない爆弾数はありうるか
+      const q = this.search(-1, 0, 0, min - 1);
+      if (q === 'yes') { min = this.lastTotal; continue; }
+      if (q === 'unknown') { for (let k = 0; k < min; k++) this.K[k] = 1; min = 0; }
+      break;
+    }
+    for (;;) {   // もっと多い爆弾数はありうるか
+      const q = this.search(-1, 0, max + 1, this.n);
+      if (q === 'yes') { max = this.lastTotal; continue; }
+      if (q === 'unknown') { for (let k = max + 1; k <= this.n; k++) this.K[k] = 1; max = this.n; }
+      break;
+    }
+    for (let k = min + 1; k < max; k++) {
+      if (!this.K[k] && this.search(-1, 0, k, k) === 'unknown') this.K[k] = 1;
+    }
+  }
+}
+GroupSolver.TIMEOUT = { timeout: true };
+
+// 各まとまりの爆弾数の組み合わせで作れる合計（ありうるものに 1）
+function countSums(list) {
+  let s = new Uint8Array(N + 1); s[0] = 1;
+  for (const sv of list) {
+    const nx = new Uint8Array(N + 1);
+    for (let a = 0; a <= N; a++) if (s[a]) for (let k = 0; k < sv.K.length; k++) if (sv.K[k] && a + k <= N) nx[a + k] = 1;
+    s = nx;
+  }
+  return s;
+}
+// まとまりの爆弾数が k のとき、残りの爆弾を他のまとまりと「どの数字にも関わらないマス」に置けるか
+function countFits(sums, k, bombsLeft, oMin, oMax) {
+  for (let a = 0; a <= N; a++) if (sums[a]) { const o = bombsLeft - k - a; if (o >= oMin && o <= oMax) return true; }
+  return false;
 }
 
-// 盤面全体の爆弾数と突き合わせて、本当にあり得る置き方だけで確定を判断する
-function applyGlobalCount(comps, outside, bombsLeft, known) {
-  const O = outside.length;
-  // 各まとまりの爆弾数の組み合わせで作れる合計
-  const sums = list => {
-    let s = new Uint8Array(N + 1); s[0] = 1;
-    for (const cp of list) {
-      const nx = new Uint8Array(N + 1);
-      for (let a = 0; a <= N; a++) if (s[a]) for (let k = 0; k < cp.K.length; k++) if (cp.K[k] && a + k <= N) nx[a + k] = 1;
-      s = nx;
-    }
-    return s;
-  };
-  // 残りの爆弾 o 個を、どの制約にも関わらないマスに置けるか
-  const fits = (s, k, oMin, oMax) => {
-    for (let a = 0; a <= N; a++) if (s[a]) { const o = bombsLeft - k - a; if (o >= oMin && o <= oMax) return true; }
-    return false;
-  };
-  comps.forEach((cp, ci) => {
-    if (cp.unknown) return;
-    const others = sums(comps.filter((_, cj) => cj !== ci));
-    cp.order.forEach((j, q) => {
-      let canB = false, canS = false;
-      for (let k = 0; k < cp.K.length && !(canB && canS); k++) {
-        if (!canB && cp.bombK[q][k] && fits(others, k, 0, O)) canB = true;
-        if (!canS && cp.safeK[q][k] && fits(others, k, 0, O)) canS = true;
-      }
-      if (canB && !canS) known.set(j, 1); else if (canS && !canB) known.set(j, 0);
+// まとまりの中のマスを判定する
+function resolveGroupCells(solvers, O, bombsLeft, known) {
+  solvers.forEach(sv => {
+    const others = countSums(solvers.filter(o => o !== sv));
+    const allowed = new Uint8Array(sv.n + 1);   // 盤面全体の爆弾数と矛盾しない、このまとまりの爆弾数
+    for (let k = 0; k <= sv.n; k++) if (sv.K[k] && countFits(others, k, bombsLeft, 0, O)) allowed[k] = 1;
+    // 許される爆弾数を、穴のない範囲ごとに分ける
+    const runs = [];
+    for (let k = 0; k <= sv.n; k++) if (allowed[k]) { if (runs.length && runs[runs.length - 1][1] === k - 1) runs[runs.length - 1][1] = k; else runs.push([k, k]); }
+    const possible = (p, v) => {
+      for (let k = 0; k <= sv.n; k++) if (allowed[k] && sv.seen[v][p][k]) return true; // 前に見つけた置き方で足りる
+      return runs.some(([lo, hi]) => sv.search(p, v, lo, hi) !== 'no');               // 反例あり（または調べきれない）
+    };
+    sv.order.forEach((j, p) => {
+      const canBomb = possible(p, 1), canSafe = possible(p, 0);
+      if (canBomb && !canSafe) known.set(j, 1);
+      else if (canSafe && !canBomb) known.set(j, 0);
     });
   });
-  if (O > 0) {
-    const all = sums(comps);
-    const canB = fits(all, 0, 1, O), canS = fits(all, 0, 0, O - 1);
-    if (canB && !canS) outside.forEach(j => known.set(j, 1));
-    else if (canS && !canB) outside.forEach(j => known.set(j, 0));
-  }
+}
+
+// どの数字にも関わらないマスは、盤面全体の爆弾数だけで決まることがある（全部爆弾／全部安全）
+function resolveOutside(solvers, outside, bombsLeft, known) {
+  const O = outside.length;
+  if (!O) return;
+  const all = countSums(solvers);
+  const canBomb = countFits(all, 0, bombsLeft, 1, O), canSafe = countFits(all, 0, bombsLeft, 0, O - 1);
+  if (canBomb && !canSafe) outside.forEach(j => known.set(j, 1));
+  else if (canSafe && !canBomb) outside.forEach(j => known.set(j, 0));
 }
 
 /* ===== 7. 描画 ===== */
@@ -1211,6 +1426,7 @@ function renderBanner() {
   const k = state.aiming, banner = $('banner'), fire = $('fireAim');
   banner.hidden = !k;
   $('frame').classList.toggle('aiming', !!k);
+  $('frame').classList.toggle('ended', state.over);
   if (!k) return;
   const it = ITEMS[k], pick = it.aim === 'pick';
   banner.classList.toggle('crystal', pick);
@@ -1288,6 +1504,30 @@ function renderBoard() {
   boardEls.forEach((el, i) => {
     const sig = cellSig(i);
     if (el.dataset.sig !== sig) { el.dataset.sig = sig; paintCell(el, i); }
+  });
+  renderTally();
+}
+
+// 盤面の下の「置いた印 / 実際の数」。枠は一度だけ作り、数字だけ書き換える
+function buildTally() {
+  $('tally').innerHTML = TALLY.map(t =>
+    `<span class="tl" data-k="${t.key}" title="${t.emoji}${t.name}の印の数 / まだ確定していない${t.of}の数">`
+    + `<span class="e" aria-hidden="true">${t.emoji}</span><span class="n">0</span><span class="sl" aria-hidden="true">/</span><span class="t">0</span></span>`).join('');
+}
+function renderTally() {
+  const placed = {};
+  ALL_CELLS.forEach(i => {
+    const f = flagOf(i); if (!f) return;
+    const t = TALLY.find(t => t.flags.includes(f));
+    if (t) placed[t.key] = (placed[t.key] || 0) + 1;
+  });
+  TALLY.forEach(t => {
+    const el = $('tally').querySelector(`[data-k="${t.key}"]`);
+    const n = placed[t.key] || 0, total = t.total();
+    el.querySelector('.n').textContent = n;
+    el.querySelector('.t').textContent = total;
+    el.classList.toggle('over', n > total);
+    el.setAttribute('aria-label', `${t.name}の印 ${n}個、まだ確定していない${t.of} ${total}個`);
   });
 }
 
@@ -1392,15 +1632,21 @@ function dealBoard() {
 
 /* ===== 9. 画面 ===== */
 // --- 決着 ---
+// 走馬灯が使えるのは、命が尽きた直後（死の直前の盤面がある）で、走馬灯を持っているとき
+const canUseLantern = () => !!deathSnapshot && (state.inv.lantern || 0) > 0;
+
 function gameOver(won) {
-  state.over = true; state.won = won; endAim();
+  state.over = true; endAim();
   if (!won) {
     deathSnapshot = JSON.parse(JSON.stringify(state)); // 走馬灯から戻る盤面（爆弾は隠れたまま）
-    state.cells.forEach(x => { if (x.bomb && !x.revealed) { x.revealed = true; x.ghost = true; } });
+    // 走馬灯を持っているときは爆弾を盤面に出さない。爆弾の位置は走馬灯の8秒間でしか見られない
+    if (!canUseLantern()) {
+      state.cells.forEach(x => { if (x.bomb && !x.revealed) { x.revealed = true; x.ghost = true; } });
+    }
   }
   render();
   $('panel').classList.toggle('lose', !won);
-  const canLantern = !won && (state.inv.lantern || 0) > 0;
+  const canLantern = canUseLantern();
   $('lanternBtn').hidden = !canLantern;
   if (won) {
     $('ovIcon').textContent = '🎊'; $('ovTitle').textContent = '脱出成功！';
@@ -1410,11 +1656,24 @@ function gameOver(won) {
     $('ovText').innerHTML = `あと <b>${state.goal - state.revealedSafe}</b> マスで脱出だった…`
       + (canLantern ? '<br>だが、走馬灯がまだ手の中にある。' : '<br>次こそは上手くいくだろう。');
   }
+  $('ovReopen').textContent = `${won ? '🎊' : '💀'} 結果を見る`;
   clearTimeout(gameOver.t);
-  gameOver.t = setTimeout(() => {
-    $('overlay').hidden = false;
-    (canLantern ? $('lanternBtn') : $('ovBtn')).focus({ preventScroll: true });
-  }, TIMING.panelDelay);
+  gameOver.t = setTimeout(showResult, TIMING.panelDelay);
+}
+
+// 結果パネルを出す／閉じる。閉じている間は盤面の下の「結果を見る」から開き直せる
+function showResult() {
+  if (!state.over) return;
+  $('overlay').hidden = false;
+  $('ovReopen').hidden = true;
+  const canLantern = canUseLantern();
+  (canLantern ? $('lanternBtn') : $('ovBtn')).focus({ preventScroll: true });
+}
+function hideResult(toBoard) {
+  clearTimeout(gameOver.t);
+  $('overlay').hidden = true;
+  $('ovReopen').hidden = !(toBoard && state.over);
+  if (toBoard && state.over) $('ovReopen').focus({ preventScroll: true });
 }
 
 // --- 走馬灯体験：盤面の真実を数秒だけ見せ、死の直前からHP1で再開 ---
@@ -1428,10 +1687,11 @@ function buildSoumatouBoard() {
     const el = document.createElement('div');
     el.className = 'sm-cell';
     el.style.setProperty('--d', rowOf(i) + colOf(i));
-    if (x.revealed) {
+    if (x.bomb || x.revealed) {
       if (x.bomb) {
         bombs++;
-        if (x.ghost) { el.classList.add('ghost'); el.textContent = '💣'; }
+        // まだ開いていない爆弾は、この画面でだけ姿を見せる
+        if (!x.revealed) { el.classList.add('ghost'); el.textContent = '💣'; }
         else if (x.defused) { el.classList.add('defused'); el.textContent = '💣'; }
         else { el.classList.add('boom'); el.textContent = '💥'; }
       } else {
@@ -1447,8 +1707,8 @@ function buildSoumatouBoard() {
 }
 
 function startSoumatou() {
-  if (!deathSnapshot || (state.inv.lantern || 0) <= 0) return;
-  $('overlay').hidden = true;
+  if (!canUseLantern()) return;
+  hideResult();
   buildSoumatouBoard();
   const scr = $('soumatou');
   scr.hidden = false; scr.scrollTop = 0;
@@ -1479,7 +1739,7 @@ function wakeSoumatou() {
     scr.hidden = true;
     document.documentElement.classList.remove('lock');
     state = deathSnapshot; deathSnapshot = null;
-    state.over = false; state.won = false; endAim();
+    state.over = false; endAim();
     state.hp = 1;
     state.inv.lantern = Math.max(0, (state.inv.lantern || 0) - 1);
     resetRenderCache();
@@ -1627,6 +1887,11 @@ function bindControls() {
   $('newBtn').addEventListener('click', () => newGame());
   $('ovBtn').addEventListener('click', () => newGame());
   $('helpBtn').addEventListener('click', () => openIntro(false));
+  $('ovClose').addEventListener('click', () => hideResult(true));
+  $('ovReopen').addEventListener('click', showResult);
+  document.addEventListener('keydown', e => {  // Esc でも結果パネルを閉じられる
+    if (e.key === 'Escape' && !$('overlay').hidden) { e.preventDefault(); hideResult(true); }
+  });
   $('tmSeg').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     ui.tapFlagMode = b.dataset.m === 'flag';
@@ -1657,6 +1922,7 @@ bindIntro();
 bindBoard();
 bindControls();
 buildBoard();
+buildTally();
 renderTapMode();
 newGame(false);
 $('board').classList.add('pre');  // オープニングが閉じたら配牌する

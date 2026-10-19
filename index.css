@@ -12,7 +12,7 @@ src: url('./fonts/misaki_gothic_2nd.ttf') format('truetype');
 }
 h1 {
     font-family: 'misakigothic';
-    font-size: 28px;
+    font-size: 32px;
     letter-spacing: 4px;
     text-shadow: 0px 0px 6px rgba(255, 255, 255, 0.6);
 }
@@ -136,6 +136,9 @@ footer {
     cursor: not-allowed;
 }
 @media (max-width: 725px) {
+    h1 {
+    font-size: 26px; 
+    }
     .caution {
     display: block;
     font-size: x-small;

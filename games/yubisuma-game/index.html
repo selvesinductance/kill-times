@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>一度親指を上げたら下げられない指スマ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="scene" aria-label="教室の空中に、手袋をはめた手が輪になって浮かんでいる3Dの場面"></canvas>
+<div id="labels" aria-hidden="true"></div>
+
+<!-- タイトル -->
+<section id="title-screen" class="screen" aria-label="タイトル">
+  <div class="title-panel">
+    <h1>一度親指を上げたら<br><span class="accent">下げられない</span>指スマ</h1>
+    <p class="lede">下のボタンで、対戦人数と自分の番手を選んでください。<br>「目安」は、全員が均衡戦略で打ったときにその番手が1抜けする確率です。おおよその難易度として使えます（低いほど難しい）。</p>
+    <div class="modes" id="modes"></div>
+    <p class="status" id="load-status">戦略データを読み込んでいます…</p>
+    <div class="tools">
+      <button class="btn" id="btn-call" type="button">掛け声設定</button>
+      <button class="btn" id="btn-rules" type="button">ルール</button>
+    </div>
+    <div class="section-label" id="lbl-color">あなたの手の色</div>
+    <div class="colors" id="colors" role="group" aria-labelledby="lbl-color"></div>
+  </div>
+</section>
+
+<!-- 対戦 -->
+<section id="game-screen" class="screen" aria-label="対戦" hidden>
+  <div class="topbar">
+    <div class="topleft">
+      <button class="btn ghost pause-btn" id="btn-pause" type="button" aria-haspopup="dialog"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3" y="2" width="3.6" height="12" rx="1" fill="currentColor"/><rect x="9.4" y="2" width="3.6" height="12" rx="1" fill="currentColor"/></svg>一時停止</button>
+    </div>
+    <div class="info" id="info" aria-live="polite"></div>
+  </div>
+  <div class="banner" id="banner" aria-live="polite"></div>
+
+  <div class="controls" id="ctl-play" hidden>
+    <h2 id="ctl-title">親指を出してください</h2>
+    <div class="thumbs" id="thumbs"></div>
+    <p class="hint" id="thumb-hint">一度立てた親指は、このゲームが終わるまで立ったまま数えます。画面の自分の手をクリック（タップ）しても切り替えられます。</p>
+    <div class="callrow" id="callrow">
+      <div class="section-label">宣言する数</div>
+      <div class="nums" id="nums" role="group" aria-label="宣言する数"></div>
+      <p class="hint" id="call-hint"></p>
+    </div>
+    <div class="decide-row">
+      <div class="summary" id="summary"></div>
+      <button class="btn primary" id="btn-decide" type="button">決定</button>
+    </div>
+  </div>
+  <!-- PC の横長画面だけ: 手の下にも宣言する数と決定ボタン（右のパネルと連動） -->
+  <div class="quickbar" id="quickbar" role="group" aria-label="宣言する数と決定">
+    <div class="qnums" id="qnums"></div>
+    <button class="btn primary" id="q-decide" type="button">決定</button>
+  </div>
+
+  <div class="controls" id="ctl-watch" hidden>
+    <h2 id="watch-title">観戦中</h2>
+    <div class="decide-row">
+      <div class="summary" id="watch-sub">残りの順位が決まるまで、NPC どうしの勝負が続きます。</div>
+      <div class="tools">
+        <button class="btn" id="btn-ff" type="button" aria-pressed="false">早送り</button>
+        <button class="btn" id="btn-skip" type="button">結果まで飛ばす</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 結果 -->
+<section id="result-screen" class="screen" aria-label="結果" hidden>
+  <div class="result">
+    <h2 id="res-title">結果</h2>
+    <div class="gotstar" id="res-star"></div>
+    <ol id="res-list"></ol>
+    <div class="tools">
+      <button class="btn primary" id="btn-again" type="button">もう一度</button>
+      <button class="btn" id="btn-title" type="button">タイトルへ</button>
+    </div>
+  </div>
+</section>
+
+<!-- ルール -->
+<div class="modal" id="modal-rules" hidden role="dialog" aria-modal="true" aria-labelledby="rules-h">
+  <div class="sheet">
+    <h2 id="rules-h">ルール</h2>
+    <h3>ここでの「指スマ」のルール</h3>
+    <ul>
+      <li>全員、両手の握りこぶしを前に出し、親指を倒した状態から始める。</li>
+      <li>宣言は時計回りに1人ずつ回る。宣言する人は掛け声に続けて数を言い（例：「いっせーの、3！」）、その瞬間に全員が、親指を立てるかどうかを決めて出す。</li>
+      <li>宣言者の親指も含め、立っている親指の合計が宣言した数と同じなら当たり。当てた人は片手を下ろす。</li>
+      <li><strong>0を宣言しても、場の手の数より大きい数を宣言しても、反則とならない。</strong></li>
+      <li><strong>当たっても外れても、次の宣言は隣の人に移る（続けて宣言はできない）。</strong></li>
+      <li>両手を下ろした人から抜ける。抜けた順に1位、2位…と順位を決める。</li>
+    </ul>
+    <h3>さらに今回は…</h3>
+    <ul>
+      <li><strong>一度立てた親指は、そのゲームが終わるまで下げられない。</strong>次の掛け声からも立てたまま数える。</li>
+      <li>当てて片手を下ろすときは、<strong>親指が上がっている手と下がっている手のどちらを下ろしてもよい。</strong></li>
+      <li>NPCは、残っている人の中で最も早く抜けることを目指す均衡戦略や早めに抜ける可能性を残すための戦略を取り続ける。</li>
+      <li>人数と自分の番手の組み合わせごとに、1抜け（1位獲得）すると★が付く。</li>
+    </ul>
+    <div class="row"><button class="btn primary" type="button" data-close>閉じる</button></div>
+  </div>
+</div>
+
+<!-- 掛け声設定 -->
+<div class="modal" id="modal-call" hidden role="dialog" aria-modal="true" aria-labelledby="call-h">
+  <div class="sheet">
+    <h2 id="call-h">掛け声設定</h2>
+    <div class="choices" id="call-choices"></div>
+    <div class="row">
+      <button class="btn" type="button" id="btn-try">試しに聞く</button>
+      <button class="btn primary" type="button" data-close>閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 下ろす手 -->
+<div class="modal" id="modal-lower" hidden role="dialog" aria-modal="true" aria-labelledby="lower-h">
+  <div class="sheet">
+    <h2 id="lower-h">当たり！ どちらの手を下ろしますか？</h2>
+    <p class="hint">親指が下がっている手を残すと、次からもその手の親指を立てるかどうか選べます。</p>
+    <div class="choices" id="lower-choices"></div>
+  </div>
+</div>
+
+<!-- 一時停止メニュー -->
+<div class="modal" id="modal-pause" hidden role="dialog" aria-modal="true" aria-labelledby="pause-h">
+  <div class="sheet pause-sheet">
+    <h2 id="pause-h">一時停止</h2>
+    <div class="pause-list">
+      <button class="btn primary" type="button" id="btn-resume">続ける</button>
+      <button class="btn" type="button" id="btn-restart">やりなおす</button>
+      <button class="btn" type="button" id="btn-to-title">タイトルへ戻る</button>
+    </div>
+    <div class="pause-row">
+      <span class="pause-label" id="voice-label">音声</span>
+      <button class="btn voice-toggle" type="button" id="btn-voice" aria-pressed="true" aria-describedby="voice-label">オン</button>
+    </div>
+    <p class="hint">「やりなおす」「タイトルへ戻る」を選ぶと、今のゲームは中断されます（★は付きません）。</p>
+  </div>
+</div>
+
+<!-- three.js r128（グローバルの THREE）。ゲーム本体は js/main.js から読み込むモジュール -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

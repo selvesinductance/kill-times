@@ -17,6 +17,7 @@
 - [無限に続くイライラ棒](./games/infinite-irairabou.html)
 - [重力の様子がおかしいブロック崩し](./games/gravity-breakout.html)
 - [フリーズブレイク](./games/freeze-break)
+- [一度親指を上げたら下げられない指スマ](./games/yubisuma-game/index.html)
 ### [本当に謎](./others/)
 - [だれでも激つよプログラマーになれるターミナル](./others/hacker_typer_terminal.html)
 - [ブラウザのタブで返信するカスチャットボット](./others/kotori-title-chatbot.html)
@@ -33,3 +34,4 @@ https://kill-times.vercel.app/
 - [./jsx](./jsx) htmlを作る前のやつが入ってます
 - [./sounds](./sounds) 効果音が入ってます
 - [./img](./img) ファビコンが入ってます
+- [./docs](./docs) なんか作るときとかに使う資料が入ってます
